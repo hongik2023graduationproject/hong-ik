@@ -6,4 +6,6 @@ set(CMAKE_CXX_STANDARD 26)
 add_executable(HongIk main.cpp
         repl/repl.cpp
         repl/repl.h
+        utf8_converter/utf8_converter.cpp
+        utf8_converter/utf8_converter.h
 )
