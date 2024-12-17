@@ -3,4 +3,7 @@ project(HongIk)
 
 set(CMAKE_CXX_STANDARD 26)
 
-add_executable(HongIk main.cpp)
+add_executable(HongIk main.cpp
+        repl/repl.cpp
+        repl/repl.h
+)
