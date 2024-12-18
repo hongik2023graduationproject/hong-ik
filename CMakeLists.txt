@@ -8,4 +8,9 @@ add_executable(HongIk main.cpp
         repl/repl.h
         utf8_converter/utf8_converter.cpp
         utf8_converter/utf8_converter.h
+        lexer/lexer.cpp
+        lexer/lexer.h
+        token/token.h
+        token/token.cpp
+        token/token_type.h
 )

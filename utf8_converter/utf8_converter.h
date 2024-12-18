@@ -7,6 +7,7 @@
 class Utf8Converter {
 public:
     static std::vector<std::string> convert(const std::string &input);
+
 private:
     static int getCharacterLength(const std::string &input, int position);
 };
