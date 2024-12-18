@@ -25,6 +25,8 @@ enum class TokenType {
     ASSIGN, // =
     EQUAL, // ==
     NOT_EQUAL, // !=
+
+    BANG, // !
 };
 
 #endif //TOKEN_TYPE_H

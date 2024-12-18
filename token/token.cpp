@@ -36,6 +36,8 @@ std::string tokenTypeToString(TokenType type) {
             return "EQUAL";
         case TokenType::NOT_EQUAL:
             return "NOT_EQUAL";
+        default:
+            break;
     }
     // 토큰 타입이 알 수 없는 경우는 일반적으로 발생하지 않지만
     // 토큰 타입이 지정되지 않은 토큰이 있을 경우가 있을 수 있음

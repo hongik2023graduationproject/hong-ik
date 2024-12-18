@@ -8,7 +8,7 @@
 
 class Lexer {
 public:
-    std::vector<Token *> tokenize(const std::vector<std::string> &code);
+    std::vector<Token *> tokenize(const std::vector<std::string> &codes);
 };
 
 
