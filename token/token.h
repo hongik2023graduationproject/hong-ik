@@ -12,6 +12,6 @@ public:
     long long line;
 };
 
-std::string tokenTypeToString(TokenType type);
+std::string TokenTypeToString(TokenType type);
 
 #endif //TOKEN_H

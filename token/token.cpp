@@ -2,7 +2,7 @@
 
 using namespace std;
 
-std::string tokenTypeToString(TokenType type) {
+std::string TokenTypeToString(TokenType type) {
     switch (type) {
         case TokenType::ILLEGAL:
             return "ILLEGAL";

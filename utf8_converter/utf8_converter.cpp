@@ -2,7 +2,7 @@
 
 using namespace std;
 
-std::vector<std::string> Utf8Converter::convert(const std::string &input) {
+std::vector<std::string> Utf8Converter::Convert(const std::string &input) {
     vector<string> characters;
 
     for (int position = 0, length; position < input.length(); position += length) {

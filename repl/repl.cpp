@@ -22,13 +22,13 @@ void Repl::Run() {
         cout << ">>> ";
         getline(cin, code);
 
-        vector<string>utf8_strings = Utf8Converter::convert(code);
-        vector<Token *> tokens = lexer->tokenize(utf8_strings);
+        vector<string>utf8_strings = Utf8Converter::Convert(code);
+        vector<Token *> tokens = lexer->Tokenize(utf8_strings);
 
         // lexer 디버깅 코드
         // 추후에 parser 작성 시 삭제
         for (auto token : tokens) {
-            cout << token->line << ' ' << tokenTypeToString(token->type) << ' ' << token->value << endl;
+            cout << token->line << ' ' << TokenTypeToString(token->type) << ' ' << token->value << endl;
         }
     }
 
