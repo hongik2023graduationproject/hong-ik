@@ -6,7 +6,7 @@
 
 using namespace std;
 
-Program *Parser::Parsing(const std::vector<Token *> &tokens) {
+Program *parser::Parsing(const std::vector<Token *> &tokens) {
     this->tokens = tokens;
     initialization();
 
@@ -22,7 +22,7 @@ Program *Parser::Parsing(const std::vector<Token *> &tokens) {
 }
 
 
-void Parser::initialization() {
+void parser::initialization() {
     delete program;
     program = new Program();
 
@@ -31,24 +31,24 @@ void Parser::initialization() {
 }
 
 
-void Parser::setToken() {
+void parser::setToken() {
     current_token = tokens.size() > current_read_position ? tokens[current_read_position] : nullptr;
     next_token = tokens.size() > current_read_position + 1 ? tokens[current_read_position + 1] : nullptr;
     next_next_token = tokens.size() > current_read_position + 2 ? tokens[current_read_position + 2] : nullptr;
 }
 
-void Parser::setNextToken() {
+void parser::setNextToken() {
     current_read_position++;
     setToken();
 }
 
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
-Statement *Parser::parseStatement() {
+Statement *parser::parseStatement() {
     return parseExpressionStatement();
 }
 
-ExpressionStatement *Parser::parseExpressionStatement() {
+ExpressionStatement *parser::parseExpressionStatement() {
     auto *expressionStatement = new ExpressionStatement();
     expressionStatement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -56,7 +56,7 @@ ExpressionStatement *Parser::parseExpressionStatement() {
 }
 
 
-Expression *Parser::parseExpression(Precedence precedence) {
+Expression *parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         // 나중에 에러 처리 추가할 것
         throw runtime_error("No prefix function found");
@@ -77,7 +77,7 @@ Expression *Parser::parseExpression(Precedence precedence) {
     return expression;
 }
 
-Expression *Parser::parseInfixExpression(Expression *left) {
+Expression *parser::parseInfixExpression(Expression *left) {
     InfixExpression *infixExpression = new InfixExpression;
     infixExpression->token = current_token;
     infixExpression->left = left;
@@ -90,7 +90,7 @@ Expression *Parser::parseInfixExpression(Expression *left) {
     return infixExpression;
 }
 
-Expression *Parser::parseIntegerLiteral() {
+Expression *parser::parseIntegerLiteral() {
     auto *integerLiteral = new IntegerLiteral();
     integerLiteral->token = current_token;
     integerLiteral->value = stoll(current_token->text);

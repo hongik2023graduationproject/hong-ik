@@ -7,7 +7,7 @@
 #include "../token/token.h"
 #include "../ast/program.h"
 
-class Parser {
+class parser {
 public:
     Program *Parsing(const std::vector<Token *> &tokens);
 
@@ -31,18 +31,18 @@ private:
     ExpressionStatement *parseExpressionStatement();
 
 
-    using PrefixParseFunction = Expression* (Parser::*)();
-    using InfixParseFunction = Expression* (Parser::*)(Expression *);
+    using PrefixParseFunction = Expression* (parser::*)();
+    using InfixParseFunction = Expression* (parser::*)(Expression *);
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
-        {TokenType::INTEGER, &Parser::parseIntegerLiteral},
+        {TokenType::INTEGER, &parser::parseIntegerLiteral},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
-        {TokenType::PLUS, &Parser::parseInfixExpression},
-        {TokenType::MINUS, &Parser::parseInfixExpression},
-        {TokenType::ASTERISK, &Parser::parseInfixExpression},
-        {TokenType::SLASH, &Parser::parseInfixExpression},
-        {TokenType::EQUAL, &Parser::parseInfixExpression},
-        {TokenType::NOT_EQUAL, &Parser::parseInfixExpression},
+        {TokenType::PLUS, &parser::parseInfixExpression},
+        {TokenType::MINUS, &parser::parseInfixExpression},
+        {TokenType::ASTERISK, &parser::parseInfixExpression},
+        {TokenType::SLASH, &parser::parseInfixExpression},
+        {TokenType::EQUAL, &parser::parseInfixExpression},
+        {TokenType::NOT_EQUAL, &parser::parseInfixExpression},
     };
 
     enum class Precedence {

@@ -9,7 +9,7 @@ using namespace std;
 
 Repl::Repl() {
     lexer = new Lexer();
-    parser = new Parser();
+    parser = new parser();
 }
 
 

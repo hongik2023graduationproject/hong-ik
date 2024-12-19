@@ -2,7 +2,7 @@
 #define REPL_H
 
 #include "../lexer/lexer.h"
-#include "../parser/Parser.h"
+#include "../parser/parser.h"
 
 class Repl {
 public:
@@ -16,7 +16,7 @@ public:
 
 private:
     Lexer *lexer;
-    Parser *parser;
+    parser *parser;
 };
 
 
