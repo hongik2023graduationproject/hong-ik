@@ -17,6 +17,7 @@ private:
     long long line;
 
     bool isNumber(const std::string &s);
+
     std::string readInteger();
 };
 

@@ -13,4 +13,11 @@ add_executable(HongIk main.cpp
         token/token.h
         token/token.cpp
         token/token_type.h
+        parser/parser.cpp
+        parser/parser.h
+        ast/program.h
+        ast/node.h
+        ast/statements.h
+        ast/literals.h
+        ast/expressions.h
 )

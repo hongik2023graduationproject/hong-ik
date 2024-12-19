@@ -2,7 +2,7 @@
 
 int main() {
     Repl repl;
-    repl.Run();
-    
+    repl.TestParser();
+
     return 0;
 }

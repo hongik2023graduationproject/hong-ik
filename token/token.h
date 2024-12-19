@@ -8,7 +8,7 @@
 class Token {
 public:
     TokenType type;
-    std::string value;
+    std::string text;
     long long line;
 };
 
