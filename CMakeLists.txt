@@ -20,6 +20,8 @@ add_executable(HongIk main.cpp
         ast/statements.h
         ast/literals.h
         ast/expressions.h
-        evaluator/evaluator.cpp
-        evaluator/evaluator.h
+        evaluator/Evaluator.cpp
+        evaluator/Evaluator.h
+        object/object.h
+        object/object_type.h
 )

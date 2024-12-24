@@ -2,6 +2,7 @@
 #define EXPRESSIONS_H
 
 #include "node.h"
+#include "../token/token.h"
 
 class Expression : public Node {
 };
@@ -16,6 +17,10 @@ public:
     std::string String() override {
         return "(" + left->String() + " " + token->text + " " + right->String() + ")";
     }
+};
+
+class PrefixExpression : public Expression {
+
 };
 
 #endif //EXPRESSIONS_H

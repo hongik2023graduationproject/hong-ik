@@ -3,6 +3,7 @@
 
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
+#include "../evaluator/evaluator.h"
 
 class Repl {
 public:
@@ -13,10 +14,10 @@ public:
     void TestLexer();
 
     void TestParser();
-
 private:
     Lexer *lexer;
-    parser *parser;
+    Parser *parser;
+    Evaluator* evaluator;
 };
 
 

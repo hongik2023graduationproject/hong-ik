@@ -9,7 +9,8 @@ using namespace std;
 
 Repl::Repl() {
     lexer = new Lexer();
-    parser = new parser();
+    parser = new Parser();
+    evaluator = new Evaluator();
 }
 
 
@@ -25,6 +26,11 @@ void Repl::Run() {
         vector<string> utf8_strings = Utf8Converter::Convert(code);
         vector<Token *> tokens = lexer->Tokenize(utf8_strings);
         Program *program = parser->Parsing(tokens);
+        vector<Object*> objects = evaluator->evaluate(program);
+
+        for (auto object : objects) {
+            cout << object->String() << endl;
+        }
     }
 };
 
@@ -59,3 +65,5 @@ void Repl::TestParser() {
         cout << program->String() << endl;
     }
 }
+
+
