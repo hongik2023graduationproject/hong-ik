@@ -26,6 +26,8 @@ private:
 
     void setNextToken();
 
+    void skipToken(TokenType type);
+
     Statement *parseStatement();
 
     ExpressionStatement *parseExpressionStatement();
@@ -35,6 +37,7 @@ private:
     using InfixParseFunction = Expression* (Parser::*)(Expression *);
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
         {TokenType::INTEGER, &Parser::parseIntegerLiteral},
+        {TokenType::LPAREN, &Parser::parseGroupedExpression},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
         {TokenType::PLUS, &Parser::parseInfixExpression},
@@ -73,6 +76,8 @@ private:
     Expression *parseExpression(Precedence precedence);
 
     Expression *parseInfixExpression(Expression *left);
+
+    Expression *parseGroupedExpression();
 
     Expression *parseIntegerLiteral();
 };

@@ -27,6 +27,9 @@ enum class TokenType {
     NOT_EQUAL, // !=
 
     BANG, // !
+
+    LPAREN, // (
+    RPAREN, // )
 };
 
 #endif //TOKEN_TYPE_H

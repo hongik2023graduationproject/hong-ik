@@ -42,6 +42,14 @@ void Parser::setNextToken() {
     setToken();
 }
 
+void Parser::skipToken(TokenType type) {
+    if (current_token->type != type) {
+        // error
+        throw std::runtime_error("Unexpected token");
+    }
+    setNextToken();
+}
+
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
 Statement *Parser::parseStatement() {
@@ -88,6 +96,13 @@ Expression *Parser::parseInfixExpression(Expression *left) {
     infixExpression->right = parseExpression(precedence);
 
     return infixExpression;
+}
+
+Expression *Parser::parseGroupedExpression() {
+    skipToken(TokenType::LPAREN);
+    Expression *expression = parseExpression(Precedence::LOWEST);
+    setNextToken(); // current_token을 )으로 세팅하는 과정
+    return expression;
 }
 
 Expression *Parser::parseIntegerLiteral() {
