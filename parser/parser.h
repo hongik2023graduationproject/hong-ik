@@ -28,6 +28,8 @@ private:
 
     void skipToken(TokenType type);
 
+    void checkToken(TokenType type);
+
     Statement *parseStatement();
 
     ExpressionStatement *parseExpressionStatement();
