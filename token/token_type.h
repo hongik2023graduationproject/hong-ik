@@ -34,6 +34,8 @@ enum class TokenType {
 
     LPAREN, // (
     RPAREN, // )
+    LBRACKET, // [
+    RBRACKET, // ]
 };
 
 #endif //TOKEN_TYPE_H
