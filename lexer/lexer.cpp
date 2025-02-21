@@ -2,6 +2,15 @@
 
 using namespace std;
 
+Lexer::Lexer() {
+    keywords = {
+        {"정수", TokenType::_INTEGER},
+        {"실수", TokenType::_FLOAT},
+        // TODO: 윈도우에서 개발 중, 한글 입력이 안되는 상황이라 테스트를 위해 임시로 추가한 코드, 나중에 제거할 것
+        {"int", TokenType::_INTEGER},
+    };
+}
+
 std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters) {
     this->characters = characters;
     current_read_position = 0;
@@ -59,8 +68,11 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
         } else if (isLetter(characters[current_read_position])) {
             string letter = readLetter();
-            // TODO: 예약어 처리는 여기서 진행할 것
-            tokens.push_back(new Token{TokenType::IDENTIFIER, letter, line});
+            if (auto it = keywords.find(letter); it != keywords.end()) {
+                tokens.push_back(new Token{it->second, letter, line});
+            } else {
+                tokens.push_back(new Token{TokenType::IDENTIFIER, letter, line});
+            }
         } else {
             tokens.push_back(new Token{TokenType::ILLEGAL, characters[current_read_position], line});
         }
@@ -98,7 +110,8 @@ bool Lexer::isLetter(const std::string &s) {
 std::string Lexer::readLetter() {
     string identifier = characters[current_read_position];
 
-    while (next_read_position < characters.size() && isLetter(characters[next_read_position]) || isNumber(characters[next_read_position])) {
+    while (next_read_position < characters.size() && isLetter(characters[next_read_position]) || isNumber(
+               characters[next_read_position])) {
         current_read_position++;
         next_read_position++;
         identifier += characters[current_read_position];

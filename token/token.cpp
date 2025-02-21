@@ -36,6 +36,10 @@ std::string TokenTypeToString(TokenType type) {
             return "EQUAL";
         case TokenType::NOT_EQUAL:
             return "NOT_EQUAL";
+        case TokenType::_INTEGER:
+            return "_INTEGER";
+        case TokenType::_FLOAT:
+            return "_FLOAT";
         default:
             break;
     }

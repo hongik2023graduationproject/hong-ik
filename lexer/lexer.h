@@ -1,13 +1,17 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include <map>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "../token/token.h"
 
 class Lexer {
 public:
+    Lexer();
+
     std::vector<Token *> Tokenize(const std::vector<std::string> &characters);
 
 private:
@@ -21,6 +25,8 @@ private:
 
     std::string readInteger();
     std::string readLetter();
+
+    std::map<std::string, TokenType> keywords;
 };
 
 
