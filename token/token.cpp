@@ -44,6 +44,8 @@ std::string TokenTypeToString(TokenType type) {
             return "LBRACKET";
         case TokenType::RBRACKET:
             return "RBRACKET";
+        case TokenType::RETURN:
+            return "RETURN";
         case TokenType::_INTEGER:
             return "_INTEGER";
         case TokenType::_FLOAT:

@@ -9,7 +9,7 @@ class Statement : public Node {
 
 class AssignmentStatement : public Statement {
 public:
-    Token* type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
+    Token *type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
     std::string name;
     Expression* value;
 
@@ -27,6 +27,15 @@ public:
             return "";
         }
         return expression->String();
+    }
+};
+
+class ReturnStatement : public Statement {
+public:
+    Expression *expression;
+
+    std::string String() override {
+        return "return " + expression->String();
     }
 };
 

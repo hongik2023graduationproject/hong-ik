@@ -20,6 +20,7 @@ enum class TokenType {
     // 예약어
     _INTEGER,
     _FLOAT,
+    RETURN, // return statement에서 사용
 
     // 기호
     PLUS, // +

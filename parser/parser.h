@@ -31,8 +31,12 @@ private:
     void checkToken(TokenType type);
 
     Statement *parseStatement();
+
     AssignmentStatement *parseAssignmentStatement();
+
     ExpressionStatement *parseExpressionStatement();
+
+    ReturnStatement *parseReturnStatement();
 
 
     using PrefixParseFunction = Expression* (Parser::*)();

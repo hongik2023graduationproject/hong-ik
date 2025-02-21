@@ -8,6 +8,7 @@ Lexer::Lexer() {
         {"실수", TokenType::_FLOAT},
         // TODO: 윈도우에서 개발 중, 한글 입력이 안되는 상황이라 테스트를 위해 임시로 추가한 코드, 나중에 제거할 것
         {"int", TokenType::_INTEGER},
+        {"return", TokenType::RETURN},
     };
 }
 

@@ -2,6 +2,9 @@
 #include <utility>
 
 #include "parser.h"
+
+#include <set>
+
 #include "../ast/literals.h"
 
 using namespace std;
@@ -63,6 +66,9 @@ Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
         return parseAssignmentStatement();
     }
+    if (current_token->type == TokenType::RETURN) {
+        return parseReturnStatement();
+    }
     return parseExpressionStatement();
 }
 
@@ -89,6 +95,14 @@ ExpressionStatement *Parser::parseExpressionStatement() {
     return expressionStatement;
 }
 
+
+ReturnStatement *Parser::parseReturnStatement() {
+    skipToken(TokenType::RETURN);
+    auto* statement = new ReturnStatement();
+    statement->expression = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    return statement;
+}
 
 Expression *Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
