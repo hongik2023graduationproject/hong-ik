@@ -63,6 +63,10 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             tokens.push_back(new Token{TokenType::LPAREN, characters[current_read_position], line});
         } else if (characters[current_read_position] == ")") {
             tokens.push_back(new Token{TokenType::RPAREN, characters[current_read_position], line});
+        } else if (characters[current_read_position] == "[") {
+            tokens.push_back(new Token{TokenType::LBRACKET, characters[current_read_position], line});
+        } else if (characters[current_read_position] == "]") {
+            tokens.push_back(new Token{TokenType::RBRACKET, characters[current_read_position], line});
         } else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
