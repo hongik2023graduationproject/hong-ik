@@ -45,7 +45,7 @@ void Parser::setNextToken() {
 void Parser::skipToken(TokenType type) {
     if (current_token->type != type) {
         // error
-        throw std::runtime_error("Unexpected token");
+        throw std::runtime_error("Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type));
     }
     setNextToken();
 }
@@ -60,7 +60,26 @@ void Parser::checkToken(TokenType type) {
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
 Statement *Parser::parseStatement() {
+    if (current_token->type == TokenType::LBRACKET) {
+        return parseAssignmentStatement();
+    }
     return parseExpressionStatement();
+}
+
+AssignmentStatement *Parser::parseAssignmentStatement() {
+    auto *statement = new AssignmentStatement();
+    skipToken(TokenType::LBRACKET);
+    // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
+    statement->type = current_token;
+    setNextToken();
+    skipToken(TokenType::RBRACKET);
+    checkToken(TokenType::IDENTIFIER);
+    statement->name = current_token->text;
+    skipToken(TokenType::IDENTIFIER);
+    skipToken(TokenType::ASSIGN);
+    statement->value = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    return statement;
 }
 
 ExpressionStatement *Parser::parseExpressionStatement() {

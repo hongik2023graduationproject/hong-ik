@@ -31,7 +31,7 @@ private:
     void checkToken(TokenType type);
 
     Statement *parseStatement();
-
+    AssignmentStatement *parseAssignmentStatement();
     ExpressionStatement *parseExpressionStatement();
 
 
