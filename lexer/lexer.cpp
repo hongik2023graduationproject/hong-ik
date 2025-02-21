@@ -50,13 +50,17 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             // tokens.push_back(new Token{TokenType::SPACE, characters[current_read_position], line});
         } else if (characters[current_read_position] == "\t") {
             tokens.push_back(new Token{TokenType::TAB, characters[current_read_position], line});
-        } else if (isNumber(characters[current_read_position])) {
-            string integer_string = readInteger();
-            tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
         } else if (characters[current_read_position] == "(") {
             tokens.push_back(new Token{TokenType::LPAREN, characters[current_read_position], line});
         } else if (characters[current_read_position] == ")") {
             tokens.push_back(new Token{TokenType::RPAREN, characters[current_read_position], line});
+        } else if (isNumber(characters[current_read_position])) {
+            string integer_string = readInteger();
+            tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
+        } else if (isLetter(characters[current_read_position])) {
+            string letter = readLetter();
+            // TODO: 예약어 처리는 여기서 진행할 것
+            tokens.push_back(new Token{TokenType::IDENTIFIER, letter, line});
         } else {
             tokens.push_back(new Token{TokenType::ILLEGAL, characters[current_read_position], line});
         }
@@ -85,4 +89,19 @@ string Lexer::readInteger() {
     }
 
     return integer_string;
+}
+
+bool Lexer::isLetter(const std::string &s) {
+    return ("a" <= s && s <= "z" || "A" <= s && s <= "Z" || s == "_" || "가" <= s && s <= "힣");
+}
+
+std::string Lexer::readLetter() {
+    string identifier = characters[current_read_position];
+
+    while (next_read_position < characters.size() && isLetter(characters[next_read_position]) || isNumber(characters[next_read_position])) {
+        current_read_position++;
+        next_read_position++;
+        identifier += characters[current_read_position];
+    }
+    return identifier;
 }

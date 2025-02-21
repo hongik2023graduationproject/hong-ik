@@ -17,6 +17,10 @@ enum class TokenType {
     FLOAT, // 부동 소수점 수
     STRING, // 문자열
 
+    // 예약어
+    _INTEGER,
+    _FLOAT,
+
     // 기호
     PLUS, // +
     MINUS, // -

@@ -17,8 +17,10 @@ private:
     long long line;
 
     bool isNumber(const std::string &s);
+    bool isLetter(const std::string &s);
 
     std::string readInteger();
+    std::string readLetter();
 };
 
 
