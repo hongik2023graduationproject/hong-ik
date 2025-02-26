@@ -71,6 +71,9 @@ Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::RETURN) {
         return parseReturnStatement();
     }
+    if (current_token->type == TokenType::IF) {
+        return parseIfStatement();
+    }
     return parseExpressionStatement();
 }
 
@@ -103,6 +106,30 @@ ReturnStatement *Parser::parseReturnStatement() {
     auto* statement = new ReturnStatement();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
+    return statement;
+}
+
+BlockStatement *Parser::parseBlockStatement() {
+    auto *statement = new BlockStatement();
+
+    // block statement 관련 로직 작성하는 곳
+
+
+    return statement;
+}
+
+IfStatement *Parser::parseIfStatement() {
+    auto *statement = new IfStatement();
+    skipToken(TokenType::IF);
+    statement->condition = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    skipToken(TokenType::END_IF);
+    skipToken(TokenType::NEW_LINE);
+
+    statement->consequence = parseBlockStatement();
+
+    // 여기에 else 구문 추가시 작성할 것
+
     return statement;
 }
 

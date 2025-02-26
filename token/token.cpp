@@ -50,6 +50,10 @@ std::string TokenTypeToString(TokenType type) {
             return "_INTEGER";
         case TokenType::_FLOAT:
             return "_FLOAT";
+        case TokenType::IF:
+            return "IF";
+        case TokenType::END_IF:
+            return "END_IF";
 
         default:
             break;

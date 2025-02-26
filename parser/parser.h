@@ -38,6 +38,10 @@ private:
 
     ReturnStatement *parseReturnStatement();
 
+    BlockStatement *parseBlockStatement();
+
+    IfStatement *parseIfStatement();
+
 
     using PrefixParseFunction = Expression* (Parser::*)();
     using InfixParseFunction = Expression* (Parser::*)(Expression *);

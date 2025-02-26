@@ -21,6 +21,12 @@ enum class TokenType {
     _INTEGER,
     _FLOAT,
     RETURN, // return statement에서 사용
+    IF, // 만약
+    END_IF, // 라면
+
+    // 코드 블록
+    START_BLOCK,
+    END_BLOCK,
 
     // 기호
     PLUS, // +
