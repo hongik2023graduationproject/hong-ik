@@ -3,6 +3,8 @@
 
 #include "parser.h"
 
+#include <iostream>
+#include <ostream>
 #include <set>
 
 #include "../ast/literals.h"
@@ -137,6 +139,17 @@ Expression *Parser::parseInfixExpression(Expression *left) {
 
     return infixExpression;
 }
+
+Expression *Parser::parsePrefixExpression() {
+    PrefixExpression *prefixExpression = new PrefixExpression;
+    prefixExpression->token = current_token;
+    setNextToken();
+
+    prefixExpression->right = parseExpression(Precedence::PREFIX);
+
+    return prefixExpression;
+}
+
 
 Expression *Parser::parseGroupedExpression() {
     skipToken(TokenType::LPAREN);

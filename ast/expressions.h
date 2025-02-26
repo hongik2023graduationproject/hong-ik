@@ -20,7 +20,13 @@ public:
 };
 
 class PrefixExpression : public Expression {
+public:
+    Token *token;
+    Expression* right;
 
+    std::string String() override {
+        return "(" + token->text + right->String() + ")";;
+    }
 };
 
 #endif //EXPRESSIONS_H
