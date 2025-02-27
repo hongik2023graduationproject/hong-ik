@@ -2,7 +2,8 @@
 
 int main() {
     Repl repl;
-    // repl.TestParser();
-    repl.Run();
+    // repl.TestLexer();
+    repl.TestParser();
+    // repl.Run();
     return 0;
 }

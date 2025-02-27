@@ -50,7 +50,8 @@ void Parser::setNextToken() {
 void Parser::skipToken(TokenType type) {
     if (current_token->type != type) {
         // error
-        throw std::runtime_error("Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type));
+        throw std::runtime_error(
+            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + to_string(current_token->line));
     }
     setNextToken();
 }
@@ -62,7 +63,6 @@ void Parser::checkToken(TokenType type) {
 }
 
 
-
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
 Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
@@ -71,7 +71,7 @@ Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::RETURN) {
         return parseReturnStatement();
     }
-    if (current_token->type == TokenType::IF) {
+    if (current_token->type == TokenType::만약) {
         return parseIfStatement();
     }
     return parseExpressionStatement();
@@ -103,7 +103,7 @@ ExpressionStatement *Parser::parseExpressionStatement() {
 
 ReturnStatement *Parser::parseReturnStatement() {
     skipToken(TokenType::RETURN);
-    auto* statement = new ReturnStatement();
+    auto *statement = new ReturnStatement();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     return statement;
@@ -111,20 +111,27 @@ ReturnStatement *Parser::parseReturnStatement() {
 
 BlockStatement *Parser::parseBlockStatement() {
     auto *statement = new BlockStatement();
+    skipToken(TokenType::LBRACE);
+    // 임시로 BRACE를 활용해서 BLOCK을 판별한다(C 스타일)
+    // 추후에 들여쓰기로 변경할 때 수정할 예정
 
-    // block statement 관련 로직 작성하는 곳
-
+    while (current_token->type != TokenType::RBRACE) {
+        statement->statements.push_back(parseStatement());
+    }
+    skipToken(TokenType::RBRACE);
 
     return statement;
 }
 
 IfStatement *Parser::parseIfStatement() {
     auto *statement = new IfStatement();
-    skipToken(TokenType::IF);
+    skipToken(TokenType::만약);
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
-    skipToken(TokenType::END_IF);
-    skipToken(TokenType::NEW_LINE);
+    skipToken(TokenType::라면);
+
+    // new line 스킵은 추후에 추가
+    // skipToken(TokenType::NEW_LINE);
 
     statement->consequence = parseBlockStatement();
 

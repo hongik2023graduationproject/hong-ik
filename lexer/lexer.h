@@ -20,6 +20,7 @@ private:
     long long next_read_position;
     long long line;
 
+
     bool isNumber(const std::string &s);
     bool isLetter(const std::string &s);
 

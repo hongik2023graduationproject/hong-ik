@@ -55,10 +55,10 @@ public:
 class IfStatement : public Statement {
 public:
     Expression *condition;
-    Statement *consequence;
+    BlockStatement *consequence;
 
     std::string String() override {
-        return "if " + condition->String() + "\n" + consequence->String();
+        return "만약 " + condition->String() + " 라면\n" + consequence->String();
     }
 };
 

@@ -18,11 +18,12 @@ enum class TokenType {
     STRING, // 문자열
 
     // 예약어
-    _INTEGER,
-    _FLOAT,
+    정수,
+    실수,
     RETURN, // return statement에서 사용
-    IF, // 만약
-    END_IF, // 라면
+    만약,
+    라면,
+    함수,
 
     // 코드 블록
     START_BLOCK,
@@ -41,8 +42,13 @@ enum class TokenType {
 
     LPAREN, // (
     RPAREN, // )
+    LBRACE, // {
+    RBRACE, // }
     LBRACKET, // [
     RBRACKET, // ]
+
+    COLON, // :
+    SEMICOLON, // ;
 };
 
 #endif //TOKEN_TYPE_H

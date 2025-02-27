@@ -15,8 +15,8 @@ Repl::Repl() {
 
 
 void Repl::Run() {
-    // cout << "한국어 프로그래밍 언어 프로젝트 홍익" << endl;
-    // cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
+    cout << "한국어 프로그래밍 언어 프로젝트 홍익" << endl;
+    cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
 
     while (true) {
         string code;

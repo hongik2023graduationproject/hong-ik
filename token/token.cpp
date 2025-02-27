@@ -40,20 +40,30 @@ std::string TokenTypeToString(TokenType type) {
             return "LPAREN";
         case TokenType::RPAREN:
             return "RPAREN";
+        case TokenType::LBRACE:
+            return "LBRACE";
+        case TokenType::RBRACE:
+            return "RBRACE";
         case TokenType::LBRACKET:
             return "LBRACKET";
         case TokenType::RBRACKET:
             return "RBRACKET";
+        case TokenType::COLON:
+            return "COLON";
+        case TokenType::SEMICOLON:
+            return "SEMICOLON";
         case TokenType::RETURN:
             return "RETURN";
-        case TokenType::_INTEGER:
-            return "_INTEGER";
-        case TokenType::_FLOAT:
-            return "_FLOAT";
-        case TokenType::IF:
-            return "IF";
-        case TokenType::END_IF:
-            return "END_IF";
+        case TokenType::정수:
+            return "정수";
+        case TokenType::실수:
+            return "실수";
+        case TokenType::만약:
+            return "만약";
+        case TokenType::라면:
+            return "라면";
+        case TokenType::함수:
+            return "함수";
 
         default:
             break;
