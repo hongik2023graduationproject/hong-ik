@@ -98,7 +98,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
     }
 
     // EOF는 표현할 수 있는 문자열이 없으므로 빈 문자열을 추가
-    tokens.push_back(new Token(TokenType::END_OF_FILE, "", line));
+    // tokens.push_back(new Token(TokenType::END_OF_FILE, "", line));
     return tokens;
 }
 

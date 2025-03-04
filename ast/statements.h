@@ -62,4 +62,18 @@ public:
     }
 };
 
+class FunctionStatement : public Statement {
+public:
+    std::vector<Token *> parameterTypes;
+    // TODO: Expression을 Identifier Expression으로 수정해야 한다.
+    std::vector<Expression *> parameters;
+    Expression *name;
+    BlockStatement *body;
+    Token *returnType;
+
+    std::string String() override {
+        return "";
+    }
+};
+
 #endif //STATEMENTS_H

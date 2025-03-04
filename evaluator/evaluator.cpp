@@ -10,10 +10,11 @@ vector<Object *> Evaluator::evaluate(Program *program) {
 }
 
 
-vector<Object *> Evaluator::evalProgram(Program *program) {
+vector<Object *> Evaluator::evalProgram(const Program *program) {
     vector<Object *> objects;
 
-    for (auto statement: program->statements) {
+    objects.reserve(program->statements.size());
+    for (const auto statement: program->statements) {
         objects.push_back(eval(statement));
     }
 
@@ -22,20 +23,21 @@ vector<Object *> Evaluator::evalProgram(Program *program) {
 
 
 Object *Evaluator::eval(Node *node) {
-    if (ExpressionStatement *expressionStatement = dynamic_cast<ExpressionStatement *>(node)) {
-        return eval(expressionStatement->expression);
+    if (auto *expression_statement = dynamic_cast<ExpressionStatement *>(node)) {
+        return eval(expression_statement->expression);
     }
-    if (IntegerLiteral *integerLiteral = dynamic_cast<IntegerLiteral *>(node)) {
-        auto *integer = new Integer(integerLiteral->value);
+    if (auto *integer_literal = dynamic_cast<IntegerLiteral *>(node)) {
+        auto *integer = new Integer(integer_literal->value);
         return integer;
     }
-    // if (PrefixExpression* prefixExpression = dynamic_cast<PrefixExpression*>(node)) {
-    //
-    // }
-    if (InfixExpression *infixExpression = dynamic_cast<InfixExpression *>(node)) {
-        Object *left = eval(infixExpression->left);
-        Object *right = eval(infixExpression->right);
-        return evalInfixExpression(infixExpression->token, left, right);
+    if (auto* prefix_expression = dynamic_cast<PrefixExpression*>(node)) {
+        Object* right = eval(prefix_expression->right);
+        return evalPrefixExpression(prefix_expression->token, right);
+    }
+    if (auto *infix_expression = dynamic_cast<InfixExpression *>(node)) {
+        Object *left = eval(infix_expression->left);
+        Object *right = eval(infix_expression->right);
+        return evalInfixExpression(infix_expression->token, left, right);
     }
 }
 
@@ -47,8 +49,8 @@ Object *Evaluator::evalInfixExpression(Token *token, Object *left, Object *right
 }
 
 Object *Evaluator::evalIntegerInfixExpression(Token *token, Object *left, Object *right) {
-    Integer* left_integer = dynamic_cast<Integer*>(left);
-    Integer* right_integer = dynamic_cast<Integer*>(right);
+    auto *left_integer = dynamic_cast<Integer *>(left);
+    auto *right_integer = dynamic_cast<Integer *>(right);
 
     long long left_value = left_integer->value;
     long long right_value = right_integer->value;
@@ -64,5 +66,17 @@ Object *Evaluator::evalIntegerInfixExpression(Token *token, Object *left, Object
     }
     if (token->type == TokenType::SLASH) {
         return new Integer(left_value / right_value);
+    }
+}
+
+Object *Evaluator::evalPrefixExpression(Token *token, Object *right) {
+    if (token->type == TokenType::MINUS) {
+        return evalMinusPrefixExpression(right);
+    }
+}
+
+Object *Evaluator::evalMinusPrefixExpression(Object *right) {
+    if (auto integer = dynamic_cast<Integer *>(right)) {
+        return new Integer(-integer->value);
     }
 }

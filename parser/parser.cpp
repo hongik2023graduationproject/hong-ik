@@ -149,7 +149,7 @@ Expression *Parser::parseExpression(Precedence precedence) {
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
     Expression *expression = (this->*prefixParseFunction)();
 
-    while (next_token->type != TokenType::END_OF_FILE && precedence < getPrecedence[next_token->type]) {
+    while (next_token != nullptr && precedence < getPrecedence[next_token->type]) {
         if (!infixParseFunctions.contains(next_token->type)) {
             throw runtime_error("No infix function found");
         }
