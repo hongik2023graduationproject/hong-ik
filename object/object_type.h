@@ -3,6 +3,7 @@
 
 enum class ObjectType {
     INTEGER,
+    BOOLEAN,
 };
 
 #endif //OBJECT_TYPE_H

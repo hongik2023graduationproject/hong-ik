@@ -22,10 +22,19 @@ public:
 class PrefixExpression : public Expression {
 public:
     Token *token;
-    Expression* right;
+    Expression *right;
 
     std::string String() override {
         return "(" + token->text + right->String() + ")";;
+    }
+};
+
+class IdentifierExpression : public Expression {
+public:
+    std::string name;
+
+    std::string String() override {
+        return name;
     }
 };
 

@@ -10,6 +10,8 @@ Lexer::Lexer() {
         {"만약", TokenType::만약},
         {"라면", TokenType::라면},
         {"함수", TokenType::함수},
+        {"true", TokenType::TRUE},
+        {"false", TokenType::FALSE},
     };
 }
 
@@ -56,7 +58,6 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "\n") {
             tokens.push_back(new Token{TokenType::NEW_LINE, characters[current_read_position], line});
         } else if (characters[current_read_position] == " ") {
-
             // space 토큰은 문법을 명확하게 작성하도록 강요하는 용도로 만들었다.
             // 하지만 리팩토링하는 지금 시점에서 다시 생각해보면 나중에 추가할 수 있는 부분이고
             // parser의 구조를 복잡하게 만드는 요소이므로 추후에 추가하는 것을 고려하기로 함
@@ -79,6 +80,26 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             tokens.push_back(new Token{TokenType::COLON, characters[current_read_position], line});
         } else if (characters[current_read_position] == ";") {
             tokens.push_back(new Token{TokenType::SEMICOLON, characters[current_read_position], line});
+        } else if (characters[current_read_position] == "&") {
+            if (next_read_position < characters.size() && characters[next_read_position] == "&") {
+                tokens.push_back(new Token{
+                    TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position], line
+                });
+                current_read_position++;
+                next_read_position++;
+            } else {
+                tokens.push_back(new Token{TokenType::BITWISE_AND, characters[current_read_position], line});
+            }
+        } else if (characters[current_read_position] == "|") {
+            if (next_read_position < characters.size() && characters[next_read_position] == "|") {
+                tokens.push_back(new Token{
+                    TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position], line
+                });
+                current_read_position++;
+                next_read_position++;
+            } else {
+                tokens.push_back(new Token{TokenType::BITWISE_OR, characters[current_read_position], line});
+            }
         } else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});

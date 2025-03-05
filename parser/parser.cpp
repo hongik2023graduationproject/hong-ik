@@ -51,7 +51,8 @@ void Parser::skipToken(TokenType type) {
     if (current_token->type != type) {
         // error
         throw std::runtime_error(
-            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + to_string(current_token->line));
+            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + to_string(
+                current_token->line));
     }
     setNextToken();
 }
@@ -193,9 +194,26 @@ Expression *Parser::parseGroupedExpression() {
     return expression;
 }
 
+Expression *Parser::parseIdentifierExpression() {
+    checkToken(TokenType::IDENTIFIER);
+
+    auto identifier_expression = new IdentifierExpression();
+    identifier_expression->name = current_token->text;
+    return identifier_expression;
+}
+
+
 Expression *Parser::parseIntegerLiteral() {
     auto *integerLiteral = new IntegerLiteral();
     integerLiteral->token = current_token;
     integerLiteral->value = stoll(current_token->text);
     return integerLiteral;
+}
+
+Expression *Parser::parseBooleanLiteral() {
+    auto *booleanLiteral = new BooleanLiteral();
+    booleanLiteral->token = current_token;
+    // true 값을 나타내는 문자열 "true"가 하드 코딩 되어 있다.
+    booleanLiteral->value = current_token->text == "true";
+    return booleanLiteral;
 }

@@ -64,6 +64,19 @@ std::string TokenTypeToString(TokenType type) {
             return "라면";
         case TokenType::함수:
             return "함수";
+        case TokenType::TRUE:
+            return "TRUE";
+        case TokenType::FALSE:
+            return "FALSE";
+        case TokenType::BITWISE_AND:
+            return "&";
+        case TokenType::LOGICAL_AND:
+            return "&&";
+        case TokenType::BITWISE_OR:
+            return "|";
+        case TokenType::LOGICAL_OR:
+            return "||";
+
 
         default:
             break;

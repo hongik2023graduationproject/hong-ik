@@ -16,5 +16,14 @@ public:
     }
 };
 
+class BooleanLiteral : public Literal {
+public:
+    Token *token;
+    bool value;
+
+    std::string String() override {
+        return token->text;
+    }
+};
 
 #endif //LITERALS_H

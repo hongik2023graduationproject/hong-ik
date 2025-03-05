@@ -25,5 +25,18 @@ public:
     }
 };
 
+class Boolean : public Object {
+public:
+    Boolean(bool value) : value(value) {
+        type = ObjectType::BOOLEAN;
+    }
+
+    bool value;
+
+    std::string String() override {
+        return value ? "true" : "false";
+    }
+};
+
 
 #endif //OBJECT_H

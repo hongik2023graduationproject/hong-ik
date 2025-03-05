@@ -24,4 +24,6 @@ add_executable(HongIk main.cpp
         evaluator/Evaluator.h
         object/object.h
         object/object_type.h
+        environment/environment.h
+        environment/environment.cpp
 )

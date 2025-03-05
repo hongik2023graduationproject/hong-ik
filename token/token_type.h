@@ -24,6 +24,8 @@ enum class TokenType {
     만약,
     라면,
     함수,
+    TRUE,
+    FALSE,
 
     // 코드 블록
     START_BLOCK,
@@ -39,6 +41,12 @@ enum class TokenType {
     NOT_EQUAL, // !=
 
     BANG, // !
+
+    BITWISE_AND, // &
+    LOGICAL_AND, // &&
+    BITWISE_OR, // |
+    LOGICAL_OR, // ||
+
 
     LPAREN, // (
     RPAREN, // )

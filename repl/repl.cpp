@@ -20,6 +20,7 @@ void Repl::Run() {
 
     vector<Token *> tokens;
     int indent = 0;
+    auto* env = new Environment();
 
     while (true) {
         if (indent == 0) {
@@ -54,7 +55,7 @@ void Repl::Run() {
         }
 
         Program *program = parser->Parsing(tokens);
-        vector<Object *> objects = evaluator->evaluate(program);
+        vector<Object *> objects = evaluator->evaluate(program, env);
 
         for (auto object: objects) {
             cout << object->String() << endl;
