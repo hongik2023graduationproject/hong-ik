@@ -6,7 +6,11 @@
 
 using namespace std;
 
-vector<Object *> Evaluator::evaluate(Program *program, Environment *environment) {
+Evaluator::Evaluator() {
+    environment = new Environment();
+};
+
+vector<Object *> Evaluator::evaluate(Program *program) {
     return evalProgram(program, environment);
 }
 
@@ -16,7 +20,9 @@ vector<Object *> Evaluator::evalProgram(const Program *program, Environment *env
 
     objects.reserve(program->statements.size());
     for (const auto statement: program->statements) {
-        objects.push_back(eval(statement, environment));
+        Object* result = eval(statement, environment);
+        if (result != nullptr)
+            objects.push_back(result);
     }
 
     return objects;
@@ -33,6 +39,17 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
         Object *value = eval(assignment_statement->value, environment);
         environment->Set(assignment_statement->name, value);
         return value;
+    }
+    if (auto *if_statement = dynamic_cast<IfStatement *>(node)) {
+        auto *condition = eval(if_statement->condition, environment);
+        Boolean *boolean = dynamic_cast<Boolean *>(condition);
+        if (boolean && boolean->value) {
+            return eval(if_statement->consequence, environment);
+        }
+        return nullptr;
+    }
+    if (auto *block_statement = dynamic_cast<BlockStatement *>(node)) {
+        return evalBlockStatements(block_statement->statements, environment);
     }
 
     if (auto *prefix_expression = dynamic_cast<PrefixExpression *>(node)) {
@@ -57,6 +74,23 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
         return boolean;
     }
 }
+
+Object *Evaluator::evalBlockStatements(std::vector<Statement *> statements, Environment *environment) {
+    Object *result = nullptr;
+
+    for (auto statement: statements) {
+        result = eval(statement, environment);
+
+        if (result == nullptr || dynamic_cast<ReturnValue *>(result)) {
+            return result;
+        }
+    }
+
+    return result;
+}
+
+
+
 
 
 Object *Evaluator::evalInfixExpression(Token *token, Object *left, Object *right) {

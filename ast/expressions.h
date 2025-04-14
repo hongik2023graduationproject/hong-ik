@@ -38,4 +38,22 @@ public:
     }
 };
 
+// 함수 호출을 위한 표현식
+class CallExpression : public Expression {
+public:
+    Expression* function;
+    std::vector<Expression*> arguments;
+
+    std::string String() override {
+        std::string s = function->String();
+        s += " (";
+        for (auto arg : arguments) {
+            s += arg->String();
+            s += ", ";
+        }
+        s += ")";
+        return s;
+    }
+};
+
 #endif //EXPRESSIONS_H

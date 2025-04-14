@@ -14,10 +14,11 @@ public:
     void TestLexer();
 
     void TestParser();
+
 private:
     Lexer *lexer;
     Parser *parser;
-    Evaluator* evaluator;
+    Evaluator *evaluator;
 };
 
 

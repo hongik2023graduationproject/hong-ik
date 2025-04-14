@@ -51,7 +51,7 @@ void Parser::skipToken(TokenType type) {
     if (current_token->type != type) {
         // error
         throw std::runtime_error(
-            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + to_string(
+            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + " " + to_string(
                 current_token->line));
     }
     setNextToken();
@@ -59,7 +59,7 @@ void Parser::skipToken(TokenType type) {
 
 void Parser::checkToken(TokenType type) {
     if (current_token->type != type) {
-        throw std::runtime_error("Unexpected token");
+        throw std::runtime_error("Unexpected token: " +  current_token->text);
     }
 }
 
@@ -74,6 +74,9 @@ Statement *Parser::parseStatement() {
     }
     if (current_token->type == TokenType::만약) {
         return parseIfStatement();
+    }
+    if (current_token->type == TokenType::함수) {
+        return parseFunctionStatement();
     }
     return parseExpressionStatement();
 }
@@ -141,6 +144,45 @@ IfStatement *Parser::parseIfStatement() {
     return statement;
 }
 
+FunctionStatement *Parser::parseFunctionStatement() {
+    auto *statement = new FunctionStatement();
+    skipToken(TokenType::함수);
+    skipToken(TokenType::COLON);
+
+    if (current_token->type == TokenType::LBRACKET) {
+        // TODO: goto 문 제거하기
+        FLAG:
+        skipToken(TokenType::LBRACKET);
+        statement->parameterTypes.push_back(current_token);
+        setNextToken();
+        skipToken(TokenType::RBRACKET);
+
+        // 흠
+        statement->parameters.push_back(parseExpression(Precedence::LOWEST));
+        setNextToken();
+
+        if (current_token->type == TokenType::COMMA) {
+            goto FLAG;
+        }
+    }
+
+    checkToken(TokenType::IDENTIFIER);
+    statement->name = current_token->text;
+    skipToken(TokenType::IDENTIFIER);
+
+    if (current_token->type == TokenType::RIGHT_ARROW) {
+        skipToken(TokenType::RIGHT_ARROW);
+        skipToken(TokenType::LBRACKET);
+        statement->returnType = current_token;
+        setNextToken();
+        skipToken(TokenType::RBRACKET);
+    }
+
+    statement->body = parseBlockStatement();
+
+    return statement;
+}
+
 Expression *Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         // 나중에 에러 처리 추가할 것
@@ -200,6 +242,28 @@ Expression *Parser::parseIdentifierExpression() {
     auto identifier_expression = new IdentifierExpression();
     identifier_expression->name = current_token->text;
     return identifier_expression;
+}
+
+Expression *Parser::parseCallExpression() {
+    skipToken(TokenType::COLON);
+
+    auto call_expression = new CallExpression();
+    call_expression->function = parseExpression(Precedence::LOWEST);
+    skipToken(TokenType::IDENTIFIER);
+
+    if (current_token != nullptr && current_token->type == TokenType::LPAREN) {
+        skipToken(TokenType::LPAREN);
+        FLAG:
+        call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
+        setNextToken();
+        if (current_token->type == TokenType::COMMA) {
+            skipToken(TokenType::COMMA);
+            goto FLAG;
+        }
+        skipToken(TokenType::RPAREN);
+    }
+
+    return call_expression;
 }
 
 

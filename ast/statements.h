@@ -67,13 +67,30 @@ public:
     std::vector<Token *> parameterTypes;
     // TODO: Expression을 Identifier Expression으로 수정해야 한다.
     std::vector<Expression *> parameters;
-    Expression *name;
+    std::string name;
     BlockStatement *body;
     Token *returnType;
 
     std::string String() override {
-        return "";
+        std::string str = "함수: ";
+
+        for (int i = 0; i < parameterTypes.size(); i++) {
+            str += "[" + parameterTypes[i]->text += "]" + parameters[i]->String() + ", ";
+        }
+        str += name;
+
+        if (returnType != nullptr) {
+            str += " -> ";
+            str += "[" + returnType->text + "]";
+        }
+
+        str += " {\n";
+        str += body->String();
+        str += "}\n";
+        return str;
     }
 };
+
+
 
 #endif //STATEMENTS_H

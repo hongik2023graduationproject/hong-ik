@@ -4,6 +4,7 @@
 enum class ObjectType {
     INTEGER,
     BOOLEAN,
+    RETURN_VALUE,
 };
 
 #endif //OBJECT_TYPE_H

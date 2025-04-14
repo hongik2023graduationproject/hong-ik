@@ -42,6 +42,8 @@ private:
 
     IfStatement *parseIfStatement();
 
+    FunctionStatement *parseFunctionStatement();
+
 
     using PrefixParseFunction = Expression* (Parser::*)();
     using InfixParseFunction = Expression* (Parser::*)(Expression *);
@@ -52,6 +54,7 @@ private:
         {TokenType::IDENTIFIER, &Parser::parseIdentifierExpression},
         {TokenType::TRUE, &Parser::parseBooleanLiteral},
         {TokenType::FALSE, &Parser::parseBooleanLiteral},
+        {TokenType::COLON, &Parser::parseCallExpression},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
         {TokenType::PLUS, &Parser::parseInfixExpression},
@@ -103,10 +106,13 @@ private:
 
     Expression *parseIdentifierExpression();
 
+    Expression *parseCallExpression();
+
 
     Expression *parseIntegerLiteral();
 
     Expression *parseBooleanLiteral();
+
 };
 
 

@@ -52,12 +52,12 @@ std::string TokenTypeToString(TokenType type) {
             return "COLON";
         case TokenType::SEMICOLON:
             return "SEMICOLON";
-        case TokenType::RETURN:
-            return "RETURN";
         case TokenType::정수:
             return "정수";
         case TokenType::실수:
             return "실수";
+        case TokenType::RETURN:
+            return "RETURN";
         case TokenType::만약:
             return "만약";
         case TokenType::라면:
@@ -69,14 +69,23 @@ std::string TokenTypeToString(TokenType type) {
         case TokenType::FALSE:
             return "FALSE";
         case TokenType::BITWISE_AND:
-            return "&";
+            return "BITWISE_AND";
         case TokenType::LOGICAL_AND:
-            return "&&";
+            return "LOGICAL_AND";
         case TokenType::BITWISE_OR:
-            return "|";
+            return "BITWISE_OR";
         case TokenType::LOGICAL_OR:
-            return "||";
-
+            return "LOGICAL_OR";
+        case TokenType::COMMA:
+            return "COMMA";
+        case TokenType::RIGHT_ARROW:
+            return "RIGHT_ARROW";
+        case TokenType::START_BLOCK:
+            return "START_BLOCK";
+        case TokenType::END_BLOCK:
+            return "END_BLOCK";
+        case TokenType::BANG:
+            return "BANG";
 
         default:
             break;

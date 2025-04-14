@@ -28,5 +28,5 @@ int Utf8Converter::getCharacterLength(const std::string &input, const int positi
         return 4; // 4바이트 문자
     }
 
-    return 0; // 잘못된 UTF-8 인코딩
+    return 0; // 잘못된 UTF-8 인코딩, TODO: 오류를 뱉는게 나을 수도 있다.
 }

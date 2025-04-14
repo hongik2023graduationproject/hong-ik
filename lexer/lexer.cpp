@@ -30,7 +30,15 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         if (characters[current_read_position] == "+") {
             tokens.push_back(new Token{TokenType::PLUS, characters[current_read_position], line});
         } else if (characters[current_read_position] == "-") {
-            tokens.push_back(new Token{TokenType::MINUS, characters[current_read_position], line});
+            if (next_read_position < characters.size() && characters[next_read_position] == ">") {
+                tokens.push_back(new Token{
+                    TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position], line
+                });
+                current_read_position++;
+                next_read_position++;
+            } else {
+                tokens.push_back(new Token{TokenType::MINUS, characters[current_read_position], line});
+            }
         } else if (characters[current_read_position] == "*") {
             tokens.push_back(new Token{TokenType::ASTERISK, characters[current_read_position], line});
         } else if (characters[current_read_position] == "/") {
@@ -100,6 +108,8 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             } else {
                 tokens.push_back(new Token{TokenType::BITWISE_OR, characters[current_read_position], line});
             }
+        } else if (characters[current_read_position] == ",") {
+            tokens.push_back(new Token{TokenType::COMMA, characters[current_read_position], line});
         } else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});

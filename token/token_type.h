@@ -17,20 +17,6 @@ enum class TokenType {
     FLOAT, // 부동 소수점 수
     STRING, // 문자열
 
-    // 예약어
-    정수,
-    실수,
-    RETURN, // return statement에서 사용
-    만약,
-    라면,
-    함수,
-    TRUE,
-    FALSE,
-
-    // 코드 블록
-    START_BLOCK,
-    END_BLOCK,
-
     // 기호
     PLUS, // +
     MINUS, // -
@@ -39,14 +25,6 @@ enum class TokenType {
     ASSIGN, // =
     EQUAL, // ==
     NOT_EQUAL, // !=
-
-    BANG, // !
-
-    BITWISE_AND, // &
-    LOGICAL_AND, // &&
-    BITWISE_OR, // |
-    LOGICAL_OR, // ||
-
 
     LPAREN, // (
     RPAREN, // )
@@ -57,6 +35,30 @@ enum class TokenType {
 
     COLON, // :
     SEMICOLON, // ;
+
+    // 예약어
+    정수,
+    실수,
+    RETURN, // return statement에서 사용
+    만약,
+    라면,
+    함수,
+    TRUE,
+    FALSE,
+
+    BITWISE_AND, // &
+    LOGICAL_AND, // &&
+    BITWISE_OR, // |
+    LOGICAL_OR, // ||
+
+    COMMA, // ,
+    RIGHT_ARROW, // ->
+
+    // 코드 블록
+    START_BLOCK,
+    END_BLOCK,
+
+    BANG, // !
 };
 
 #endif //TOKEN_TYPE_H

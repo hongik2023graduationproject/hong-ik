@@ -38,5 +38,13 @@ public:
     }
 };
 
+class ReturnValue : public Object {
+public:
+    Object* value;
+
+    std::string String() override {
+        return value->String();
+    }
+};
 
 #endif //OBJECT_H
