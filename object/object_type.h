@@ -5,6 +5,7 @@ enum class ObjectType {
     INTEGER,
     BOOLEAN,
     RETURN_VALUE,
+    FUNCTION,
 };
 
 #endif //OBJECT_TYPE_H

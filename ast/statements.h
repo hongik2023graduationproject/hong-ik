@@ -7,7 +7,7 @@
 class Statement : public Node {
 };
 
-class AssignmentStatement : public Statement {
+class InitializationStatement : public Statement {
 public:
     Token *type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
     std::string name;
@@ -15,6 +15,17 @@ public:
 
     std::string String() override {
         return "[" + type->text + "] " + name + " = " + value->String();
+    }
+};
+
+class AssignmentStatement : public Statement {
+public:
+    Token *type;
+    std::string name;
+    Expression *value;
+
+    std::string String() override {
+        return name + " = " + value->String();
     }
 };
 
@@ -90,7 +101,6 @@ public:
         return str;
     }
 };
-
 
 
 #endif //STATEMENTS_H

@@ -10,6 +10,7 @@
 class Environment {
 public:
     std::map<std::string, Object *> store;
+    Environment* outer;
 
     Object *Get(const std::string& name);
 

@@ -31,6 +31,14 @@ private:
     Object *evalPrefixExpression(Token *token, Object *right);
 
     Object *evalMinusPrefixExpression(Object *right);
+
+    Object *evalBangPrefixExpression(Object *right);
+
+    Object *applyFunction(Object *function, std::vector<Object *> arguments);
+
+    Environment *extendFunctionEnvironment(Function *function, std::vector<Object *> arguments);
+
+    Object *unwarpReturnValue(Object *object);
 };
 
 

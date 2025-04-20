@@ -32,6 +32,8 @@ private:
 
     Statement *parseStatement();
 
+    InitializationStatement *parseInitializationStatement();
+
     AssignmentStatement *parseAssignmentStatement();
 
     ExpressionStatement *parseExpressionStatement();

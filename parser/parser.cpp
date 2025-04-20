@@ -16,6 +16,7 @@ Program *Parser::Parsing(const std::vector<Token *> &tokens) {
     initialization();
 
     while (current_read_position < tokens.size()) {
+        // 인터프리터에서는 EOF가 마지막에 오지 않는다.
         if (current_token->type == TokenType::END_OF_FILE) {
             break;
         }
@@ -47,19 +48,19 @@ void Parser::setNextToken() {
     setToken();
 }
 
-void Parser::skipToken(TokenType type) {
+void Parser::skipToken(const TokenType type) {
     if (current_token->type != type) {
-        // error
-        throw std::runtime_error(
-            "Unexpected token, " + TokenTypeToString(current_token->type) + ", " + TokenTypeToString(type) + " " + to_string(
-                current_token->line));
+        throw runtime_error{
+            "예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type) + ", 예상 토큰: " + TokenTypeToString(type) +
+            " " + to_string(current_token->line)
+        };
     }
     setNextToken();
 }
 
 void Parser::checkToken(TokenType type) {
     if (current_token->type != type) {
-        throw std::runtime_error("Unexpected token: " +  current_token->text);
+        throw runtime_error{"예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type)};
     }
 }
 
@@ -67,6 +68,9 @@ void Parser::checkToken(TokenType type) {
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
 Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
+        return parseInitializationStatement();
+    }
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr && next_token->type == TokenType::ASSIGN) {
         return parseAssignmentStatement();
     }
     if (current_token->type == TokenType::RETURN) {
@@ -81,8 +85,8 @@ Statement *Parser::parseStatement() {
     return parseExpressionStatement();
 }
 
-AssignmentStatement *Parser::parseAssignmentStatement() {
-    auto *statement = new AssignmentStatement();
+InitializationStatement *Parser::parseInitializationStatement() {
+    auto *statement = new InitializationStatement();
     skipToken(TokenType::LBRACKET);
     // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
     statement->type = current_token;
@@ -92,6 +96,20 @@ AssignmentStatement *Parser::parseAssignmentStatement() {
     statement->name = current_token->text;
     skipToken(TokenType::IDENTIFIER);
     skipToken(TokenType::ASSIGN);
+    statement->value = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    return statement;
+}
+
+AssignmentStatement *Parser::parseAssignmentStatement() {
+    auto *statement = new AssignmentStatement();
+
+    checkToken(TokenType::IDENTIFIER);
+    statement->name = current_token->text;
+    skipToken(TokenType::IDENTIFIER);
+
+    skipToken(TokenType::ASSIGN);
+
     statement->value = parseExpression(Precedence::LOWEST);
     setNextToken();
     return statement;
@@ -151,7 +169,7 @@ FunctionStatement *Parser::parseFunctionStatement() {
 
     if (current_token->type == TokenType::LBRACKET) {
         // TODO: goto 문 제거하기
-        FLAG:
+    FLAG:
         skipToken(TokenType::LBRACKET);
         statement->parameterTypes.push_back(current_token);
         setNextToken();
@@ -162,6 +180,7 @@ FunctionStatement *Parser::parseFunctionStatement() {
         setNextToken();
 
         if (current_token->type == TokenType::COMMA) {
+            skipToken(TokenType::COMMA);
             goto FLAG;
         }
     }
@@ -186,7 +205,7 @@ FunctionStatement *Parser::parseFunctionStatement() {
 Expression *Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         // 나중에 에러 처리 추가할 것
-        throw runtime_error("No prefix function found");
+        throw runtime_error("No prefix function found, " + TokenTypeToString(current_token->type));
     }
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
@@ -253,7 +272,7 @@ Expression *Parser::parseCallExpression() {
 
     if (current_token != nullptr && current_token->type == TokenType::LPAREN) {
         skipToken(TokenType::LPAREN);
-        FLAG:
+    FLAG:
         call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
         setNextToken();
         if (current_token->type == TokenType::COMMA) {

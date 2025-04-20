@@ -22,47 +22,53 @@ void Repl::Run() {
     int indent = 0;
 
     while (true) {
-        if (indent == 0) {
-            cout << ">>> ";
-        } else {
-            for (int i = 0; i <= indent; i++) {
-                cout << "    ";
+        try {
+            if (indent == 0) {
+                cout << ">>> ";
+            } else {
+                for (int i = 0; i <= indent; i++) {
+                    cout << "    ";
+                }
             }
+
+            string code;
+            getline(cin, code);
+
+            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태, 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
+            if (code == "종료하기") {
+                return;
+            }
+
+            vector<string> utf8_strings = Utf8Converter::Convert(code);
+            vector<Token *> new_tokens = lexer->Tokenize(utf8_strings);
+            tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
+
+            // TODO: LBRACE, RBRACE는 각각 START_BLOCK, END_BLOCK을 임시로 대체하고 있다.
+            //       나중에 교체가 되면 코드 수정이 필요하다.
+            if (tokens.back()->type == TokenType::LBRACE) {
+                indent += 1;
+            }
+            if (tokens.back()->type == TokenType::RBRACE) {
+                indent -= 1;
+            }
+
+            if (indent != 0) {
+                continue;
+            }
+
+            Program *program = parser->Parsing(tokens);
+            vector<Object *> objects = evaluator->evaluate(program);
+
+            for (auto object: objects) {
+                cout << object->String() << endl;
+            }
+
+            tokens.clear();
+        } catch (const exception &e) {
+            cout << "Error: " << e.what() << endl;
+            tokens.clear();
+            indent = 0;
         }
-
-        string code;
-        getline(cin, code);
-
-        // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태, 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
-        if (code == "종료하기") {
-            return;
-        }
-
-        vector<string> utf8_strings = Utf8Converter::Convert(code);
-        vector<Token *> new_tokens = lexer->Tokenize(utf8_strings);
-        tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
-
-        // TODO: LBRACE, RBRACE는 각각 START_BLOCK, END_BLOCK을 임시로 대체하고 있다.
-        //       나중에 교체가 되면 코드 수정이 필요하다.
-        if (tokens.back()->type == TokenType::LBRACE) {
-            indent += 1;
-        }
-        if (tokens.back()->type == TokenType::RBRACE) {
-            indent -= 1;
-        }
-
-        if (indent != 0) {
-            continue;
-        }
-
-        Program *program = parser->Parsing(tokens);
-        vector<Object *> objects = evaluator->evaluate(program);
-
-        for (auto object: objects) {
-            cout << object->String() << endl;
-        }
-
-        tokens.clear();
     }
 };
 
@@ -87,36 +93,42 @@ void Repl::TestParser() {
     int indent = 0;
 
     while (true) {
-        string code;
+        try {
+            string code;
 
-        if (indent == 0) {
-            cout << ">>> ";
-        } else {
-            for (int i = 0; i <= indent; i++) {
-                cout << "    ";
+            if (indent == 0) {
+                cout << ">>> ";
+            } else {
+                for (int i = 0; i <= indent; i++) {
+                    cout << "    ";
+                }
             }
+            getline(cin, code);
+
+
+            vector<string> utf8_strings = Utf8Converter::Convert(code);
+            vector<Token *> new_tokens = lexer->Tokenize(utf8_strings);
+            tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
+
+            if (tokens.back()->type == TokenType::LBRACE) {
+                indent += 1;
+            }
+            if (tokens.back()->type == TokenType::RBRACE) {
+                indent -= 1;
+            }
+
+            if (indent != 0) {
+                continue;
+            }
+
+            Program *program = parser->Parsing(tokens);
+
+            cout << program->String() << endl;
+            tokens.clear();
+        } catch (const exception &e) {
+            cout << "Error: " << e.what() << endl;
+            tokens.clear();
+            indent = 0;
         }
-        getline(cin, code);
-
-
-        vector<string> utf8_strings = Utf8Converter::Convert(code);
-        vector<Token *> new_tokens = lexer->Tokenize(utf8_strings);
-        tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
-
-        if (tokens.back()->type == TokenType::LBRACE) {
-            indent += 1;
-        }
-        if (tokens.back()->type == TokenType::RBRACE) {
-            indent -= 1;
-        }
-
-        if (indent != 0) {
-            continue;
-        }
-
-        Program *program = parser->Parsing(tokens);
-
-        cout << program->String() << endl;
-        tokens.clear();
     }
 }
