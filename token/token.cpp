@@ -86,6 +86,14 @@ std::string TokenTypeToString(TokenType type) {
             return "END_BLOCK";
         case TokenType::BANG:
             return "BANG";
+        case TokenType::LESS_THAN:
+            return "LESS_THAN";
+        case TokenType::GREATER_THAN:
+            return "GREATER_THAN";
+        case TokenType::LESS_EQUAL:
+            return "LESS_EQUAL";
+        case TokenType::GREATER_EQUAL:
+            return "GREATER_EQUAL";
 
         default:
             break;

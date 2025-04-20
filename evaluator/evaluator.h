@@ -11,16 +11,17 @@ class Evaluator {
 public:
     Evaluator();
 
-    std::vector<Object *> evaluate(Program *program);
+    Object * Evaluate(Program *program);
 
 private:
     Environment *environment;
 
-    std::vector<Object *> evalProgram(const Program *program, Environment *environment);
+
+    Object *evalProgram(const Program *program, Environment *environment);
 
     Object *eval(Node *statement, Environment *environment);
 
-    Object *evalBlockStatements(std::vector<Statement *> statements, Environment *environment);
+    Object *evalBlockStatement(std::vector<Statement *> statements, Environment *environment);
 
     Object *evalInfixExpression(Token *token, Object *left, Object *right);
 

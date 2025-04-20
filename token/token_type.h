@@ -59,6 +59,11 @@ enum class TokenType {
     END_BLOCK,
 
     BANG, // !
+
+    LESS_THAN, // <
+    GREATER_THAN, // >
+    LESS_EQUAL, // <=
+    GREATER_EQUAL, // >=
 };
 
 #endif //TOKEN_TYPE_H

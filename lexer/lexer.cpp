@@ -110,7 +110,28 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             }
         } else if (characters[current_read_position] == ",") {
             tokens.push_back(new Token{TokenType::COMMA, characters[current_read_position], line});
-        } else if (isNumber(characters[current_read_position])) {
+        } else if (characters[current_read_position] == "<") {
+            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
+                tokens.push_back(new Token{
+                    TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position], line
+                });
+                current_read_position++;
+                next_read_position++;
+            } else {
+                tokens.push_back(new Token{TokenType::LESS_THAN, characters[current_read_position], line});
+            }
+        } else if (characters[current_read_position] == ">") {
+            if (next_read_position < characters.size() && characters[next_read_position] == "|") {
+                tokens.push_back(new Token{
+                    TokenType::GREATER_EQUAL, characters[current_read_position] + characters[next_read_position], line
+                });
+                current_read_position++;
+                next_read_position++;
+            } else {
+                tokens.push_back(new Token{TokenType::GREATER_THAN, characters[current_read_position], line});
+            }
+        }
+        else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
         } else if (isLetter(characters[current_read_position])) {

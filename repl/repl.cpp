@@ -57,11 +57,9 @@ void Repl::Run() {
             }
 
             Program *program = parser->Parsing(tokens);
-            vector<Object *> objects = evaluator->evaluate(program);
+            Object *object = evaluator->Evaluate(program);
 
-            for (auto object: objects) {
-                cout << object->String() << endl;
-            }
+            cout << object->String() << endl;
 
             tokens.clear();
         } catch (const exception &e) {

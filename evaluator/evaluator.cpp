@@ -1,4 +1,5 @@
 #include "evaluator.h"
+#include "iostream"
 
 #include "../ast/literals.h"
 #include "../ast/expressions.h"
@@ -10,28 +11,22 @@ Evaluator::Evaluator() {
     environment = new Environment();
 };
 
-vector<Object *> Evaluator::evaluate(Program *program) {
-    return evalProgram(program, environment);
+// TODO: Evaluate와 eval 함수 합치기
+Object *Evaluator::Evaluate(Program *program) {
+    return eval(program, environment);
 }
 
-
-vector<Object *> Evaluator::evalProgram(const Program *program, Environment *environment) {
-    vector<Object *> objects;
-
-    objects.reserve(program->statements.size());
-    for (const auto statement: program->statements) {
-        Object *result = eval(statement, environment);
-        if (result != nullptr)
-            objects.push_back(result);
-    }
-
-    return objects;
-}
 
 // eval 하는 순서는 statement, expression, literal 순으로 배치
 // 이는 많이 call 되는 순서에 따라 배치하는 것이 효율적으로 작동할 것이지만 개발의 편의성을 위한 것
 // 추후에 call 되는 순서에 따라 배치하거나, map을 사용해여 최적화 할 것
 Object *Evaluator::eval(Node *node, Environment *environment) {
+    if (auto *program = dynamic_cast<Program *>(node)) {
+        return evalProgram(program, environment);
+    }
+    if (auto *block_statement = dynamic_cast<BlockStatement *>(node)) {
+        return evalBlockStatement(block_statement->statements, environment);
+    }
     if (auto *expression_statement = dynamic_cast<ExpressionStatement *>(node)) {
         return eval(expression_statement->expression, environment);
     }
@@ -54,9 +49,7 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
         }
         return nullptr;
     }
-    if (auto *block_statement = dynamic_cast<BlockStatement *>(node)) {
-        return evalBlockStatements(block_statement->statements, environment);
-    }
+
     if (auto *function_statement = dynamic_cast<FunctionStatement *>(node)) {
         auto *function = new Function;
         function->body = function_statement->body;
@@ -66,6 +59,12 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
 
         environment->Set(function_statement->name, function);
         return function;
+    }
+    if (auto *return_statement = dynamic_cast<ReturnStatement *>(node)) {
+        auto *returnValue = new ReturnValue;
+        Object *value = eval(return_statement->expression, environment);
+        returnValue->value = value;
+        return returnValue;
     }
 
     if (auto *prefix_expression = dynamic_cast<PrefixExpression *>(node)) {
@@ -108,15 +107,34 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
         auto *boolean = new Boolean(boolean_literal->value);
         return boolean;
     }
+
+    throw invalid_argument("알 수 없는 구문입니다.");
 }
 
-Object *Evaluator::evalBlockStatements(std::vector<Statement *> statements, Environment *environment) {
+
+Object *Evaluator::evalProgram(const Program *program, Environment *environment) {
     Object *result = nullptr;
 
-    for (auto statement: statements) {
+    for (const auto statement: program->statements) {
         result = eval(statement, environment);
 
-        if (result == nullptr || dynamic_cast<ReturnValue *>(result)) {
+
+        if (auto *return_value = dynamic_cast<ReturnValue *>(result)) {
+            return return_value->value;
+        }
+    }
+
+    return result;
+}
+
+Object *Evaluator::evalBlockStatement(std::vector<Statement *> statements, Environment *environment) {
+    // nullptr를 반환할 수 있는 여지가 있음
+    Object *result = nullptr;
+
+    for (const auto statement: statements) {
+        result = eval(statement, environment);
+
+        if (const auto *return_value = dynamic_cast<ReturnValue *>(result)) {
             return result;
         }
     }

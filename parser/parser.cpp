@@ -279,7 +279,6 @@ Expression *Parser::parseCallExpression() {
             skipToken(TokenType::COMMA);
             goto FLAG;
         }
-        skipToken(TokenType::RPAREN);
     }
 
     return call_expression;
