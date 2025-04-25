@@ -18,7 +18,7 @@ private:
     Environment *environment;
 
 
-    std::map<std::string, Builtin*> builtins = {
+    std::map<std::string, Builtin *> builtins = {
         {"길이", new Length},
     };
 
@@ -41,6 +41,10 @@ private:
     Object *evalMinusPrefixExpression(Object *right);
 
     Object *evalBangPrefixExpression(Object *right);
+
+    Object *evalIndexExpression(Object *left, Object *index);
+
+    Object *evalArrayIndexExpression(Object *array, Object *index);
 
     Object *applyFunction(Object *function, std::vector<Object *> arguments);
 

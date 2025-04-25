@@ -111,6 +111,13 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
 
         return applyFunction(function, arguments);
     }
+    if (auto *index_expression = dynamic_cast<IndexExpression *>(node)) {
+        auto *left = eval(index_expression->name, environment);
+        // ERROR 처리?
+        auto *index = eval(index_expression->index, environment);
+        // ERROR 처리?
+        return evalIndexExpression(left, index);
+    }
 
 
     if (auto *integer_literal = dynamic_cast<IntegerLiteral *>(node)) {
@@ -124,6 +131,15 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
     if (auto *string_literal = dynamic_cast<StringLiteral *>(node)) {
         auto *string = new String(string_literal->value);
         return string;
+    }
+    if (auto *array_literal = dynamic_cast<ArrayLiteral *>(node)) {
+        auto *array = new Array();
+        array->type = ObjectType::ARRAY;
+        for (auto element: array_literal->elements) {
+            Object *value = eval(element, environment);
+            array->elements.push_back(value);
+        }
+        return array;
     }
 
     throw invalid_argument("알 수 없는 구문입니다.");
@@ -231,6 +247,23 @@ Object *Evaluator::evalStringInfixExpression(Token *token, Object *left, Object 
     }
 
     // TODO: 에러 처리 (지원하지 않는 연산자)
+}
+
+Object *Evaluator::evalIndexExpression(Object *left, Object *index) {
+    if (left->type == ObjectType::ARRAY && index->type == ObjectType::INTEGER) {
+        return evalArrayIndexExpression(left, index);
+    }
+    // ERROR
+}
+
+Object *Evaluator::evalArrayIndexExpression(Object *array, Object *index) {
+    auto *array_object = dynamic_cast<Array *>(array);
+    auto *index_object = dynamic_cast<Integer *>(index);
+    if (0 <= index_object->value && index_object->value < array_object->elements.size()) {
+        return array_object->elements[index_object->value];
+    }
+
+    // ERROR
 }
 
 

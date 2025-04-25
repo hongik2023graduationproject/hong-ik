@@ -83,10 +83,24 @@ public:
     }
 };
 
+class Array final : public Object {
+public:
+    std::vector<Object*> elements;
+
+    std::string ToString() override {
+        std::string s = "[";
+        for (auto & element : elements) {
+            s += element->ToString();
+            s += ", ";
+        }
+        s += "]";
+        return s;
+    }
+};
 
 class Builtin : public Object {
 public:
-    virtual Object* function(std::vector<Object*> args) = 0;
+    virtual Object *function(std::vector<Object *> args) = 0;
 
     std::string ToString() override {
         return "";

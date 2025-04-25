@@ -70,7 +70,8 @@ Statement *Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
         return parseInitializationStatement();
     }
-    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr && next_token->type == TokenType::ASSIGN) {
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr && next_token->type ==
+        TokenType::ASSIGN) {
         return parseAssignmentStatement();
     }
     if (current_token->type == TokenType::RETURN) {
@@ -284,6 +285,17 @@ Expression *Parser::parseCallExpression() {
     return call_expression;
 }
 
+Expression *Parser::parseIndexExpression(Expression* left) {
+    auto index_expression = new IndexExpression();
+    index_expression->name = left;
+    skipToken(TokenType::LBRACKET);
+    index_expression->index = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    checkToken(TokenType::RBRACKET);
+
+    return index_expression;
+}
+
 
 Expression *Parser::parseIntegerLiteral() {
     auto *integerLiteral = new IntegerLiteral();
@@ -310,4 +322,18 @@ Expression *Parser::parseStringLiteral() {
 Expression *Parser::parseArrayLiteral() {
     auto *arrayLiteral = new ArrayLiteral();
 
+    skipToken(TokenType::LBRACKET);
+    while (current_token != nullptr && current_token->type != TokenType::RBRACKET) {
+    flag:
+        Expression *element = parseExpression(Precedence::LOWEST);
+        arrayLiteral->elements.push_back(element);
+        setNextToken();
+
+        if (current_token != nullptr && current_token->type == TokenType::COMMA) {
+            skipToken(TokenType::COMMA);
+            goto flag;
+        }
+    }
+
+    return arrayLiteral;
 }

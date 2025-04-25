@@ -8,6 +8,7 @@ enum class ObjectType {
     RETURN_VALUE,
     FUNCTION,
     BUILTIN_FUNCTION,
+    ARRAY,
 };
 
 #endif //OBJECT_TYPE_H

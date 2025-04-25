@@ -41,18 +41,28 @@ public:
 // 함수 호출을 위한 표현식
 class CallExpression : public Expression {
 public:
-    Expression* function;
-    std::vector<Expression*> arguments;
+    Expression *function;
+    std::vector<Expression *> arguments;
 
     std::string String() override {
         std::string s = function->String();
         s += " (";
-        for (auto arg : arguments) {
+        for (auto arg: arguments) {
             s += arg->String();
             s += ", ";
         }
         s += ")";
         return s;
+    }
+};
+
+class IndexExpression : public Expression {
+public:
+    Expression *name;
+    Expression *index;
+
+    std::string String() override {
+        return name->String() + "[" + index->String() + "]";
     }
 };
 
