@@ -11,13 +11,14 @@
 // 전방 선언, 순환 참조가 발생해 전방 선언 사용
 class Environment;
 
+
 class Object {
 public:
     virtual ~Object() = default;
 
     ObjectType type;
 
-    virtual std::string String() = 0;
+    virtual std::string ToString() = 0;
 };
 
 class Integer final : public Object {
@@ -28,7 +29,7 @@ public:
 
     long long value;
 
-    std::string String() override {
+    std::string ToString() override {
         return std::to_string(value);
     }
 };
@@ -41,31 +42,54 @@ public:
 
     bool value;
 
-    std::string String() override {
+    std::string ToString() override {
         return value ? "true" : "false";
+    }
+};
+
+class String final : public Object {
+public:
+    String(std::string value) : value(value) {
+        type = ObjectType::STRING;
+    }
+
+    std::string value;
+
+    std::string ToString() override {
+        return value;
     }
 };
 
 class ReturnValue final : public Object {
 public:
-    Object* value;
+    Object *value;
 
-    std::string String() override {
-        return value->String();
+    std::string ToString() override {
+        return value->ToString();
     }
 };
 
 class Function final : public Object {
-    public:
-    std::vector<Expression*> parameters;
-    BlockStatement* body;
-    Environment* env;
+public:
+    std::vector<Expression *> parameters;
+    BlockStatement *body;
+    Environment *env;
 
     // TODO: 미구현 상태
-    std::string String() override {
+    std::string ToString() override {
         std::string s = "함수: ";
 
         return s;
+    }
+};
+
+
+class Builtin : public Object {
+public:
+    virtual Object* function(std::vector<Object*> args) = 0;
+
+    std::string ToString() override {
+        return "";
     }
 };
 

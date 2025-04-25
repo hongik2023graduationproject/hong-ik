@@ -7,7 +7,6 @@ Object *Environment::Get(const std::string& name) {
     if (obj == nullptr) {
         if (outer != nullptr)
             return outer->Get(name);
-        throw std::runtime_error {"알 수 없는 변수명: " + name};
     }
 
     return obj;

@@ -26,6 +26,7 @@ private:
 
     std::string readInteger();
     std::string readLetter();
+    std::string readString();
 
     std::map<std::string, TokenType> keywords;
 };

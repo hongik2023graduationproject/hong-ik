@@ -39,6 +39,7 @@ enum class TokenType {
     // 예약어
     정수,
     실수,
+    문자,
     RETURN, // return statement에서 사용
     만약,
     라면,

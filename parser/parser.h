@@ -54,9 +54,11 @@ private:
         {TokenType::LPAREN, &Parser::parseGroupedExpression},
         {TokenType::MINUS, &Parser::parsePrefixExpression},
         {TokenType::IDENTIFIER, &Parser::parseIdentifierExpression},
+        {TokenType::COLON, &Parser::parseCallExpression},
         {TokenType::TRUE, &Parser::parseBooleanLiteral},
         {TokenType::FALSE, &Parser::parseBooleanLiteral},
-        {TokenType::COLON, &Parser::parseCallExpression},
+        {TokenType::STRING, &Parser::parseStringLiteral},
+        {TokenType::LBRACKET, &Parser::parseArrayLiteral},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
         {TokenType::PLUS, &Parser::parseInfixExpression},
@@ -115,6 +117,9 @@ private:
 
     Expression *parseBooleanLiteral();
 
+    Expression *parseStringLiteral();
+
+    Expression *parseArrayLiteral();
 };
 
 

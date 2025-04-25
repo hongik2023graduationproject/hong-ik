@@ -6,6 +6,7 @@ Lexer::Lexer() {
     keywords = {
         {"정수", TokenType::정수},
         {"실수", TokenType::실수},
+        {"문자", TokenType::문자},
         {"return", TokenType::RETURN},
         {"만약", TokenType::만약},
         {"라면", TokenType::라면},
@@ -130,8 +131,10 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             } else {
                 tokens.push_back(new Token{TokenType::GREATER_THAN, characters[current_read_position], line});
             }
-        }
-        else if (isNumber(characters[current_read_position])) {
+        } else if (characters[current_read_position] == "\"") {
+            string s = readString();
+            tokens.push_back(new Token{TokenType::STRING, s, line});
+        } else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
             tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
         } else if (isLetter(characters[current_read_position])) {
@@ -185,4 +188,21 @@ std::string Lexer::readLetter() {
         identifier += characters[current_read_position];
     }
     return identifier;
+}
+
+string Lexer::readString() {
+    // TODO: 문자열 덧셈을 줄여서 최적화 가능
+    string s = "";
+
+    // characters[current_read_position]은 "\""인 상황, 다음 토큰으로 넘겨서 문자열만 추출하기
+    current_read_position++;
+    next_read_position++;
+
+    while (next_read_position < characters.size() && characters[current_read_position] != "\"") {
+        s += characters[current_read_position];
+
+        current_read_position++;
+        next_read_position++;
+    }
+    return s;
 }

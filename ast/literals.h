@@ -26,7 +26,31 @@ public:
     }
 };
 
+class StringLiteral : public Literal {
+public:
+    Token *token;
+    std::string value;
 
+    std::string String() override {
+        return token->text;
+    }
+};
 
+class ArrayLiteral : public Literal {
+public:
+    Token *token;
+    std::vector<Expression *> elements;
+
+    std::string String() override {
+        std::string s;
+        s += "[";
+        for (int i = 0; i < elements.size(); i++) {
+            s += elements[i]->String();
+            s += ", ";
+        }
+        s += "]";
+        return s;
+    }
+};
 
 #endif //LITERALS_H

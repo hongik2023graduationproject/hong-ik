@@ -299,3 +299,15 @@ Expression *Parser::parseBooleanLiteral() {
     booleanLiteral->value = current_token->text == "true";
     return booleanLiteral;
 }
+
+Expression *Parser::parseStringLiteral() {
+    auto *stringLiteral = new StringLiteral();
+    stringLiteral->token = current_token;
+    stringLiteral->value = current_token->text;
+    return stringLiteral;
+}
+
+Expression *Parser::parseArrayLiteral() {
+    auto *arrayLiteral = new ArrayLiteral();
+
+}

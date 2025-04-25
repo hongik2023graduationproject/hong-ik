@@ -59,7 +59,7 @@ void Repl::Run() {
             Program *program = parser->Parsing(tokens);
             Object *object = evaluator->Evaluate(program);
 
-            cout << object->String() << endl;
+            cout << object->ToString() << endl;
 
             tokens.clear();
         } catch (const exception &e) {
