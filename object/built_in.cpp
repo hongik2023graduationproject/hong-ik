@@ -13,6 +13,9 @@ Object *Length::function(std::vector<Object *> parameters) {
     if (auto string = dynamic_cast<String *>(parameters[0])) {
         return new Integer(string->value.size());
     }
+    if (auto array = dynamic_cast<Array *>(parameters[0])) {
+        return new Integer(array->elements.size());
+    }
 
     // ERR
 }
@@ -29,4 +32,16 @@ Object *Print::function(std::vector<Object *> parameters) {
             cout << boolean->value;
         }
     }
+}
+
+Object *Push::function(std::vector<Object *> parameters) {
+    if (parameters.size() != 2) {
+        // ERR
+    }
+    if (auto array = dynamic_cast<Array*>(parameters[0])) {
+        // array type 검사 추가 예정
+        array->elements.push_back(parameters[1]);
+    }
+
+    // ERR
 }

@@ -20,6 +20,8 @@ private:
 
     std::map<std::string, Builtin *> builtins = {
         {"길이", new Length},
+        {"출력", new Print},
+        {"추가", new Push},
     };
 
     Object *evalProgram(const Program *program, Environment *environment);

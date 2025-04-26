@@ -12,4 +12,8 @@ class Print : public Builtin {
     Object *function(std::vector<Object *> parameters) override;
 };
 
+class Push : public Builtin {
+    Object *function(std::vector<Object *> parameters) override;
+};
+
 #endif //BUILT_IN_H

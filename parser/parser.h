@@ -99,7 +99,7 @@ private:
         {TokenType::LBRACKET, Precedence::INDEX},
         {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
         {TokenType::LOGICAL_OR, Precedence::LOGICAL_OR},
-        {TokenType::COLON, Precedence::CALL}, // TODO: 이 부분은 검증할 것(생각대로 작성만 함)
+        // {TokenType::COLON, Precedence::CALL}, // TODO: 이 부분은 검증할 것(생각대로 작성만 함)
     };
 
     Expression *parseExpression(Precedence precedence);

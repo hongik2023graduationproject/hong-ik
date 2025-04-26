@@ -45,7 +45,7 @@ public:
     std::vector<Expression *> arguments;
 
     std::string String() override {
-        std::string s = function->String();
+        std::string s = ":" + function->String();
         s += " (";
         for (auto arg: arguments) {
             s += arg->String();
