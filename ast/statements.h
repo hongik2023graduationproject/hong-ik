@@ -1,17 +1,16 @@
 #ifndef STATEMENTS_H
 #define STATEMENTS_H
 
-#include "node.h"
 #include "expressions.h"
+#include "node.h"
 
-class Statement : public Node {
-};
+class Statement : public Node {};
 
 class InitializationStatement : public Statement {
 public:
-    Token *type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
+    Token* type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
     std::string name;
-    Expression *value;
+    Expression* value;
 
     std::string String() override {
         return "[" + type->text + "] " + name + " = " + value->String();
@@ -20,9 +19,9 @@ public:
 
 class AssignmentStatement : public Statement {
 public:
-    Token *type;
+    Token* type;
     std::string name;
-    Expression *value;
+    Expression* value;
 
     std::string String() override {
         return name + " = " + value->String();
@@ -31,7 +30,7 @@ public:
 
 class ExpressionStatement : public Statement {
 public:
-    Expression *expression;
+    Expression* expression;
 
     std::string String() override {
         if (expression == nullptr) {
@@ -43,7 +42,7 @@ public:
 
 class ReturnStatement : public Statement {
 public:
-    Expression *expression;
+    Expression* expression;
 
     std::string String() override {
         return "return " + expression->String();
@@ -52,11 +51,11 @@ public:
 
 class BlockStatement : public Statement {
 public:
-    std::vector<Statement *> statements;
+    std::vector<Statement*> statements;
 
     std::string String() override {
         std::string s;
-        for (Statement *stm: statements) {
+        for (Statement* stm : statements) {
             s += "  " + stm->String() + '\n';
         }
         return s;
@@ -65,8 +64,8 @@ public:
 
 class IfStatement : public Statement {
 public:
-    Expression *condition;
-    BlockStatement *consequence;
+    Expression* condition;
+    BlockStatement* consequence;
 
     std::string String() override {
         return "만약 " + condition->String() + " 라면\n" + consequence->String();
@@ -75,12 +74,12 @@ public:
 
 class FunctionStatement : public Statement {
 public:
-    std::vector<Token *> parameterTypes;
+    std::vector<Token*> parameterTypes;
     // TODO: Expression을 Identifier Expression으로 수정해야 한다.
-    std::vector<Expression *> parameters;
+    std::vector<Expression*> parameters;
     std::string name;
-    BlockStatement *body;
-    Token *returnType;
+    BlockStatement* body;
+    Token* returnType;
 
     std::string String() override {
         std::string str = "함수: ";
@@ -102,5 +101,4 @@ public:
     }
 };
 
-
-#endif //STATEMENTS_H
+#endif // STATEMENTS_H

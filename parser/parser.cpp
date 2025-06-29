@@ -1,17 +1,15 @@
-#include <stdexcept>
-#include <utility>
-
 #include "parser.h"
 
+#include "../ast/literals.h"
 #include <iostream>
 #include <ostream>
 #include <set>
-
-#include "../ast/literals.h"
+#include <stdexcept>
+#include <utility>
 
 using namespace std;
 
-Program *Parser::Parsing(const std::vector<Token *> &tokens) {
+Program* Parser::Parsing(const std::vector<Token*>& tokens) {
     this->tokens = tokens;
     initialization();
 
@@ -20,7 +18,7 @@ Program *Parser::Parsing(const std::vector<Token *> &tokens) {
         if (current_token->type == TokenType::END_OF_FILE) {
             break;
         }
-        auto *statement = parseStatement();
+        auto* statement = parseStatement();
         program->statements.push_back(statement);
     }
 
@@ -38,8 +36,8 @@ void Parser::initialization() {
 
 
 void Parser::setToken() {
-    current_token = tokens.size() > current_read_position ? tokens[current_read_position] : nullptr;
-    next_token = tokens.size() > current_read_position + 1 ? tokens[current_read_position + 1] : nullptr;
+    current_token   = tokens.size() > current_read_position ? tokens[current_read_position] : nullptr;
+    next_token      = tokens.size() > current_read_position + 1 ? tokens[current_read_position + 1] : nullptr;
     next_next_token = tokens.size() > current_read_position + 2 ? tokens[current_read_position + 2] : nullptr;
 }
 
@@ -50,10 +48,8 @@ void Parser::setNextToken() {
 
 void Parser::skipToken(const TokenType type) {
     if (current_token->type != type) {
-        throw runtime_error{
-            "예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type) + ", 예상 토큰: " + TokenTypeToString(type) +
-            " " + to_string(current_token->line)
-        };
+        throw runtime_error{"예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type)
+                            + ", 예상 토큰: " + TokenTypeToString(type) + " " + to_string(current_token->line)};
     }
     setNextToken();
 }
@@ -66,12 +62,12 @@ void Parser::checkToken(TokenType type) {
 
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
-Statement *Parser::parseStatement() {
+Statement* Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
         return parseInitializationStatement();
     }
-    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr && next_token->type ==
-        TokenType::ASSIGN) {
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
+        && next_token->type == TokenType::ASSIGN) {
         return parseAssignmentStatement();
     }
     if (current_token->type == TokenType::RETURN) {
@@ -86,8 +82,8 @@ Statement *Parser::parseStatement() {
     return parseExpressionStatement();
 }
 
-InitializationStatement *Parser::parseInitializationStatement() {
-    auto *statement = new InitializationStatement();
+InitializationStatement* Parser::parseInitializationStatement() {
+    auto* statement = new InitializationStatement();
     skipToken(TokenType::LBRACKET);
     // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
     statement->type = current_token;
@@ -102,8 +98,8 @@ InitializationStatement *Parser::parseInitializationStatement() {
     return statement;
 }
 
-AssignmentStatement *Parser::parseAssignmentStatement() {
-    auto *statement = new AssignmentStatement();
+AssignmentStatement* Parser::parseAssignmentStatement() {
+    auto* statement = new AssignmentStatement();
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -116,24 +112,24 @@ AssignmentStatement *Parser::parseAssignmentStatement() {
     return statement;
 }
 
-ExpressionStatement *Parser::parseExpressionStatement() {
-    auto *expressionStatement = new ExpressionStatement();
+ExpressionStatement* Parser::parseExpressionStatement() {
+    auto* expressionStatement       = new ExpressionStatement();
     expressionStatement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     return expressionStatement;
 }
 
 
-ReturnStatement *Parser::parseReturnStatement() {
+ReturnStatement* Parser::parseReturnStatement() {
     skipToken(TokenType::RETURN);
-    auto *statement = new ReturnStatement();
+    auto* statement       = new ReturnStatement();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     return statement;
 }
 
-BlockStatement *Parser::parseBlockStatement() {
-    auto *statement = new BlockStatement();
+BlockStatement* Parser::parseBlockStatement() {
+    auto* statement = new BlockStatement();
     skipToken(TokenType::LBRACE);
     // 임시로 BRACE를 활용해서 BLOCK을 판별한다(C 스타일)
     // 추후에 들여쓰기로 변경할 때 수정할 예정
@@ -146,8 +142,8 @@ BlockStatement *Parser::parseBlockStatement() {
     return statement;
 }
 
-IfStatement *Parser::parseIfStatement() {
-    auto *statement = new IfStatement();
+IfStatement* Parser::parseIfStatement() {
+    auto* statement = new IfStatement();
     skipToken(TokenType::만약);
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -163,8 +159,8 @@ IfStatement *Parser::parseIfStatement() {
     return statement;
 }
 
-FunctionStatement *Parser::parseFunctionStatement() {
-    auto *statement = new FunctionStatement();
+FunctionStatement* Parser::parseFunctionStatement() {
+    auto* statement = new FunctionStatement();
     skipToken(TokenType::함수);
     skipToken(TokenType::COLON);
 
@@ -203,14 +199,14 @@ FunctionStatement *Parser::parseFunctionStatement() {
     return statement;
 }
 
-Expression *Parser::parseExpression(Precedence precedence) {
+Expression* Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         // 나중에 에러 처리 추가할 것
         throw runtime_error("No prefix function found, " + TokenTypeToString(current_token->type));
     }
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
-    Expression *expression = (this->*prefixParseFunction)();
+    Expression* expression                  = (this->*prefixParseFunction)();
 
     while (next_token != nullptr && precedence < getPrecedence[next_token->type]) {
         if (!infixParseFunctions.contains(next_token->type)) {
@@ -224,10 +220,10 @@ Expression *Parser::parseExpression(Precedence precedence) {
     return expression;
 }
 
-Expression *Parser::parseInfixExpression(Expression *left) {
-    InfixExpression *infixExpression = new InfixExpression;
-    infixExpression->token = current_token;
-    infixExpression->left = left;
+Expression* Parser::parseInfixExpression(Expression* left) {
+    InfixExpression* infixExpression = new InfixExpression;
+    infixExpression->token           = current_token;
+    infixExpression->left            = left;
 
     Precedence precedence = getPrecedence[current_token->type];
     setNextToken();
@@ -237,9 +233,9 @@ Expression *Parser::parseInfixExpression(Expression *left) {
     return infixExpression;
 }
 
-Expression *Parser::parsePrefixExpression() {
-    PrefixExpression *prefixExpression = new PrefixExpression;
-    prefixExpression->token = current_token;
+Expression* Parser::parsePrefixExpression() {
+    PrefixExpression* prefixExpression = new PrefixExpression;
+    prefixExpression->token            = current_token;
     setNextToken();
 
     prefixExpression->right = parseExpression(Precedence::PREFIX);
@@ -248,26 +244,26 @@ Expression *Parser::parsePrefixExpression() {
 }
 
 
-Expression *Parser::parseGroupedExpression() {
+Expression* Parser::parseGroupedExpression() {
     skipToken(TokenType::LPAREN);
-    Expression *expression = parseExpression(Precedence::LOWEST);
+    Expression* expression = parseExpression(Precedence::LOWEST);
     setNextToken(); // current_token을 )으로 세팅하는 과정
     checkToken(TokenType::RPAREN);
     return expression;
 }
 
-Expression *Parser::parseIdentifierExpression() {
+Expression* Parser::parseIdentifierExpression() {
     checkToken(TokenType::IDENTIFIER);
 
-    auto identifier_expression = new IdentifierExpression();
+    auto identifier_expression  = new IdentifierExpression();
     identifier_expression->name = current_token->text;
     return identifier_expression;
 }
 
-Expression *Parser::parseCallExpression() {
+Expression* Parser::parseCallExpression() {
     skipToken(TokenType::COLON);
 
-    auto call_expression = new CallExpression();
+    auto call_expression      = new CallExpression();
     call_expression->function = parseExpression(Precedence::LOWEST);
     skipToken(TokenType::IDENTIFIER);
 
@@ -285,8 +281,8 @@ Expression *Parser::parseCallExpression() {
     return call_expression;
 }
 
-Expression *Parser::parseIndexExpression(Expression* left) {
-    auto index_expression = new IndexExpression();
+Expression* Parser::parseIndexExpression(Expression* left) {
+    auto index_expression  = new IndexExpression();
     index_expression->name = left;
     skipToken(TokenType::LBRACKET);
     index_expression->index = parseExpression(Precedence::LOWEST);
@@ -297,35 +293,35 @@ Expression *Parser::parseIndexExpression(Expression* left) {
 }
 
 
-Expression *Parser::parseIntegerLiteral() {
-    auto *integerLiteral = new IntegerLiteral();
+Expression* Parser::parseIntegerLiteral() {
+    auto* integerLiteral  = new IntegerLiteral();
     integerLiteral->token = current_token;
     integerLiteral->value = stoll(current_token->text);
     return integerLiteral;
 }
 
-Expression *Parser::parseBooleanLiteral() {
-    auto *booleanLiteral = new BooleanLiteral();
+Expression* Parser::parseBooleanLiteral() {
+    auto* booleanLiteral  = new BooleanLiteral();
     booleanLiteral->token = current_token;
     // true 값을 나타내는 문자열 "true"가 하드 코딩 되어 있다.
     booleanLiteral->value = current_token->text == "true";
     return booleanLiteral;
 }
 
-Expression *Parser::parseStringLiteral() {
-    auto *stringLiteral = new StringLiteral();
+Expression* Parser::parseStringLiteral() {
+    auto* stringLiteral  = new StringLiteral();
     stringLiteral->token = current_token;
     stringLiteral->value = current_token->text;
     return stringLiteral;
 }
 
-Expression *Parser::parseArrayLiteral() {
-    auto *arrayLiteral = new ArrayLiteral();
+Expression* Parser::parseArrayLiteral() {
+    auto* arrayLiteral = new ArrayLiteral();
 
     skipToken(TokenType::LBRACKET);
     while (current_token != nullptr && current_token->type != TokenType::RBRACKET) {
     flag:
-        Expression *element = parseExpression(Precedence::LOWEST);
+        Expression* element = parseExpression(Precedence::LOWEST);
         arrayLiteral->elements.push_back(element);
         setNextToken();
 

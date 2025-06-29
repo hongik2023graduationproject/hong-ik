@@ -67,4 +67,4 @@ enum class TokenType {
     GREATER_EQUAL, // >=
 };
 
-#endif //TOKEN_TYPE_H
+#endif // TOKEN_TYPE_H

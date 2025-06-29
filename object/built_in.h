@@ -5,15 +5,15 @@
 
 
 class Length : public Builtin {
-    Object *function(std::vector<Object *> parameters) override;
+    Object* function(std::vector<Object*> parameters) override;
 };
 
 class Print : public Builtin {
-    Object *function(std::vector<Object *> parameters) override;
+    Object* function(std::vector<Object*> parameters) override;
 };
 
 class Push : public Builtin {
-    Object *function(std::vector<Object *> parameters) override;
+    Object* function(std::vector<Object*> parameters) override;
 };
 
-#endif //BUILT_IN_H
+#endif // BUILT_IN_H

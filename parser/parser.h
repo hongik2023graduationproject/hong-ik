@@ -1,23 +1,22 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "../ast/program.h"
+#include "../token/token.h"
 #include <map>
 #include <vector>
 
-#include "../token/token.h"
-#include "../ast/program.h"
-
 class Parser {
 public:
-    Program *Parsing(const std::vector<Token *> &tokens);
+    Program* Parsing(const std::vector<Token*>& tokens);
 
 private:
-    std::vector<Token *> tokens;
+    std::vector<Token*> tokens;
 
-    Program *program;
-    Token *current_token;
-    Token *next_token;
-    Token *next_next_token;
+    Program* program;
+    Token* current_token;
+    Token* next_token;
+    Token* next_next_token;
     long long current_read_position;
 
     void initialization();
@@ -30,25 +29,25 @@ private:
 
     void checkToken(TokenType type);
 
-    Statement *parseStatement();
+    Statement* parseStatement();
 
-    InitializationStatement *parseInitializationStatement();
+    InitializationStatement* parseInitializationStatement();
 
-    AssignmentStatement *parseAssignmentStatement();
+    AssignmentStatement* parseAssignmentStatement();
 
-    ExpressionStatement *parseExpressionStatement();
+    ExpressionStatement* parseExpressionStatement();
 
-    ReturnStatement *parseReturnStatement();
+    ReturnStatement* parseReturnStatement();
 
-    BlockStatement *parseBlockStatement();
+    BlockStatement* parseBlockStatement();
 
-    IfStatement *parseIfStatement();
+    IfStatement* parseIfStatement();
 
-    FunctionStatement *parseFunctionStatement();
+    FunctionStatement* parseFunctionStatement();
 
 
-    using PrefixParseFunction = Expression* (Parser::*)();
-    using InfixParseFunction = Expression* (Parser::*)(Expression *);
+    using PrefixParseFunction                                     = Expression* (Parser::*) ();
+    using InfixParseFunction                                      = Expression* (Parser::*) (Expression*);
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
         {TokenType::INTEGER, &Parser::parseIntegerLiteral},
         {TokenType::LPAREN, &Parser::parseGroupedExpression},
@@ -86,46 +85,40 @@ private:
     };
 
     std::map<TokenType, Precedence> getPrecedence = {
-        {TokenType::EQUAL, Precedence::EQUALS},
-        {TokenType::NOT_EQUAL, Precedence::EQUALS},
-        {TokenType::LESS_THAN, Precedence::LESS_GREATER},
-        {TokenType::GREATER_THAN, Precedence::LESS_GREATER},
-        {TokenType::LESS_EQUAL, Precedence::LESS_GREATER},
-        {TokenType::GREATER_EQUAL, Precedence::LESS_GREATER},
-        {TokenType::PLUS, Precedence::SUM},
-        {TokenType::MINUS, Precedence::SUM},
-        {TokenType::ASTERISK, Precedence::PRODUCT},
-        {TokenType::SLASH, Precedence::PRODUCT},
-        {TokenType::LBRACKET, Precedence::INDEX},
-        {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
+        {TokenType::EQUAL, Precedence::EQUALS}, {TokenType::NOT_EQUAL, Precedence::EQUALS},
+        {TokenType::LESS_THAN, Precedence::LESS_GREATER}, {TokenType::GREATER_THAN, Precedence::LESS_GREATER},
+        {TokenType::LESS_EQUAL, Precedence::LESS_GREATER}, {TokenType::GREATER_EQUAL, Precedence::LESS_GREATER},
+        {TokenType::PLUS, Precedence::SUM}, {TokenType::MINUS, Precedence::SUM},
+        {TokenType::ASTERISK, Precedence::PRODUCT}, {TokenType::SLASH, Precedence::PRODUCT},
+        {TokenType::LBRACKET, Precedence::INDEX}, {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
         {TokenType::LOGICAL_OR, Precedence::LOGICAL_OR},
         // {TokenType::COLON, Precedence::CALL}, // TODO: 이 부분은 검증할 것(생각대로 작성만 함)
     };
 
-    Expression *parseExpression(Precedence precedence);
+    Expression* parseExpression(Precedence precedence);
 
-    Expression *parseInfixExpression(Expression *left);
+    Expression* parseInfixExpression(Expression* left);
 
-    Expression *parseIndexExpression(Expression* left);
-
-
-    Expression *parsePrefixExpression();
-
-    Expression *parseGroupedExpression();
-
-    Expression *parseIdentifierExpression();
-
-    Expression *parseCallExpression();
+    Expression* parseIndexExpression(Expression* left);
 
 
-    Expression *parseIntegerLiteral();
+    Expression* parsePrefixExpression();
 
-    Expression *parseBooleanLiteral();
+    Expression* parseGroupedExpression();
 
-    Expression *parseStringLiteral();
+    Expression* parseIdentifierExpression();
 
-    Expression *parseArrayLiteral();
+    Expression* parseCallExpression();
+
+
+    Expression* parseIntegerLiteral();
+
+    Expression* parseBooleanLiteral();
+
+    Expression* parseStringLiteral();
+
+    Expression* parseArrayLiteral();
 };
 
 
-#endif //PARSER_H
+#endif // PARSER_H

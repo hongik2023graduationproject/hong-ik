@@ -6,11 +6,11 @@
 
 class Utf8Converter {
 public:
-    static std::vector<std::string> Convert(const std::string &input);
+    static std::vector<std::string> Convert(const std::string& input);
 
 private:
-    static int getCharacterLength(const std::string &input, int position);
+    static int getCharacterLength(const std::string& input, int position);
 };
 
 
-#endif //UTF8_CONVERTER_H
+#endif // UTF8_CONVERTER_H

@@ -1,9 +1,9 @@
 #ifndef REPL_H
 #define REPL_H
 
+#include "../evaluator/evaluator.h"
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
-#include "../evaluator/evaluator.h"
 
 class Repl {
 public:
@@ -16,10 +16,10 @@ public:
     void TestParser();
 
 private:
-    Lexer *lexer;
-    Parser *parser;
-    Evaluator *evaluator;
+    Lexer* lexer;
+    Parser* parser;
+    Evaluator* evaluator;
 };
 
 
-#endif //REPL_H
+#endif // REPL_H

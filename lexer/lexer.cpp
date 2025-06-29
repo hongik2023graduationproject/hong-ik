@@ -17,14 +17,14 @@ Lexer::Lexer() {
 }
 
 
-std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters) {
-    this->characters = characters;
+std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) {
+    this->characters      = characters;
     current_read_position = 0;
-    next_read_position = 1;
-    line = 1;
+    next_read_position    = 1;
+    line                  = 1;
 
 
-    vector<Token *> tokens;
+    vector<Token*> tokens;
     // 현재 token type에 정의된 토큰 중 identifier, integer, float, string이 미구현
     // 추후에 hash 함수 이용한 switch문 같은 가독성, 효율 좋은 코드로 변경할 필요 있음
     while (current_read_position < characters.size()) {
@@ -33,8 +33,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "-") {
             if (next_read_position < characters.size() && characters[next_read_position] == ">") {
                 tokens.push_back(new Token{
-                    TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -47,8 +46,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "=") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
                 tokens.push_back(new Token{
-                    TokenType::EQUAL, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::EQUAL, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -57,8 +55,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "!") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
                 tokens.push_back(new Token{
-                    TokenType::NOT_EQUAL, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::NOT_EQUAL, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -92,8 +89,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "&") {
             if (next_read_position < characters.size() && characters[next_read_position] == "&") {
                 tokens.push_back(new Token{
-                    TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -102,8 +98,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "|") {
             if (next_read_position < characters.size() && characters[next_read_position] == "|") {
                 tokens.push_back(new Token{
-                    TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -114,8 +109,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
         } else if (characters[current_read_position] == "<") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
                 tokens.push_back(new Token{
-                    TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position], line
-                });
+                    TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -123,9 +117,8 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
             }
         } else if (characters[current_read_position] == ">") {
             if (next_read_position < characters.size() && characters[next_read_position] == "|") {
-                tokens.push_back(new Token{
-                    TokenType::GREATER_EQUAL, characters[current_read_position] + characters[next_read_position], line
-                });
+                tokens.push_back(new Token{TokenType::GREATER_EQUAL,
+                    characters[current_read_position] + characters[next_read_position], line});
                 current_read_position++;
                 next_read_position++;
             } else {
@@ -158,7 +151,7 @@ std::vector<Token *> Lexer::Tokenize(const std::vector<std::string> &characters)
 }
 
 
-bool Lexer::isNumber(const std::string &s) {
+bool Lexer::isNumber(const std::string& s) {
     return ("0" <= s && s <= "9");
 }
 
@@ -174,15 +167,15 @@ string Lexer::readInteger() {
     return integer_string;
 }
 
-bool Lexer::isLetter(const std::string &s) {
+bool Lexer::isLetter(const std::string& s) {
     return ("a" <= s && s <= "z" || "A" <= s && s <= "Z" || s == "_" || "가" <= s && s <= "힣");
 }
 
 std::string Lexer::readLetter() {
     string identifier = characters[current_read_position];
 
-    while (next_read_position < characters.size() && isLetter(characters[next_read_position]) || isNumber(
-               characters[next_read_position])) {
+    while (next_read_position < characters.size() && isLetter(characters[next_read_position])
+           || isNumber(characters[next_read_position])) {
         current_read_position++;
         next_read_position++;
         identifier += characters[current_read_position];

@@ -1,87 +1,88 @@
 #include "evaluator.h"
-#include "iostream"
 
-#include "../ast/literals.h"
 #include "../ast/expressions.h"
+#include "../ast/literals.h"
 #include "../environment/environment.h"
+#include "iostream"
 
 using namespace std;
 
 Evaluator::Evaluator() {
     environment = new Environment();
-};
+}
 
 // TODO: Evaluate와 eval 함수 합치기
-Object *Evaluator::Evaluate(Program *program) {
+Object* Evaluator::Evaluate(Program* program) {
     return eval(program, environment);
 }
 
-
 // eval 하는 순서는 statement, expression, literal 순으로 배치
-// 이는 많이 call 되는 순서에 따라 배치하는 것이 효율적으로 작동할 것이지만 개발의 편의성을 위한 것
-// 추후에 call 되는 순서에 따라 배치하거나, map을 사용해여 최적화 할 것
-Object *Evaluator::eval(Node *node, Environment *environment) {
-    if (auto *program = dynamic_cast<Program *>(node)) {
+// 이는 많이 call 되는 순서에 따라 배치하는 것이 효율적으로 작동할 것이지만
+// 개발의 편의성을 위한 것 추후에 call 되는 순서에 따라 배치하거나, map을
+// 사용해여 최적화 할 것
+Object* Evaluator::eval(Node* node, Environment* environment) {
+    if (auto* program = dynamic_cast<Program*>(node)) {
         return evalProgram(program, environment);
     }
-    if (auto *block_statement = dynamic_cast<BlockStatement *>(node)) {
+    if (auto* block_statement = dynamic_cast<BlockStatement*>(node)) {
         return evalBlockStatement(block_statement->statements, environment);
     }
-    if (auto *expression_statement = dynamic_cast<ExpressionStatement *>(node)) {
+    if (auto* expression_statement = dynamic_cast<ExpressionStatement*>(node)) {
         return eval(expression_statement->expression, environment);
     }
-    if (auto *initialization_statement = dynamic_cast<InitializationStatement *>(node)) {
-        Object *value = eval(initialization_statement->value, environment);
+    if (auto* initialization_statement = dynamic_cast<InitializationStatement*>(node)) {
+        Object* value = eval(initialization_statement->value, environment);
         // if (environment->Get(initialization_statement->name) != nullptr) {
         //     throw std::runtime_error("존재하는 변수명입니다.");
         // }
         environment->Set(initialization_statement->name, value);
         return value;
     }
-    if (auto *assignment_statement = dynamic_cast<AssignmentStatement *>(node)) {
-        Object *before = environment->Get(assignment_statement->name); // 변수가 현재 환경에 존재하는 지 확인하기 위한 절차
-        Object *value = eval(assignment_statement->value, environment);
+    if (auto* assignment_statement = dynamic_cast<AssignmentStatement*>(node)) {
+        Object* before = environment->Get(assignment_statement->name); // 변수가 현재 환경에 존재하는 지
+                                                                       // 확인하기 위한 절차
+        Object* value = eval(assignment_statement->value, environment);
         // TODO: if (value.type != before.type) throw error
         environment->Set(assignment_statement->name, value);
         return value;
     }
-    if (auto *if_statement = dynamic_cast<IfStatement *>(node)) {
-        auto *condition = eval(if_statement->condition, environment);
-        Boolean *boolean = dynamic_cast<Boolean *>(condition);
+    if (auto* if_statement = dynamic_cast<IfStatement*>(node)) {
+        auto* condition  = eval(if_statement->condition, environment);
+        Boolean* boolean = dynamic_cast<Boolean*>(condition);
         if (boolean && boolean->value) {
             return eval(if_statement->consequence, environment);
         }
         return nullptr;
     }
 
-    if (auto *function_statement = dynamic_cast<FunctionStatement *>(node)) {
-        auto *function = new Function;
-        function->body = function_statement->body;
+    if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
+        auto* function       = new Function;
+        function->body       = function_statement->body;
         function->parameters = function_statement->parameters;
-        function->env = environment;
-        function->type = ObjectType::FUNCTION;
+        function->env        = environment;
+        function->type       = ObjectType::FUNCTION;
 
         environment->Set(function_statement->name, function);
         return function;
     }
-    if (auto *return_statement = dynamic_cast<ReturnStatement *>(node)) {
-        auto *returnValue = new ReturnValue;
-        Object *value = eval(return_statement->expression, environment);
+    if (auto* return_statement = dynamic_cast<ReturnStatement*>(node)) {
+        auto* returnValue  = new ReturnValue;
+        Object* value      = eval(return_statement->expression, environment);
         returnValue->value = value;
         return returnValue;
     }
 
-    if (auto *prefix_expression = dynamic_cast<PrefixExpression *>(node)) {
-        Object *right = eval(prefix_expression->right, environment);
+    if (auto* prefix_expression = dynamic_cast<PrefixExpression*>(node)) {
+        Object* right = eval(prefix_expression->right, environment);
         return evalPrefixExpression(prefix_expression->token, right);
     }
-    if (auto *infix_expression = dynamic_cast<InfixExpression *>(node)) {
-        Object *left = eval(infix_expression->left, environment);
-        Object *right = eval(infix_expression->right, environment);
+    if (auto* infix_expression = dynamic_cast<InfixExpression*>(node)) {
+        Object* left  = eval(infix_expression->left, environment);
+        Object* right = eval(infix_expression->right, environment);
         return evalInfixExpression(infix_expression->token, left, right);
     }
-    if (auto *identifier_expression = dynamic_cast<IdentifierExpression *>(node)) {
-        Object *value = environment->Get(identifier_expression->name);
+    if (auto* identifier_expression = dynamic_cast<IdentifierExpression*>(node)) {
+        Object* value = environment->Get(identifier_expression->name);
         if (value != nullptr) {
             return value;
         }
@@ -93,17 +94,17 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
         // ERROR
         // throw
     }
-    if (auto *call_expression = dynamic_cast<CallExpression *>(node)) {
+    if (auto* call_expression = dynamic_cast<CallExpression*>(node)) {
         // 함수명이 env에 존재하는 지 확인하는 작업
-        Object *function = eval(call_expression->function, environment);
+        Object* function = eval(call_expression->function, environment);
         if (function == nullptr) {
             // error
         }
 
         // arguments를 eval
-        vector<Object *> arguments;
-        for (auto argument: call_expression->arguments) {
-            Object *value = eval(argument, environment);
+        vector<Object*> arguments;
+        for (auto argument : call_expression->arguments) {
+            Object* value = eval(argument, environment);
             // TODO: 타입 검사도 해야 함
             // TODO: 에러 처리 필요할 가능성 농후
             arguments.push_back(value);
@@ -111,32 +112,31 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
 
         return applyFunction(function, arguments);
     }
-    if (auto *index_expression = dynamic_cast<IndexExpression *>(node)) {
-        auto *left = eval(index_expression->name, environment);
+    if (auto* index_expression = dynamic_cast<IndexExpression*>(node)) {
+        auto* left = eval(index_expression->name, environment);
         // ERROR 처리?
-        auto *index = eval(index_expression->index, environment);
+        auto* index = eval(index_expression->index, environment);
         // ERROR 처리?
         return evalIndexExpression(left, index);
     }
 
-
-    if (auto *integer_literal = dynamic_cast<IntegerLiteral *>(node)) {
-        auto *integer = new Integer(integer_literal->value);
+    if (auto* integer_literal = dynamic_cast<IntegerLiteral*>(node)) {
+        auto* integer = new Integer(integer_literal->value);
         return integer;
     }
-    if (auto *boolean_literal = dynamic_cast<BooleanLiteral *>(node)) {
-        auto *boolean = new Boolean(boolean_literal->value);
+    if (auto* boolean_literal = dynamic_cast<BooleanLiteral*>(node)) {
+        auto* boolean = new Boolean(boolean_literal->value);
         return boolean;
     }
-    if (auto *string_literal = dynamic_cast<StringLiteral *>(node)) {
-        auto *string = new String(string_literal->value);
+    if (auto* string_literal = dynamic_cast<StringLiteral*>(node)) {
+        auto* string = new String(string_literal->value);
         return string;
     }
-    if (auto *array_literal = dynamic_cast<ArrayLiteral *>(node)) {
-        auto *array = new Array();
+    if (auto* array_literal = dynamic_cast<ArrayLiteral*>(node)) {
+        auto* array = new Array();
         array->type = ObjectType::ARRAY;
-        for (auto element: array_literal->elements) {
-            Object *value = eval(element, environment);
+        for (auto element : array_literal->elements) {
+            Object* value = eval(element, environment);
             array->elements.push_back(value);
         }
         return array;
@@ -145,15 +145,13 @@ Object *Evaluator::eval(Node *node, Environment *environment) {
     throw invalid_argument("알 수 없는 구문입니다.");
 }
 
+Object* Evaluator::evalProgram(const Program* program, Environment* environment) {
+    Object* result = nullptr;
 
-Object *Evaluator::evalProgram(const Program *program, Environment *environment) {
-    Object *result = nullptr;
-
-    for (const auto statement: program->statements) {
+    for (const auto statement : program->statements) {
         result = eval(statement, environment);
 
-
-        if (auto *return_value = dynamic_cast<ReturnValue *>(result)) {
+        if (auto* return_value = dynamic_cast<ReturnValue*>(result)) {
             return return_value->value;
         }
     }
@@ -161,14 +159,14 @@ Object *Evaluator::evalProgram(const Program *program, Environment *environment)
     return result;
 }
 
-Object *Evaluator::evalBlockStatement(std::vector<Statement *> statements, Environment *environment) {
+Object* Evaluator::evalBlockStatement(std::vector<Statement*> statements, Environment* environment) {
     // nullptr를 반환할 수 있는 여지가 있음
-    Object *result = nullptr;
+    Object* result = nullptr;
 
-    for (const auto statement: statements) {
+    for (const auto statement : statements) {
         result = eval(statement, environment);
 
-        if (const auto *return_value = dynamic_cast<ReturnValue *>(result)) {
+        if (const auto* return_value = dynamic_cast<ReturnValue*>(result)) {
             return result;
         }
     }
@@ -176,8 +174,7 @@ Object *Evaluator::evalBlockStatement(std::vector<Statement *> statements, Envir
     return result;
 }
 
-
-Object *Evaluator::evalInfixExpression(Token *token, Object *left, Object *right) {
+Object* Evaluator::evalInfixExpression(Token* token, Object* left, Object* right) {
     if (left->type == ObjectType::INTEGER && right->type == ObjectType::INTEGER) {
         return evalIntegerInfixExpression(token, left, right);
     }
@@ -189,11 +186,11 @@ Object *Evaluator::evalInfixExpression(Token *token, Object *left, Object *right
     }
 }
 
-Object *Evaluator::evalIntegerInfixExpression(Token *token, Object *left, Object *right) {
-    auto *left_integer = dynamic_cast<Integer *>(left);
-    auto *right_integer = dynamic_cast<Integer *>(right);
+Object* Evaluator::evalIntegerInfixExpression(Token* token, Object* left, Object* right) {
+    auto* left_integer  = dynamic_cast<Integer*>(left);
+    auto* right_integer = dynamic_cast<Integer*>(right);
 
-    long long left_value = left_integer->value;
+    long long left_value  = left_integer->value;
     long long right_value = right_integer->value;
 
     if (token->type == TokenType::PLUS) {
@@ -218,9 +215,9 @@ Object *Evaluator::evalIntegerInfixExpression(Token *token, Object *left, Object
     // TODO: 에러 처리 (지원하지 않는 연산자)
 }
 
-Object *Evaluator::evalBooleanInfixExpression(Token *token, Object *left, Object *right) {
-    auto *left_boolean = dynamic_cast<Boolean *>(left);
-    auto *right_boolean = dynamic_cast<Boolean *>(right);
+Object* Evaluator::evalBooleanInfixExpression(Token* token, Object* left, Object* right) {
+    auto* left_boolean  = dynamic_cast<Boolean*>(left);
+    auto* right_boolean = dynamic_cast<Boolean*>(right);
 
     if (token->type == TokenType::LOGICAL_AND) {
         return new Boolean(left_boolean->value && right_boolean->value);
@@ -232,9 +229,9 @@ Object *Evaluator::evalBooleanInfixExpression(Token *token, Object *left, Object
     // TODO: 에러 처리 (지원하지 않는 연산자)
 }
 
-Object *Evaluator::evalStringInfixExpression(Token *token, Object *left, Object *right) {
-    auto *left_string = dynamic_cast<String *>(left);
-    auto *right_string = dynamic_cast<String *>(right);
+Object* Evaluator::evalStringInfixExpression(Token* token, Object* left, Object* right) {
+    auto* left_string  = dynamic_cast<String*>(left);
+    auto* right_string = dynamic_cast<String*>(right);
 
     if (token->type == TokenType::PLUS) {
         return new String(left_string->value + right_string->value);
@@ -249,16 +246,16 @@ Object *Evaluator::evalStringInfixExpression(Token *token, Object *left, Object 
     // TODO: 에러 처리 (지원하지 않는 연산자)
 }
 
-Object *Evaluator::evalIndexExpression(Object *left, Object *index) {
+Object* Evaluator::evalIndexExpression(Object* left, Object* index) {
     if (left->type == ObjectType::ARRAY && index->type == ObjectType::INTEGER) {
         return evalArrayIndexExpression(left, index);
     }
     // ERROR
 }
 
-Object *Evaluator::evalArrayIndexExpression(Object *array, Object *index) {
-    auto *array_object = dynamic_cast<Array *>(array);
-    auto *index_object = dynamic_cast<Integer *>(index);
+Object* Evaluator::evalArrayIndexExpression(Object* array, Object* index) {
+    auto* array_object = dynamic_cast<Array*>(array);
+    auto* index_object = dynamic_cast<Integer*>(index);
     if (0 <= index_object->value && index_object->value < array_object->elements.size()) {
         return array_object->elements[index_object->value];
     }
@@ -266,8 +263,7 @@ Object *Evaluator::evalArrayIndexExpression(Object *array, Object *index) {
     // ERROR
 }
 
-
-Object *Evaluator::evalPrefixExpression(Token *token, Object *right) {
+Object* Evaluator::evalPrefixExpression(Token* token, Object* right) {
     if (token->type == TokenType::MINUS) {
         return evalMinusPrefixExpression(right);
     }
@@ -276,44 +272,44 @@ Object *Evaluator::evalPrefixExpression(Token *token, Object *right) {
     }
 }
 
-Object *Evaluator::evalMinusPrefixExpression(Object *right) {
-    if (auto integer = dynamic_cast<Integer *>(right)) {
+Object* Evaluator::evalMinusPrefixExpression(Object* right) {
+    if (auto integer = dynamic_cast<Integer*>(right)) {
         return new Integer(-integer->value);
     }
 }
 
-Object *Evaluator::evalBangPrefixExpression(Object *right) {
-    if (auto boolean = dynamic_cast<Boolean *>(right)) {
+Object* Evaluator::evalBangPrefixExpression(Object* right) {
+    if (auto boolean = dynamic_cast<Boolean*>(right)) {
         return new Boolean(!boolean->value);
     }
 }
 
-
-Object *Evaluator::applyFunction(Object *function, std::vector<Object *> arguments) {
-    if (auto *function_object = dynamic_cast<Function *>(function)) {
+Object* Evaluator::applyFunction(Object* function, std::vector<Object*> arguments) {
+    if (auto* function_object = dynamic_cast<Function*>(function)) {
         if (function_object == nullptr) {
             throw std::invalid_argument("Function is not a function");
         }
 
         // 함수 내부에서 사용할 env 확장하는 과정
 
-        Environment *extended_env = extendFunctionEnvironment(function_object, arguments);
+        Environment* extended_env = extendFunctionEnvironment(function_object, arguments);
 
-        Object *evaluated = eval(function_object->body, extended_env);
+        Object* evaluated = eval(function_object->body, extended_env);
 
-        // TODO: return type 검사를 하지 않고 있다. 또한 리턴 타입이 존재하는 지도 검사해야 함
+        // TODO: return type 검사를 하지 않고 있다. 또한 리턴 타입이 존재하는
+        // 지도 검사해야 함
         return unwarpReturnValue(evaluated);
     }
 
-    if (auto *builtin_object = dynamic_cast<Builtin *>(function)) {
+    if (auto* builtin_object = dynamic_cast<Builtin*>(function)) {
         return builtin_object->function(arguments);
     }
 
     // TODO: ERROR
 }
 
-Environment *Evaluator::extendFunctionEnvironment(Function *function, std::vector<Object *> arguments) {
-    environment = new Environment();
+Environment* Evaluator::extendFunctionEnvironment(Function* function, std::vector<Object*> arguments) {
+    environment        = new Environment();
     environment->outer = function->env;
 
     for (int i = 0; i < function->parameters.size(); i++) {
@@ -324,18 +320,17 @@ Environment *Evaluator::extendFunctionEnvironment(Function *function, std::vecto
     return environment;
 }
 
-// 지금 expression statement가 존재하고 있어 return value가 없더라고 마지막에 eval되어
-// 결과 값으로 나온 Object가 자동으로 return 하게 끔 하고 있다.
-// 추후에 expression statement가 삭제되면 수정할 필요가 있다
-Object *Evaluator::unwarpReturnValue(Object *object) {
-    if (auto *return_value = dynamic_cast<ReturnValue *>(object)) {
+// 지금 expression statement가 존재하고 있어 return value가 없더라고 마지막에
+// eval되어 결과 값으로 나온 Object가 자동으로 return 하게 끔 하고 있다. 추후에
+// expression statement가 삭제되면 수정할 필요가 있다
+Object* Evaluator::unwarpReturnValue(Object* object) {
+    if (auto* return_value = dynamic_cast<ReturnValue*>(object)) {
         return return_value->value;
     }
 
     return object;
 }
 
-
-Object *Evaluator::length(std::vector<Object *> argumenmts) {
+Object* Evaluator::length(std::vector<Object*> argumenmts) {
     return new Integer(argumenmts.size());
 }

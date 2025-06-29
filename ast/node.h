@@ -9,5 +9,4 @@ public:
     virtual std::string String() = 0;
 };
 
-
-#endif //NODE_H
+#endif // NODE_H

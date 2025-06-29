@@ -11,4 +11,4 @@ enum class ObjectType {
     ARRAY,
 };
 
-#endif //OBJECT_TYPE_H
+#endif // OBJECT_TYPE_H

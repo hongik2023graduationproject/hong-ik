@@ -1,12 +1,11 @@
 #ifndef OBJECT_H
 #define OBJECT_H
 
-#include <string>
-#include <vector>
-
-#include "object_type.h"
 #include "../ast/expressions.h"
 #include "../ast/statements.h"
+#include "object_type.h"
+#include <string>
+#include <vector>
 
 // 전방 선언, 순환 참조가 발생해 전방 선언 사용
 class Environment;
@@ -62,7 +61,7 @@ public:
 
 class ReturnValue final : public Object {
 public:
-    Object *value;
+    Object* value;
 
     std::string ToString() override {
         return value->ToString();
@@ -71,9 +70,9 @@ public:
 
 class Function final : public Object {
 public:
-    std::vector<Expression *> parameters;
-    BlockStatement *body;
-    Environment *env;
+    std::vector<Expression*> parameters;
+    BlockStatement* body;
+    Environment* env;
 
     // TODO: 미구현 상태
     std::string ToString() override {
@@ -89,7 +88,7 @@ public:
 
     std::string ToString() override {
         std::string s = "[";
-        for (auto & element : elements) {
+        for (auto& element : elements) {
             s += element->ToString();
             s += ", ";
         }
@@ -100,11 +99,11 @@ public:
 
 class Builtin : public Object {
 public:
-    virtual Object *function(std::vector<Object *> args) = 0;
+    virtual Object* function(std::vector<Object*> args) = 0;
 
     std::string ToString() override {
         return "";
     }
 };
 
-#endif //OBJECT_H
+#endif // OBJECT_H

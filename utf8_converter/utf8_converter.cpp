@@ -2,7 +2,7 @@
 
 using namespace std;
 
-std::vector<std::string> Utf8Converter::Convert(const std::string &input) {
+std::vector<std::string> Utf8Converter::Convert(const std::string& input) {
     vector<string> characters;
 
     for (int position = 0, length; position < input.length(); position += length) {
@@ -13,7 +13,7 @@ std::vector<std::string> Utf8Converter::Convert(const std::string &input) {
     return characters;
 }
 
-int Utf8Converter::getCharacterLength(const std::string &input, const int position) {
+int Utf8Converter::getCharacterLength(const std::string& input, const int position) {
     if (position < 0 || position >= input.size()) {
         return 0; // 유효하지 않은 위치
     }

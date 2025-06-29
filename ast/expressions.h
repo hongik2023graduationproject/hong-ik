@@ -1,18 +1,16 @@
 #ifndef EXPRESSIONS_H
 #define EXPRESSIONS_H
 
-#include "node.h"
 #include "../token/token.h"
+#include "node.h"
 
-class Expression : public Node {
-};
-
+class Expression : public Node {};
 
 class InfixExpression : public Expression {
 public:
-    Token *token;
-    Expression *left;
-    Expression *right;
+    Token* token;
+    Expression* left;
+    Expression* right;
 
     std::string String() override {
         return "(" + left->String() + " " + token->text + " " + right->String() + ")";
@@ -21,11 +19,12 @@ public:
 
 class PrefixExpression : public Expression {
 public:
-    Token *token;
-    Expression *right;
+    Token* token;
+    Expression* right;
 
     std::string String() override {
-        return "(" + token->text + right->String() + ")";;
+        return "(" + token->text + right->String() + ")";
+        ;
     }
 };
 
@@ -41,13 +40,13 @@ public:
 // 함수 호출을 위한 표현식
 class CallExpression : public Expression {
 public:
-    Expression *function;
-    std::vector<Expression *> arguments;
+    Expression* function;
+    std::vector<Expression*> arguments;
 
     std::string String() override {
         std::string s = ":" + function->String();
         s += " (";
-        for (auto arg: arguments) {
+        for (auto arg : arguments) {
             s += arg->String();
             s += ", ";
         }
@@ -58,12 +57,12 @@ public:
 
 class IndexExpression : public Expression {
 public:
-    Expression *name;
-    Expression *index;
+    Expression* name;
+    Expression* index;
 
     std::string String() override {
         return name->String() + "[" + index->String() + "]";
     }
 };
 
-#endif //EXPRESSIONS_H
+#endif // EXPRESSIONS_H
