@@ -3,6 +3,7 @@
 
 #include "../token/token.h"
 #include "node.h"
+#include <vector>
 
 class Expression : public Node {};
 

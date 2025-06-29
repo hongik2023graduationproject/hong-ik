@@ -11,17 +11,14 @@ int main(int argc, char* argv[]) {
     SetConsoleCP(CP_UTF8);
 #endif
 
+    // 파일 모드
     if (argc > 1) {
         std::cout << "사용법: hongik [script]"; // 추후 추가 예정
-        return 1;
-    }
-
-    // 파일 모드
-    if (argc == 1) {
+        return 0;
     }
 
     // 인터프리터 모드
-    if (argc == 0) {
+    if (argc == 1) {
         Repl repl;
         // repl.TestLexer();
         // repl.TestParser();
