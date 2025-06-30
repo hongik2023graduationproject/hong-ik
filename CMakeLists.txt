@@ -47,6 +47,8 @@ add_executable(HongIk main.cpp
 add_library(HongIkLib STATIC
         utf8_converter/utf8_converter.cpp
         lexer/lexer.cpp
+        token/token_type.h
+        token/token.cpp
 )
 
 add_executable(HongIkTests

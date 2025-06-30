@@ -11,7 +11,8 @@ protected:
     void ExpectStringsEqual(const vector<string>& actual, const vector<string>& expected) {
         ASSERT_EQ(actual.size(), expected.size()) << "벡터 길이가 일치하지 않습니다.!";
         for (size_t i = 0; i < expected.size(); ++i) {
-            EXPECT_EQ(actual[i], expected[i]) << "예측과 다른 결과 발생, 예측: " << expected[i] << ", 결과: " << actual[i];
+            EXPECT_EQ(actual[i], expected[i])
+                << "예측과 다른 결과 발생, 예측: " << expected[i] << ", 결과: " << actual[i];
         }
     }
 };
@@ -52,7 +53,7 @@ TEST_F(Utf8ConverterTest, EmptyVectorTest) {
 
 TEST_F(Utf8ConverterTest, NewLineTest) {
     vector<string> expected = {"a", "\n", "b"};
-    auto actual = converter.Convert("a\nb");
+    auto actual             = converter.Convert("a\nb");
 
     ExpectStringsEqual(actual, expected);
 }

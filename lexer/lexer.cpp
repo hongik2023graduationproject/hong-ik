@@ -111,7 +111,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
                 addToken(TokenType::LESS_THAN);
             }
         } else if (characters[current_read_position] == ">") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "|") {
+            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
                 addToken(TokenType::GREATER_EQUAL, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
@@ -169,11 +169,11 @@ bool Lexer::isLetter(const std::string& s) {
 std::string Lexer::readLetter() {
     string identifier = characters[current_read_position];
 
-    while (next_read_position < characters.size() && isLetter(characters[next_read_position])
-           || isNumber(characters[next_read_position])) {
+    while (next_read_position < characters.size() && (isLetter(characters[next_read_position])
+           || isNumber(characters[next_read_position]))) {
+        identifier += characters[next_read_position];
         current_read_position++;
         next_read_position++;
-        identifier += characters[current_read_position];
     }
     return identifier;
 }
