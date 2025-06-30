@@ -24,121 +24,116 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     line                  = 1;
 
 
-    vector<Token*> tokens;
+    tokens.clear();
+
     // 현재 token type에 정의된 토큰 중 identifier, integer, float, string이 미구현
     // 추후에 hash 함수 이용한 switch문 같은 가독성, 효율 좋은 코드로 변경할 필요 있음
     while (current_read_position < characters.size()) {
         if (characters[current_read_position] == "+") {
-            tokens.push_back(new Token{TokenType::PLUS, characters[current_read_position], line});
+            addToken(TokenType::PLUS);
         } else if (characters[current_read_position] == "-") {
             if (next_read_position < characters.size() && characters[next_read_position] == ">") {
-                tokens.push_back(new Token{
-                    TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::MINUS, characters[current_read_position], line});
+                addToken(TokenType::MINUS);
             }
         } else if (characters[current_read_position] == "*") {
-            tokens.push_back(new Token{TokenType::ASTERISK, characters[current_read_position], line});
+            addToken(TokenType::ASTERISK);
         } else if (characters[current_read_position] == "/") {
-            tokens.push_back(new Token{TokenType::SLASH, characters[current_read_position], line});
+            addToken(TokenType::SLASH);
         } else if (characters[current_read_position] == "=") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                tokens.push_back(new Token{
-                    TokenType::EQUAL, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::EQUAL, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::ASSIGN, characters[current_read_position], line});
+                addToken(TokenType::ASSIGN);
             }
         } else if (characters[current_read_position] == "!") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                tokens.push_back(new Token{
-                    TokenType::NOT_EQUAL, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::NOT_EQUAL, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::BANG, characters[current_read_position], line});
+                addToken(TokenType::BANG);
             }
         } else if (characters[current_read_position] == "\n") {
-            tokens.push_back(new Token{TokenType::NEW_LINE, characters[current_read_position], line});
+            addToken(TokenType::NEW_LINE);
         } else if (characters[current_read_position] == " ") {
             // space 토큰은 문법을 명확하게 작성하도록 강요하는 용도로 만들었다.
             // 하지만 리팩토링하는 지금 시점에서 다시 생각해보면 나중에 추가할 수 있는 부분이고
             // parser의 구조를 복잡하게 만드는 요소이므로 추후에 추가하는 것을 고려하기로 함
             // tokens.push_back(new Token{TokenType::SPACE, characters[current_read_position], line});
         } else if (characters[current_read_position] == "\t") {
-            tokens.push_back(new Token{TokenType::TAB, characters[current_read_position], line});
+            addToken(TokenType::TAB);
         } else if (characters[current_read_position] == "(") {
-            tokens.push_back(new Token{TokenType::LPAREN, characters[current_read_position], line});
+            addToken(TokenType::LPAREN);
         } else if (characters[current_read_position] == ")") {
-            tokens.push_back(new Token{TokenType::RPAREN, characters[current_read_position], line});
+            addToken(TokenType::RPAREN);
         } else if (characters[current_read_position] == "{") {
-            tokens.push_back(new Token{TokenType::LBRACE, characters[current_read_position], line});
+            addToken(TokenType::LBRACE);
         } else if (characters[current_read_position] == "}") {
-            tokens.push_back(new Token{TokenType::RBRACE, characters[current_read_position], line});
+            addToken(TokenType::RBRACE);
         } else if (characters[current_read_position] == "[") {
-            tokens.push_back(new Token{TokenType::LBRACKET, characters[current_read_position], line});
+            addToken(TokenType::LBRACKET);
         } else if (characters[current_read_position] == "]") {
-            tokens.push_back(new Token{TokenType::RBRACKET, characters[current_read_position], line});
+            addToken(TokenType::RBRACKET);
         } else if (characters[current_read_position] == ":") {
-            tokens.push_back(new Token{TokenType::COLON, characters[current_read_position], line});
+            addToken(TokenType::COLON);
         } else if (characters[current_read_position] == ";") {
-            tokens.push_back(new Token{TokenType::SEMICOLON, characters[current_read_position], line});
+            addToken(TokenType::SEMICOLON);
         } else if (characters[current_read_position] == "&") {
             if (next_read_position < characters.size() && characters[next_read_position] == "&") {
-                tokens.push_back(new Token{
-                    TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::BITWISE_AND, characters[current_read_position], line});
+                addToken(TokenType::BITWISE_AND);
             }
         } else if (characters[current_read_position] == "|") {
             if (next_read_position < characters.size() && characters[next_read_position] == "|") {
-                tokens.push_back(new Token{
-                    TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::BITWISE_OR, characters[current_read_position], line});
+                addToken(TokenType::BITWISE_OR);
             }
         } else if (characters[current_read_position] == ",") {
-            tokens.push_back(new Token{TokenType::COMMA, characters[current_read_position], line});
+            addToken(TokenType::COMMA);
         } else if (characters[current_read_position] == "<") {
             if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                tokens.push_back(new Token{
-                    TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::LESS_THAN, characters[current_read_position], line});
+                addToken(TokenType::LESS_THAN);
             }
         } else if (characters[current_read_position] == ">") {
             if (next_read_position < characters.size() && characters[next_read_position] == "|") {
-                tokens.push_back(new Token{TokenType::GREATER_EQUAL,
-                    characters[current_read_position] + characters[next_read_position], line});
+                addToken(TokenType::GREATER_EQUAL, characters[current_read_position] + characters[next_read_position]);
                 current_read_position++;
                 next_read_position++;
             } else {
-                tokens.push_back(new Token{TokenType::GREATER_THAN, characters[current_read_position], line});
+                addToken(TokenType::GREATER_THAN);
             }
         } else if (characters[current_read_position] == "\"") {
             string s = readString();
-            tokens.push_back(new Token{TokenType::STRING, s, line});
+            addToken(TokenType::STRING, s);
         } else if (isNumber(characters[current_read_position])) {
             string integer_string = readInteger();
-            tokens.push_back(new Token{TokenType::INTEGER, integer_string, line});
+            addToken(TokenType::INTEGER, integer_string);
         } else if (isLetter(characters[current_read_position])) {
             string letter = readLetter();
             if (auto it = keywords.find(letter); it != keywords.end()) {
-                tokens.push_back(new Token{it->second, letter, line});
+                addToken(it->second, letter);
             } else {
-                tokens.push_back(new Token{TokenType::IDENTIFIER, letter, line});
+                addToken(TokenType::IDENTIFIER, letter);
             }
         } else {
-            tokens.push_back(new Token{TokenType::ILLEGAL, characters[current_read_position], line});
+            // 여기서 바로 에러 처리해도 됨
+            addToken(TokenType::ILLEGAL, characters[current_read_position]);
         }
 
         current_read_position++;
@@ -198,4 +193,12 @@ string Lexer::readString() {
         next_read_position++;
     }
     return s;
+}
+
+void Lexer::addToken(TokenType type) {
+    tokens.push_back(new Token{type, characters[current_read_position], line});
+}
+
+void Lexer::addToken(TokenType type, string literal) {
+    tokens.push_back(new Token{type, literal, line});
 }

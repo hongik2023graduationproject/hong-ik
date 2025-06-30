@@ -14,6 +14,7 @@ public:
 
 private:
     std::vector<std::string> characters;
+    std::vector<Token*> tokens;
     long long current_read_position;
     long long next_read_position;
     long long line;
@@ -25,6 +26,9 @@ private:
     std::string readInteger();
     std::string readLetter();
     std::string readString();
+
+    void addToken(TokenType type);
+    void addToken(TokenType type, std::string literal);
 
     std::map<std::string, TokenType> keywords;
 };
