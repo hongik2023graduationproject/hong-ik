@@ -60,8 +60,6 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
 
     tokens.clear();
 
-    // 현재 token type에 정의된 토큰 중 identifier, integer, float, string이 미구현
-    // 추후에 hash 함수 이용한 switch문 같은 가독성, 효율 좋은 코드로 변경할 필요 있음
     while (current_read_position < characters.size()) {
         string current_character = characters[current_read_position];
         string next_character    = (next_read_position < characters.size()) ? characters[next_read_position] : "";
@@ -78,7 +76,6 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
         if (handleMultiCharacterToken(current_character, next_character)) {
             continue;
         }
-
 
         // 1글자 연산자 처리
         if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
@@ -120,7 +117,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
 
 
 bool Lexer::isNumber(const std::string& s) {
-    return ("0" <= s && s <= "9");
+    return s.length() == 1 && s[0] >= '0' && s[0] <= '9';
 }
 
 string Lexer::readInteger() {
@@ -153,6 +150,7 @@ std::string Lexer::readLetter() {
 
 string Lexer::readString() {
     string string_value;
+    bool escape_mode = false;
 
     // characters[current_read_position]은 "\""인 상황, 다음 토큰으로 넘겨서 문자열만 추출하기
     current_read_position++;
@@ -161,13 +159,36 @@ string Lexer::readString() {
     while (next_read_position < characters.size()) {
         string current_character = characters[current_read_position];
 
+        // 이스케이프 모드 처리
+        if (escape_mode) {
+            if (current_character == "n") {
+                string_value += "\n";
+            } else if (current_character == "t") {
+                string_value += "\t";
+            } else if (current_character == "\"") {
+                string_value += "\"";
+            } else {
+                string_value += "\\" + current_character;
+            }
+            escape_mode = false;
+            current_read_position++;
+            next_read_position++;
+            continue;
+        }
+
+        // 이스케이프 문자 발견
+        if (current_character == "\\") {
+            escape_mode = true;
+            current_read_position++;
+            next_read_position++;
+            continue;
+        }
+
         if (current_character == "\"") {
             current_read_position++;
             next_read_position++;
-            break;
+            return string_value;
         }
-
-        // 이스케이프 문자 처리가 필요하면 할 것
 
         // 일반 문자 처리
         string_value += current_character;
@@ -175,20 +196,24 @@ string Lexer::readString() {
         next_read_position++;
     }
 
+    // TODO: 에러 처리(닫는 따옴표가 없음)
     return string_value;
 }
 
 void Lexer::addToken(TokenType type) {
     tokens.push_back(new Token{type, characters[current_read_position], line});
+    if (type == TokenType::NEW_LINE) {
+        line++;
+    }
 }
 
 void Lexer::addToken(TokenType type, string literal) {
     tokens.push_back(new Token{type, literal, line});
 }
 
-int Lexer::handleMultiCharacterToken(std::string& current_character, std::string& next_character) {
+bool Lexer::handleMultiCharacterToken(std::string& current_character, std::string& next_character) {
     if (next_character.empty()) {
-        return 0;
+        return false;
     }
 
     string potential_token = current_character + next_character;
@@ -197,9 +222,9 @@ int Lexer::handleMultiCharacterToken(std::string& current_character, std::string
 
         current_read_position += 2;
         next_read_position += 2;
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 void Lexer::handleIdentifier(std::string& identifier) {

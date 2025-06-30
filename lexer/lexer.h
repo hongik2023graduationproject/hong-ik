@@ -19,7 +19,7 @@ private:
     long long next_read_position;
     long long line;
 
-    int handleMultiCharacterToken(std::string& current_character, std::string& next_character);
+    bool handleMultiCharacterToken(std::string& current_character, std::string& next_character);
     void handleIdentifier(std::string& identifier);
 
     bool isNumber(const std::string& s);

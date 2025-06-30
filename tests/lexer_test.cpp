@@ -11,8 +11,9 @@ protected:
         ASSERT_EQ(actual.size(), expected.size()) << "벡터 길이가 일치하지 않습니다.!";
         for (size_t i = 0; i < expected.size(); ++i) {
             EXPECT_EQ(*actual[i], *expected[i])
-                << "예측과 다른 결과 발생, 예측: " << TokenTypeToString(expected[i]->type)
-                << ", 결과: " << TokenTypeToString(actual[i]->type);
+                << "예측과 다른 결과 발생, 예측: " << TokenTypeToString(expected[i]->type) << ' ' << expected[i]->text
+                << ' ' << expected[i]->line << ", 결과: " << TokenTypeToString(actual[i]->type) << ' '
+                << actual[i]->text << ' ' << actual[i]->line;
         }
     }
 };
@@ -37,7 +38,7 @@ TEST_F(LexerTest, OperatorTest) {
 TEST_F(LexerTest, EscapeSequenceTest) {
     vector<Token*> expected = {
         new Token{TokenType::NEW_LINE, "\n", 1},
-        new Token{TokenType::TAB, "\t", 1},
+        new Token{TokenType::TAB, "\t", 2},
     };
     vector<Token*> actual = lexer.Tokenize({"\n", "\t"});
 
