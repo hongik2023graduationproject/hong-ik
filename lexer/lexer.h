@@ -2,7 +2,7 @@
 #define LEXER_H
 
 #include "../token/token.h"
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -19,6 +19,8 @@ private:
     long long next_read_position;
     long long line;
 
+    int handleMultiCharacterToken(std::string& current_character, std::string& next_character);
+    void handleIdentifier(std::string& identifier);
 
     bool isNumber(const std::string& s);
     bool isLetter(const std::string& s);
@@ -30,7 +32,9 @@ private:
     void addToken(TokenType type);
     void addToken(TokenType type, std::string literal);
 
-    std::map<std::string, TokenType> keywords;
+    std::unordered_map<std::string, TokenType> keywords;
+    std::unordered_map<std::string, TokenType> singleCharacterTokens;
+    std::unordered_map<std::string, TokenType> multiCharacterTokens;
 };
 
 

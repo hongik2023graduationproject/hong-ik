@@ -1,5 +1,7 @@
 #include "lexer.h"
 
+#include <unordered_map>
+
 using namespace std;
 
 Lexer::Lexer() {
@@ -13,6 +15,38 @@ Lexer::Lexer() {
         {"함수", TokenType::함수},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
+    };
+    singleCharacterTokens = {
+        {"+", TokenType::PLUS},
+        {"*", TokenType::ASTERISK},
+        {"/", TokenType::SLASH},
+        {"\n", TokenType::NEW_LINE},
+        {"\t", TokenType::TAB},
+        {"(", TokenType::LPAREN},
+        {")", TokenType::RPAREN},
+        {"{", TokenType::LBRACE},
+        {"}", TokenType::RBRACE},
+        {"[", TokenType::LBRACKET},
+        {"]", TokenType::RBRACKET},
+        {":", TokenType::COLON},
+        {";", TokenType::SEMICOLON},
+        {",", TokenType::COMMA},
+        {"-", TokenType::MINUS},
+        {"=", TokenType::ASSIGN},
+        {"!", TokenType::BANG},
+        {"<", TokenType::LESS_THAN},
+        {">", TokenType::GREATER_THAN},
+        {"&", TokenType::BITWISE_AND},
+        {"|", TokenType::BITWISE_OR},
+    };
+    multiCharacterTokens = {
+        {"->", TokenType::RIGHT_ARROW},
+        {"==", TokenType::EQUAL},
+        {"!=", TokenType::NOT_EQUAL},
+        {"&&", TokenType::LOGICAL_AND},
+        {"||", TokenType::LOGICAL_OR},
+        {"<=", TokenType::LESS_EQUAL},
+        {">=", TokenType::GREATER_EQUAL},
     };
 }
 
@@ -29,115 +63,54 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     // 현재 token type에 정의된 토큰 중 identifier, integer, float, string이 미구현
     // 추후에 hash 함수 이용한 switch문 같은 가독성, 효율 좋은 코드로 변경할 필요 있음
     while (current_read_position < characters.size()) {
-        if (characters[current_read_position] == "+") {
-            addToken(TokenType::PLUS);
-        } else if (characters[current_read_position] == "-") {
-            if (next_read_position < characters.size() && characters[next_read_position] == ">") {
-                addToken(TokenType::RIGHT_ARROW, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::MINUS);
-            }
-        } else if (characters[current_read_position] == "*") {
-            addToken(TokenType::ASTERISK);
-        } else if (characters[current_read_position] == "/") {
-            addToken(TokenType::SLASH);
-        } else if (characters[current_read_position] == "=") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                addToken(TokenType::EQUAL, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::ASSIGN);
-            }
-        } else if (characters[current_read_position] == "!") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                addToken(TokenType::NOT_EQUAL, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::BANG);
-            }
-        } else if (characters[current_read_position] == "\n") {
-            addToken(TokenType::NEW_LINE);
-        } else if (characters[current_read_position] == " ") {
-            // space 토큰은 문법을 명확하게 작성하도록 강요하는 용도로 만들었다.
-            // 하지만 리팩토링하는 지금 시점에서 다시 생각해보면 나중에 추가할 수 있는 부분이고
-            // parser의 구조를 복잡하게 만드는 요소이므로 추후에 추가하는 것을 고려하기로 함
-            // tokens.push_back(new Token{TokenType::SPACE, characters[current_read_position], line});
-        } else if (characters[current_read_position] == "\t") {
-            addToken(TokenType::TAB);
-        } else if (characters[current_read_position] == "(") {
-            addToken(TokenType::LPAREN);
-        } else if (characters[current_read_position] == ")") {
-            addToken(TokenType::RPAREN);
-        } else if (characters[current_read_position] == "{") {
-            addToken(TokenType::LBRACE);
-        } else if (characters[current_read_position] == "}") {
-            addToken(TokenType::RBRACE);
-        } else if (characters[current_read_position] == "[") {
-            addToken(TokenType::LBRACKET);
-        } else if (characters[current_read_position] == "]") {
-            addToken(TokenType::RBRACKET);
-        } else if (characters[current_read_position] == ":") {
-            addToken(TokenType::COLON);
-        } else if (characters[current_read_position] == ";") {
-            addToken(TokenType::SEMICOLON);
-        } else if (characters[current_read_position] == "&") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "&") {
-                addToken(TokenType::LOGICAL_AND, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::BITWISE_AND);
-            }
-        } else if (characters[current_read_position] == "|") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "|") {
-                addToken(TokenType::LOGICAL_OR, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::BITWISE_OR);
-            }
-        } else if (characters[current_read_position] == ",") {
-            addToken(TokenType::COMMA);
-        } else if (characters[current_read_position] == "<") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                addToken(TokenType::LESS_EQUAL, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::LESS_THAN);
-            }
-        } else if (characters[current_read_position] == ">") {
-            if (next_read_position < characters.size() && characters[next_read_position] == "=") {
-                addToken(TokenType::GREATER_EQUAL, characters[current_read_position] + characters[next_read_position]);
-                current_read_position++;
-                next_read_position++;
-            } else {
-                addToken(TokenType::GREATER_THAN);
-            }
-        } else if (characters[current_read_position] == "\"") {
-            string s = readString();
-            addToken(TokenType::STRING, s);
-        } else if (isNumber(characters[current_read_position])) {
-            string integer_string = readInteger();
-            addToken(TokenType::INTEGER, integer_string);
-        } else if (isLetter(characters[current_read_position])) {
-            string letter = readLetter();
-            if (auto it = keywords.find(letter); it != keywords.end()) {
-                addToken(it->second, letter);
-            } else {
-                addToken(TokenType::IDENTIFIER, letter);
-            }
-        } else {
-            // 여기서 바로 에러 처리해도 됨
-            addToken(TokenType::ILLEGAL, characters[current_read_position]);
+        string current_character = characters[current_read_position];
+        string next_character    = (next_read_position < characters.size()) ? characters[next_read_position] : "";
+
+        // 공백 무시 (토큰 생성 안함)
+        // 나중에 공백 처리할 때 변경될 예정
+        if (current_character == " ") {
+            current_read_position++;
+            next_read_position++;
+            continue;
         }
 
-        current_read_position++;
-        next_read_position++;
+        // 2글자 연산자 처리
+        if (handleMultiCharacterToken(current_character, next_character)) {
+            continue;
+        }
+
+
+        // 1글자 연산자 처리
+        if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
+            addToken(iterator->second);
+            current_read_position++;
+            next_read_position++;
+            continue;
+        }
+
+        // 문자열
+        if (current_character == "\"") {
+            string string_value = readString();
+            addToken(TokenType::STRING, string_value);
+            continue;
+        }
+
+        // 숫자 (나중에 부동소수점 수 추가하면 수정)
+        if (isNumber(current_character)) {
+            string number_string = readInteger();
+            addToken(TokenType::INTEGER, number_string);
+            continue;
+        }
+
+        // 식별자 | 키워드
+        if (isLetter(current_character)) {
+            string identifier = readLetter();
+            handleIdentifier(identifier);
+            continue;
+        }
+
+        // TODO: 에러 처리
+        // 잘못된 문자
     }
 
     // EOF는 표현할 수 있는 문자열이 없으므로 빈 문자열을 추가
@@ -151,12 +124,12 @@ bool Lexer::isNumber(const std::string& s) {
 }
 
 string Lexer::readInteger() {
-    string integer_string = characters[current_read_position];
+    string integer_string;
 
-    while (next_read_position < characters.size() && isNumber(characters[next_read_position])) {
+    while (current_read_position < characters.size() && isNumber(characters[current_read_position])) {
+        integer_string += characters[current_read_position];
         current_read_position++;
         next_read_position++;
-        integer_string += characters[current_read_position];
     }
 
     return integer_string;
@@ -167,11 +140,11 @@ bool Lexer::isLetter(const std::string& s) {
 }
 
 std::string Lexer::readLetter() {
-    string identifier = characters[current_read_position];
+    string identifier;
 
-    while (next_read_position < characters.size() && (isLetter(characters[next_read_position])
-           || isNumber(characters[next_read_position]))) {
-        identifier += characters[next_read_position];
+    while (current_read_position < characters.size()
+           && (isLetter(characters[current_read_position]) || isNumber(characters[current_read_position]))) {
+        identifier += characters[current_read_position];
         current_read_position++;
         next_read_position++;
     }
@@ -179,20 +152,30 @@ std::string Lexer::readLetter() {
 }
 
 string Lexer::readString() {
-    // TODO: 문자열 덧셈을 줄여서 최적화 가능
-    string s = "";
+    string string_value;
 
     // characters[current_read_position]은 "\""인 상황, 다음 토큰으로 넘겨서 문자열만 추출하기
     current_read_position++;
     next_read_position++;
 
-    while (next_read_position < characters.size() && characters[current_read_position] != "\"") {
-        s += characters[current_read_position];
+    while (next_read_position < characters.size()) {
+        string current_character = characters[current_read_position];
 
+        if (current_character == "\"") {
+            current_read_position++;
+            next_read_position++;
+            break;
+        }
+
+        // 이스케이프 문자 처리가 필요하면 할 것
+
+        // 일반 문자 처리
+        string_value += current_character;
         current_read_position++;
         next_read_position++;
     }
-    return s;
+
+    return string_value;
 }
 
 void Lexer::addToken(TokenType type) {
@@ -201,4 +184,28 @@ void Lexer::addToken(TokenType type) {
 
 void Lexer::addToken(TokenType type, string literal) {
     tokens.push_back(new Token{type, literal, line});
+}
+
+int Lexer::handleMultiCharacterToken(std::string& current_character, std::string& next_character) {
+    if (next_character.empty()) {
+        return 0;
+    }
+
+    string potential_token = current_character + next_character;
+    if (multiCharacterTokens.find(potential_token) != multiCharacterTokens.end()) {
+        addToken(multiCharacterTokens.at(potential_token), potential_token);
+
+        current_read_position += 2;
+        next_read_position += 2;
+        return 1;
+    }
+    return 0;
+}
+
+void Lexer::handleIdentifier(std::string& identifier) {
+    if (auto iterator = keywords.find(identifier); iterator != keywords.end()) {
+        addToken(iterator->second, identifier);
+    } else {
+        addToken(TokenType::IDENTIFIER, identifier);
+    }
 }
