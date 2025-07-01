@@ -1,5 +1,6 @@
 #include "lexer.h"
 
+#include <stdexcept>
 #include <unordered_map>
 
 using namespace std;
@@ -106,8 +107,8 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
             continue;
         }
 
-        // TODO: 에러 처리
-        // 잘못된 문자
+        throw std::runtime_error(
+            "잘못된 문자 '" + current_character + "'가 line " + std::to_string(line) + "에서 발견되었습니다.");
     }
 
     // EOF는 표현할 수 있는 문자열이 없으므로 빈 문자열을 추가
@@ -196,7 +197,8 @@ string Lexer::readString() {
         next_read_position++;
     }
 
-    // TODO: 에러 처리(닫는 따옴표가 없음)
+    throw std::runtime_error("문자열이 닫히지 않았습니다 (line " + std::to_string(line) + "). '\"'가 필요합니다.");
+
     return string_value;
 }
 
