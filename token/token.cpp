@@ -58,7 +58,7 @@ std::string TokenTypeToString(TokenType type) {
         return "실수";
     case TokenType::문자:
         return "문자";
-    case TokenType::RETURN:
+    case TokenType::리턴:
         return "RETURN";
     case TokenType::만약:
         return "만약";

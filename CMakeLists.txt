@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.28)
 project(HongIk)
 
 set(CMAKE_CXX_STANDARD 26)
@@ -27,15 +27,15 @@ add_executable(HongIk main.cpp
         token/token.h
         token/token.cpp
         token/token_type.h
-        parser/Parser.cpp
-        parser/Parser.h
+        parser/parser.cpp
+        parser/parser.h
         ast/program.h
         ast/node.h
         ast/statements.h
         ast/literals.h
         ast/expressions.h
-        evaluator/Evaluator.cpp
-        evaluator/Evaluator.h
+        evaluator/evaluator.cpp
+        evaluator/evaluator.h
         object/object.h
         object/object_type.h
         environment/environment.h

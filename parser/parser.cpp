@@ -70,7 +70,7 @@ Statement* Parser::parseStatement() {
         && next_token->type == TokenType::ASSIGN) {
         return parseAssignmentStatement();
     }
-    if (current_token->type == TokenType::RETURN) {
+    if (current_token->type == TokenType::리턴) {
         return parseReturnStatement();
     }
     if (current_token->type == TokenType::만약) {
@@ -121,7 +121,7 @@ ExpressionStatement* Parser::parseExpressionStatement() {
 
 
 ReturnStatement* Parser::parseReturnStatement() {
-    skipToken(TokenType::RETURN);
+    skipToken(TokenType::리턴);
     auto* statement       = new ReturnStatement();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();

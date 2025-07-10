@@ -10,7 +10,7 @@ Lexer::Lexer() {
         {"정수", TokenType::정수},
         {"실수", TokenType::실수},
         {"문자", TokenType::문자},
-        {"return", TokenType::RETURN},
+        {"리턴", TokenType::리턴},
         {"만약", TokenType::만약},
         {"라면", TokenType::라면},
         {"함수", TokenType::함수},
@@ -57,8 +57,6 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     current_read_position = 0;
     next_read_position    = 1;
     line                  = 1;
-
-
     tokens.clear();
 
     while (current_read_position < characters.size()) {
@@ -74,12 +72,20 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
         }
 
         // 2글자 연산자 처리
-        if (handleMultiCharacterToken(current_character, next_character)) {
+        if (auto iterator = multiCharacterTokens.find(current_character + next_character); 
+            iterator != multiCharacterTokens.end()) {
+            addToken(iterator->second, current_character + next_character);
+            current_read_position += 2;
+            next_read_position += 2;
             continue;
-        }
+        } 
+        // handleMultiCharacterToken(current_character, next_character)) {
+        //     continue;
+        // }
 
         // 1글자 연산자 처리
-        if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
+        if (auto iterator = singleCharacterTokens.find(current_character); 
+        iterator != singleCharacterTokens.end()) {
             addToken(iterator->second);
             current_read_position++;
             next_read_position++;
@@ -103,7 +109,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
         // 식별자 | 키워드
         if (isLetter(current_character)) {
             string identifier = readLetter();
-            handleIdentifier(identifier);
+            handleIdentifierAndKeywords(identifier);
             continue;
         }
 
@@ -118,7 +124,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
 
 
 bool Lexer::isNumber(const std::string& s) {
-    return s.length() == 1 && s[0] >= '0' && s[0] <= '9';
+    return "0" <= s && s <= "9";
 }
 
 string Lexer::readInteger() {
@@ -160,7 +166,7 @@ string Lexer::readString() {
     while (next_read_position < characters.size()) {
         string current_character = characters[current_read_position];
 
-        // 이스케이프 모드 처리
+        // 이스케이프 모드
         if (escape_mode) {
             if (current_character == "n") {
                 string_value += "\n";
@@ -177,7 +183,7 @@ string Lexer::readString() {
             continue;
         }
 
-        // 이스케이프 문자 발견
+        // 이스케이프 문자
         if (current_character == "\\") {
             escape_mode = true;
             current_read_position++;
@@ -202,34 +208,19 @@ string Lexer::readString() {
     return string_value;
 }
 
+// literal이 주어지지 않는 경우 lexer가 바라보는 토큰을 literal으로 전달한다.
 void Lexer::addToken(TokenType type) {
-    tokens.push_back(new Token{type, characters[current_read_position], line});
+    addToken(type, characters[current_read_position]);
+}
+
+void Lexer::addToken(TokenType type, string literal) {
+    tokens.push_back(new Token{type, literal, line});
     if (type == TokenType::NEW_LINE) {
         line++;
     }
 }
 
-void Lexer::addToken(TokenType type, string literal) {
-    tokens.push_back(new Token{type, literal, line});
-}
-
-bool Lexer::handleMultiCharacterToken(std::string& current_character, std::string& next_character) {
-    if (next_character.empty()) {
-        return false;
-    }
-
-    string potential_token = current_character + next_character;
-    if (multiCharacterTokens.find(potential_token) != multiCharacterTokens.end()) {
-        addToken(multiCharacterTokens.at(potential_token), potential_token);
-
-        current_read_position += 2;
-        next_read_position += 2;
-        return true;
-    }
-    return false;
-}
-
-void Lexer::handleIdentifier(std::string& identifier) {
+void Lexer::handleIdentifierAndKeywords(std::string& identifier) {
     if (auto iterator = keywords.find(identifier); iterator != keywords.end()) {
         addToken(iterator->second, identifier);
     } else {

@@ -18,9 +18,11 @@ private:
     long long current_read_position;
     long long next_read_position;
     long long line;
+    std::unordered_map<std::string, TokenType> keywords;
+    std::unordered_map<std::string, TokenType> singleCharacterTokens;
+    std::unordered_map<std::string, TokenType> multiCharacterTokens;
 
-    bool handleMultiCharacterToken(std::string& current_character, std::string& next_character);
-    void handleIdentifier(std::string& identifier);
+    void handleIdentifierAndKeywords(std::string& identifier);
 
     bool isNumber(const std::string& s);
     bool isLetter(const std::string& s);
@@ -32,9 +34,7 @@ private:
     void addToken(TokenType type);
     void addToken(TokenType type, std::string literal);
 
-    std::unordered_map<std::string, TokenType> keywords;
-    std::unordered_map<std::string, TokenType> singleCharacterTokens;
-    std::unordered_map<std::string, TokenType> multiCharacterTokens;
+
 };
 
 
