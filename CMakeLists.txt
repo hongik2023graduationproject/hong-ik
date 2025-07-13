@@ -42,6 +42,7 @@ add_executable(HongIk main.cpp
         environment/environment.cpp
         object/built_in.cpp
         object/built_in.h
+        exception/exception.h
 )
 
 add_library(HongIkLib STATIC
@@ -49,6 +50,7 @@ add_library(HongIkLib STATIC
         lexer/lexer.cpp
         token/token_type.h
         token/token.cpp
+        exception/exception.h
 )
 
 add_executable(HongIkTests
