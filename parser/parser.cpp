@@ -1,6 +1,7 @@
 #include "parser.h"
 
 #include "../ast/literals.h"
+#include "../exception/exception.h"
 #include <iostream>
 #include <ostream>
 #include <set>
@@ -48,15 +49,14 @@ void Parser::setNextToken() {
 
 void Parser::skipToken(const TokenType type) {
     if (current_token->type != type) {
-        throw runtime_error{"예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type)
-                            + ", 예상 토큰: " + TokenTypeToString(type) + " " + to_string(current_token->line)};
+        throw UnexpectedTokenException(current_token->type, type, current_token->line);
     }
     setNextToken();
 }
 
 void Parser::checkToken(TokenType type) {
     if (current_token->type != type) {
-        throw runtime_error{"예상하지 못한 토큰입니다, 현재 토큰: " + TokenTypeToString(current_token->type)};
+        throw UnexpectedTokenException(current_token->type, type, current_token->line);
     }
 }
 
@@ -201,8 +201,7 @@ FunctionStatement* Parser::parseFunctionStatement() {
 
 Expression* Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
-        // 나중에 에러 처리 추가할 것
-        throw runtime_error("No prefix function found, " + TokenTypeToString(current_token->type));
+        throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
     }
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
@@ -210,7 +209,7 @@ Expression* Parser::parseExpression(Precedence precedence) {
 
     while (next_token != nullptr && precedence < getPrecedence[next_token->type]) {
         if (!infixParseFunctions.contains(next_token->type)) {
-            throw runtime_error("No infix function found");
+            throw UnknownInfixParseFunctionException(next_token->type, next_token->line);
         }
         InfixParseFunction infixParseFunction = infixParseFunctions[next_token->type];
         setNextToken();

@@ -49,11 +49,11 @@ private:
     using PrefixParseFunction                                     = Expression* (Parser::*) ();
     using InfixParseFunction                                      = Expression* (Parser::*) (Expression*);
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
-        {TokenType::INTEGER, &Parser::parseIntegerLiteral},
         {TokenType::LPAREN, &Parser::parseGroupedExpression},
         {TokenType::MINUS, &Parser::parsePrefixExpression},
         {TokenType::IDENTIFIER, &Parser::parseIdentifierExpression},
         {TokenType::COLON, &Parser::parseCallExpression},
+        {TokenType::INTEGER, &Parser::parseIntegerLiteral},
         {TokenType::TRUE, &Parser::parseBooleanLiteral},
         {TokenType::FALSE, &Parser::parseBooleanLiteral},
         {TokenType::STRING, &Parser::parseStringLiteral},
