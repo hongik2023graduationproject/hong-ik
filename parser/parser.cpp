@@ -15,7 +15,6 @@ Program* Parser::Parsing(const std::vector<Token*>& tokens) {
     initialization();
 
     while (current_read_position < tokens.size()) {
-        // 인터프리터에서는 EOF가 마지막에 오지 않는다.
         if (current_token->type == TokenType::END_OF_FILE) {
             break;
         }
@@ -30,7 +29,6 @@ Program* Parser::Parsing(const std::vector<Token*>& tokens) {
 void Parser::initialization() {
     delete program;
     program = new Program();
-
     current_read_position = 0;
     setToken();
 }
@@ -85,9 +83,11 @@ Statement* Parser::parseStatement() {
 InitializationStatement* Parser::parseInitializationStatement() {
     auto* statement = new InitializationStatement();
     skipToken(TokenType::LBRACKET);
+
     // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
     statement->type = current_token;
     setNextToken();
+
     skipToken(TokenType::RBRACKET);
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -168,11 +168,13 @@ FunctionStatement* Parser::parseFunctionStatement() {
         // TODO: goto 문 제거하기
     FLAG:
         skipToken(TokenType::LBRACKET);
+
+        // TODO: type 체크 안하는 중 && 토큰 하나만 넘기는 중
         statement->parameterTypes.push_back(current_token);
         setNextToken();
+
         skipToken(TokenType::RBRACKET);
 
-        // 흠
         statement->parameters.push_back(parseExpression(Precedence::LOWEST));
         setNextToken();
 

@@ -32,6 +32,9 @@ class ExpressionStatement : public Statement {
 public:
     Expression* expression;
 
+    ExpressionStatement() = default;
+    explicit ExpressionStatement(Expression* expression) : expression(expression) {}
+
     std::string String() override {
         if (expression == nullptr) {
             return "";

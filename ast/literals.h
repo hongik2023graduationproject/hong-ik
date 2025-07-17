@@ -10,6 +10,9 @@ public:
     Token* token;
     long long value;
 
+    IntegerLiteral() = default;
+    IntegerLiteral(Token* token, long long value) : token(token), value(value) {}
+
     std::string String() override {
         return token->text;
     }

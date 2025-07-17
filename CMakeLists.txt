@@ -48,14 +48,21 @@ add_executable(HongIk main.cpp
 add_library(HongIkLib STATIC
         utf8_converter/utf8_converter.cpp
         lexer/lexer.cpp
+        parser/parser.cpp
         token/token_type.h
         token/token.cpp
         exception/exception.h
+        ast/node.h
+        ast/program.h
+        ast/statements.h
+        ast/expressions.h
+        ast/literals.h
 )
 
 add_executable(HongIkTests
         tests/lexer_test.cpp
         tests/utf8_converter_test.cpp
+        tests/parser_test.cpp
 )
 
 # 헤더 파일 경로 추가

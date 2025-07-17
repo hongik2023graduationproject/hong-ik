@@ -13,6 +13,9 @@ public:
     Expression* left;
     Expression* right;
 
+    InfixExpression() = default;
+    InfixExpression(Token* token, Expression* left, Expression* right) : token(token), left(left), right(right) {}
+
     std::string String() override {
         return "(" + left->String() + " " + token->text + " " + right->String() + ")";
     }
