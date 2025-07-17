@@ -85,6 +85,7 @@ InitializationStatement* Parser::parseInitializationStatement() {
     skipToken(TokenType::LBRACKET);
 
     // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
+    // 25.07.17(tolelom): 런타임에 추가되는 타입이 있을 수 있으므로 evaluator에 위임해도 될 것으로 보임
     statement->type = current_token;
     setNextToken();
 
@@ -307,8 +308,7 @@ Expression* Parser::parseIntegerLiteral() {
 Expression* Parser::parseBooleanLiteral() {
     auto* booleanLiteral  = new BooleanLiteral();
     booleanLiteral->token = current_token;
-    // true 값을 나타내는 문자열 "true"가 하드 코딩 되어 있다.
-    booleanLiteral->value = current_token->text == "true";
+    booleanLiteral->value = current_token->type == TokenType::TRUE;
     return booleanLiteral;
 }
 

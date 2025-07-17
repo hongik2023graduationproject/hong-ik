@@ -64,6 +64,7 @@ add_executable(HongIkTests
         tests/utf8_converter_test.cpp
         tests/parser_test.cpp
         tests/evaluator_test.cpp
+        tests/repl_test.cpp
 )
 
 # 헤더 파일 경로 추가

@@ -67,8 +67,13 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
                 return eval(if_statement->then, environment);
             }
         }
-
         return nullptr;
+    }
+    if (auto* return_statement = dynamic_cast<ReturnStatement*>(node)) {
+        auto* returnValue  = new ReturnValue;
+        Object* value      = eval(return_statement->expression, environment);
+        returnValue->value = value;
+        return returnValue;
     }
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
         auto* function       = new Function;
@@ -79,12 +84,6 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
 
         environment->Set(function_statement->name, function);
         return function;
-    }
-    if (auto* return_statement = dynamic_cast<ReturnStatement*>(node)) {
-        auto* returnValue  = new ReturnValue;
-        Object* value      = eval(return_statement->expression, environment);
-        returnValue->value = value;
-        return returnValue;
     }
 
 
