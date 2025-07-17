@@ -11,40 +11,52 @@ Evaluator::Evaluator() {
     environment = new Environment();
 }
 
-// TODO: Evaluate와 eval 함수 합치기
 Object* Evaluator::Evaluate(Program* program) {
     return eval(program, environment);
 }
 
-// eval 하는 순서는 statement, expression, literal 순으로 배치
-// 이는 많이 call 되는 순서에 따라 배치하는 것이 효율적으로 작동할 것이지만
-// 개발의 편의성을 위한 것 추후에 call 되는 순서에 따라 배치하거나, map을
-// 사용해여 최적화 할 것
-Object* Evaluator::eval(Node* node, Environment* environment) {
+// map을 사용해여 최적화 할 것
+Object* Evaluator::eval(Node* node, Environment* environment) { // program
     if (auto* program = dynamic_cast<Program*>(node)) {
         return evalProgram(program, environment);
     }
-    if (auto* block_statement = dynamic_cast<BlockStatement*>(node)) {
-        return evalBlockStatement(block_statement->statements, environment);
-    }
+
+
+    // statements
     if (auto* expression_statement = dynamic_cast<ExpressionStatement*>(node)) {
         return eval(expression_statement->expression, environment);
     }
     if (auto* initialization_statement = dynamic_cast<InitializationStatement*>(node)) {
+        cout << "initialization statement" << endl;
         Object* value = eval(initialization_statement->value, environment);
-        // if (environment->Get(initialization_statement->name) != nullptr) {
-        //     throw std::runtime_error("존재하는 변수명입니다.");
-        // }
+        if (environment->Get(initialization_statement->name) != nullptr) {
+            throw runtime_error("이미 선언된 변수명입니다.");
+        }
+
+        if (!typeCheck(initialization_statement->type, value)) {
+            throw runtime_error("타입이 안맞음");
+        }
         environment->Set(initialization_statement->name, value);
+
         return value;
     }
     if (auto* assignment_statement = dynamic_cast<AssignmentStatement*>(node)) {
-        Object* before = environment->Get(assignment_statement->name); // 변수가 현재 환경에 존재하는 지
-                                                                       // 확인하기 위한 절차
+        Object* before = environment->Get(assignment_statement->name);
+        if (before == nullptr) {
+            throw runtime_error("선언되지 않은 변수명입니다.");
+        }
+
         Object* value = eval(assignment_statement->value, environment);
-        // TODO: if (value.type != before.type) throw error
+
+        if (before->type != value->type) {
+            throw runtime_error("값의 형식이 변수의 형식과 일치하지 않습니다.");
+        }
+
         environment->Set(assignment_statement->name, value);
         return value;
+    }
+    if (auto* block_statement = dynamic_cast<BlockStatement*>(node)) {
+        return evalBlockStatement(block_statement->statements, environment);
     }
     if (auto* if_statement = dynamic_cast<IfStatement*>(node)) {
         auto* condition  = eval(if_statement->condition, environment);
@@ -54,7 +66,6 @@ Object* Evaluator::eval(Node* node, Environment* environment) {
         }
         return nullptr;
     }
-
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
         auto* function       = new Function;
         function->body       = function_statement->body;
@@ -72,6 +83,8 @@ Object* Evaluator::eval(Node* node, Environment* environment) {
         return returnValue;
     }
 
+
+    // expression
     if (auto* prefix_expression = dynamic_cast<PrefixExpression*>(node)) {
         Object* right = eval(prefix_expression->right, environment);
         return evalPrefixExpression(prefix_expression->token, right);
@@ -333,4 +346,18 @@ Object* Evaluator::unwarpReturnValue(Object* object) {
 
 Object* Evaluator::length(std::vector<Object*> argumenmts) {
     return new Integer(argumenmts.size());
+}
+
+
+// 현재 버전에서 타입 체크는 기본형에 한해서만 제공한다.
+bool Evaluator::typeCheck(Token* type, Object* value) {
+    if (type->type == TokenType::INTEGER) {
+        return dynamic_cast<Integer*>(value) != nullptr;
+    }
+    if (type->type == TokenType::STRING) {
+        return dynamic_cast<String*>(value) != nullptr;
+    }
+
+    // 모든 케이스가 구현되지 않았음으로 해당되지 않은 경우에 한해서는 임시로 true 리턴
+    return true;
 }

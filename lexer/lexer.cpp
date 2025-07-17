@@ -163,7 +163,7 @@ string Lexer::readString() {
     current_read_position++;
     next_read_position++;
 
-    while (next_read_position < characters.size()) {
+    while (current_read_position < characters.size()) {
         string current_character = characters[current_read_position];
 
         // 이스케이프 모드
@@ -203,7 +203,7 @@ string Lexer::readString() {
         next_read_position++;
     }
 
-    throw UnterminatedStringException(line);
+    throw UnterminatedStringException(string_value, line);
 }
 
 // literal이 주어지지 않는 경우 lexer가 바라보는 토큰을 literal으로 전달한다.

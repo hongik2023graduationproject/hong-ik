@@ -23,8 +23,8 @@ private:
     std::string message;
 
 public:
-    explicit UnterminatedStringException(long long line)
-        : message("문자열이 line: " + std::to_string(line) + "에서 닫는 따옴표 없이 끝났습니다. '\"'가 필요합니다.") {}
+    explicit UnterminatedStringException(std::string s, long long line)
+        : message("문자열: " + s + " 이 line: " + std::to_string(line) + "에서 닫는 따옴표 없이 끝났습니다. '\"'가 필요합니다.") {}
     const char* what() const noexcept override {
         return message.c_str();
     }

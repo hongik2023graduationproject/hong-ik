@@ -160,4 +160,28 @@ TEST_F(LexerTest, KeywordTest) {
     ExpectTokensEqual(actual, expected);
 }
 
-// TODO: 코드 블록 추가 시 테스트 코드 작성할 것
+
+
+
+TEST_F(LexerTest, LiteralTest) {
+    vector<Token*> expected = {
+        new Token{TokenType::INTEGER, "31", 1},
+        new Token{TokenType::INTEGER, "7", 1},
+        new Token{TokenType::STRING, "apple", 1},
+    };
+    vector<Token*> actual = lexer.Tokenize({
+        "3",
+        "1",
+        " ",
+        "7",
+        "\"",
+        "a",
+        "p",
+        "p",
+        "l",
+        "e",
+        "\"",
+    });
+
+    ExpectTokensEqual(actual, expected);
+}

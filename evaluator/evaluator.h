@@ -53,6 +53,8 @@ private:
 
     Object* unwarpReturnValue(Object* object);
 
+    bool typeCheck(Token* type, Object* value);
+
     // builtin function
     Object* length(std::vector<Object*> arguments);
 };
