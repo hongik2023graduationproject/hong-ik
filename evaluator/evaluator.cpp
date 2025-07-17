@@ -27,14 +27,13 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         return eval(expression_statement->expression, environment);
     }
     if (auto* initialization_statement = dynamic_cast<InitializationStatement*>(node)) {
-        cout << "initialization statement" << endl;
         Object* value = eval(initialization_statement->value, environment);
         if (environment->Get(initialization_statement->name) != nullptr) {
             throw runtime_error("이미 선언된 변수명입니다.");
         }
 
         if (!typeCheck(initialization_statement->type, value)) {
-            throw runtime_error("타입이 안맞음");
+            throw runtime_error("선언에서 자료형과 값의 타입이 일치하지 않습니다.");
         }
         environment->Set(initialization_statement->name, value);
 
@@ -48,7 +47,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
 
         Object* value = eval(assignment_statement->value, environment);
 
-        if (before->type != value->type) {
+        if (typeCheck(before->type, value)) {
             throw runtime_error("값의 형식이 변수의 형식과 일치하지 않습니다.");
         }
 
@@ -351,13 +350,19 @@ Object* Evaluator::length(std::vector<Object*> argumenmts) {
 
 // 현재 버전에서 타입 체크는 기본형에 한해서만 제공한다.
 bool Evaluator::typeCheck(Token* type, Object* value) {
-    if (type->type == TokenType::INTEGER) {
+    if (type->type == TokenType::정수) {
         return dynamic_cast<Integer*>(value) != nullptr;
     }
-    if (type->type == TokenType::STRING) {
+    if (type->type == TokenType::문자) {
         return dynamic_cast<String*>(value) != nullptr;
     }
 
     // 모든 케이스가 구현되지 않았음으로 해당되지 않은 경우에 한해서는 임시로 true 리턴
+    return true;
+}
+
+bool Evaluator::typeCheck(ObjectType type, Object* value) {
+    if (type != value->type)
+        return false;
     return true;
 }
