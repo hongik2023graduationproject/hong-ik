@@ -70,7 +70,8 @@ public:
 
 class Function final : public Object {
 public:
-    std::vector<Expression*> parameters;
+    std::vector<Token*> parameterTypes;
+    std::vector<IdentifierExpression*> parameters;
     BlockStatement* body;
     Environment* env;
 

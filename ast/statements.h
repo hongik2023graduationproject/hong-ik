@@ -83,8 +83,7 @@ public:
 class FunctionStatement : public Statement {
 public:
     std::vector<Token*> parameterTypes;
-    // TODO: Expression을 Identifier Expression으로 수정해야 한다.
-    std::vector<Expression*> parameters;
+    std::vector<IdentifierExpression*> parameters;
     std::string name;
     BlockStatement* body;
     Token* returnType;

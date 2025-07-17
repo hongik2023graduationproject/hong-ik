@@ -179,7 +179,7 @@ FunctionStatement* Parser::parseFunctionStatement() {
 
         skipToken(TokenType::RBRACKET);
 
-        statement->parameters.push_back(parseExpression(Precedence::LOWEST));
+        statement->parameters.push_back(dynamic_cast<IdentifierExpression*>(parseExpression(Precedence::LOWEST)));
         setNextToken();
 
         if (current_token->type == TokenType::COMMA) {

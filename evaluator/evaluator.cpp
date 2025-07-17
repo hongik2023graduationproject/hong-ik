@@ -78,6 +78,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
         auto* function       = new Function;
         function->body       = function_statement->body;
+
         function->parameters = function_statement->parameters;
         function->env        = environment;
         function->type       = ObjectType::FUNCTION;
@@ -102,27 +103,19 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         if (value != nullptr) {
             return value;
         }
-        // built in function 추가 예정
-        if (builtins.find(identifier_expression->name) != builtins.end()) {
+
+        if (builtins.contains(identifier_expression->name)) {
             return builtins[identifier_expression->name];
         }
 
-        // ERROR
-        // throw
+        throw runtime_error("존재하지 않은 식별자입니다.");
     }
     if (auto* call_expression = dynamic_cast<CallExpression*>(node)) {
-        // 함수명이 env에 존재하는 지 확인하는 작업
         Object* function = eval(call_expression->function, environment);
-        if (function == nullptr) {
-            // error
-        }
 
-        // arguments를 eval
         vector<Object*> arguments;
         for (auto argument : call_expression->arguments) {
             Object* value = eval(argument, environment);
-            // TODO: 타입 검사도 해야 함
-            // TODO: 에러 처리 필요할 가능성 농후
             arguments.push_back(value);
         }
 
@@ -153,6 +146,9 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         array->type = ObjectType::ARRAY;
         for (auto element : array_literal->elements) {
             Object* value = eval(element, environment);
+
+            // TODO: type 검사
+
             array->elements.push_back(value);
         }
         return array;
@@ -302,26 +298,32 @@ Object* Evaluator::evalBangPrefixExpression(Object* right) {
 
 Object* Evaluator::applyFunction(Object* function, std::vector<Object*> arguments) {
     if (auto* function_object = dynamic_cast<Function*>(function)) {
-        if (function_object == nullptr) {
-            throw std::invalid_argument("Function is not a function");
+
+        if (function_object->parameterTypes.size() != arguments.size()) {
+            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
         }
 
-        // 함수 내부에서 사용할 env 확장하는 과정
+        // arguments 타입 검사
+        for (int i = 0; i < function_object->parameterTypes.size(); i++) {
+            typeCheck(function_object->parameterTypes[i], arguments[i]);
+        }
 
+        // 함수 내부에서 사용할 env 확장, arguments 세팅
         Environment* extended_env = extendFunctionEnvironment(function_object, arguments);
 
         Object* evaluated = eval(function_object->body, extended_env);
 
-        // TODO: return type 검사를 하지 않고 있다. 또한 리턴 타입이 존재하는
-        // 지도 검사해야 함
+        // TODO: return type 검사를 하지 않고 있다. 또한 리턴 타입이 존재하는 지도 검사해야 함
         return unwarpReturnValue(evaluated);
     }
 
     if (auto* builtin_object = dynamic_cast<Builtin*>(function)) {
+        // TODO: arguments 타입 검사
+
         return builtin_object->function(arguments);
     }
 
-    // TODO: ERROR
+    throw runtime_error("함수가 존재하지 않습니다.");
 }
 
 Environment* Evaluator::extendFunctionEnvironment(Function* function, std::vector<Object*> arguments) {
@@ -329,8 +331,7 @@ Environment* Evaluator::extendFunctionEnvironment(Function* function, std::vecto
     environment->outer = function->env;
 
     for (int i = 0; i < function->parameters.size(); i++) {
-        // TODO: String() 함수가 아니라 실제 변수 명이 들어가도록 수정해야 함
-        environment->Set(function->parameters[i]->String(), arguments[i]);
+        environment->Set(function->parameters[i]->name, arguments[i]);
     }
 
     return environment;
@@ -347,8 +348,8 @@ Object* Evaluator::unwarpReturnValue(Object* object) {
     return object;
 }
 
-Object* Evaluator::length(std::vector<Object*> argumenmts) {
-    return new Integer(argumenmts.size());
+Object* Evaluator::length(std::vector<Object*> arguments) {
+    return new Integer(arguments.size());
 }
 
 
