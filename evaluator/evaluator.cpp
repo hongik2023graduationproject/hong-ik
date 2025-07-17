@@ -59,10 +59,15 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
     }
     if (auto* if_statement = dynamic_cast<IfStatement*>(node)) {
         auto* condition  = eval(if_statement->condition, environment);
-        Boolean* boolean = dynamic_cast<Boolean*>(condition);
-        if (boolean && boolean->value) {
-            return eval(if_statement->consequence, environment);
+
+        if (auto* boolean = dynamic_cast<Boolean*>(condition)) {
+            if (boolean->value) {
+                return eval(if_statement->consequence, environment);
+            } else {
+                return eval(if_statement->then, environment);
+            }
         }
+
         return nullptr;
     }
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
@@ -178,7 +183,7 @@ Object* Evaluator::evalBlockStatement(std::vector<Statement*> statements, Enviro
     for (const auto statement : statements) {
         result = eval(statement, environment);
 
-        if (const auto* return_value = dynamic_cast<ReturnValue*>(result)) {
+        if (dynamic_cast<ReturnValue*>(result)) {
             return result;
         }
     }

@@ -64,6 +64,8 @@ std::string TokenTypeToString(TokenType type) {
         return "만약";
     case TokenType::라면:
         return "라면";
+    case TokenType::아니면:
+        return "아니면";
     case TokenType::함수:
         return "함수";
     case TokenType::TRUE:

@@ -69,9 +69,14 @@ class IfStatement : public Statement {
 public:
     Expression* condition;
     BlockStatement* consequence;
+    BlockStatement* then;
 
     std::string String() override {
-        return "만약 " + condition->String() + " 라면\n" + consequence->String();
+        std::string s = "만약 " + condition->String() + " 라면\n" + consequence->String();
+        if (then != nullptr) {
+            s += "아니면\n" + then->String();
+        }
+        return s;
     }
 };
 

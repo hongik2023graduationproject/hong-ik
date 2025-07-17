@@ -14,6 +14,7 @@ Lexer::Lexer() {
         {"리턴", TokenType::리턴},
         {"만약", TokenType::만약},
         {"라면", TokenType::라면},
+        {"아니면", TokenType::아니면},
         {"함수", TokenType::함수},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},

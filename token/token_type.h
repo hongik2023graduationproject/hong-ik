@@ -43,6 +43,7 @@ enum class TokenType {
     리턴, // return statement에서 사용
     만약,
     라면,
+    아니면,
     함수,
     TRUE,
     FALSE,

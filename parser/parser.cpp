@@ -154,7 +154,10 @@ IfStatement* Parser::parseIfStatement() {
 
     statement->consequence = parseBlockStatement();
 
-    // 여기에 else 구문 추가시 작성할 것
+    if (current_token->type == TokenType::아니면) {
+        skipToken(TokenType::아니면);
+        statement->then = parseBlockStatement();
+    }
 
     return statement;
 }
