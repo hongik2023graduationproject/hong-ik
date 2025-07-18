@@ -4,6 +4,7 @@
 #include "../token/token.h"
 #include "../utf8_converter/utf8_converter.h"
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
@@ -61,6 +62,49 @@ void Repl::Run() {
 
             cout << object->ToString() << endl;
 
+            tokens.clear();
+        } catch (const exception& e) {
+            cout << "Error: " << e.what() << endl;
+            tokens.clear();
+            indent = 0;
+        }
+    }
+}
+
+void Repl::FileMode(string& filename) {
+    vector<Token*> tokens;
+    int indent = 0;
+
+    // 파일 스트림 생성 및 열기
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cout << "Error: cannot open file: " << filename << std::endl;
+        return;
+    }
+
+    string code;
+    while (getline(file, code)) {
+        try {
+            vector<string> utf8_strings = Utf8Converter::Convert(code);
+            vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+            tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
+
+            // TODO: LBRACE, RBRACE는 각각 START_BLOCK, END_BLOCK을 임시로 대체하고 있다.
+            if (tokens.back()->type == TokenType::LBRACE) {
+                indent += 1;
+            }
+            if (tokens.back()->type == TokenType::RBRACE) {
+                indent -= 1;
+            }
+
+            if (indent != 0) {
+                continue;
+            }
+
+            Program* program = parser->Parsing(tokens);
+            Object* object   = evaluator->Evaluate(program);
+
+            cout << object->ToString() << endl;
             tokens.clear();
         } catch (const exception& e) {
             cout << "Error: " << e.what() << endl;

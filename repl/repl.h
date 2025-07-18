@@ -11,6 +11,7 @@ public:
 
     void Run();
 
+    void FileMode(std::string& filename);
 
     void TestLexer();
 
