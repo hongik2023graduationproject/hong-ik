@@ -155,7 +155,7 @@ IfStatement* Parser::parseIfStatement() {
 
     statement->consequence = parseBlockStatement();
 
-    if (current_token->type == TokenType::아니면) {
+    if (current_token != nullptr && current_token->type == TokenType::아니면) {
         skipToken(TokenType::아니면);
         statement->then = parseBlockStatement();
     }
