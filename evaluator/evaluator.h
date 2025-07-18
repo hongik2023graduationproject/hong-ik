@@ -27,7 +27,7 @@ private:
 
     Object* eval(Node* statement, Environment* environment);
 
-    Object* evalBlockStatement(std::vector<Statement*> statements, Environment* environment);
+    Object* evalBlockStatement(const std::vector<Statement*>& statements, Environment* environment);
 
     Object* evalInfixExpression(Token* token, Object* left, Object* right);
 
@@ -54,10 +54,8 @@ private:
     Object* unwarpReturnValue(Object* object);
 
     bool typeCheck(Token* type, Object* value);
-    bool typeCheck(ObjectType type, Object* value);
 
-    // builtin function
-    Object* length(std::vector<Object*> arguments);
+    bool typeCheck(ObjectType type, Object* value);
 };
 
 

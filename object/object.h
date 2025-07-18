@@ -74,6 +74,7 @@ public:
     std::vector<IdentifierExpression*> parameters;
     BlockStatement* body;
     Environment* env;
+    Token* returnType;
 
     // TODO: 미구현 상태
     std::string ToString() override {
@@ -101,6 +102,8 @@ public:
 class Builtin : public Object {
 public:
     virtual Object* function(std::vector<Object*> args) = 0;
+    std::vector<Token*> parameterTypes;
+    Token* returnType;
 
     std::string ToString() override {
         return "";

@@ -15,7 +15,7 @@ Object* Evaluator::Evaluate(Program* program) {
     return eval(program, environment);
 }
 
-// map을 사용해여 최적화 할 것
+// TODO: map을 사용해여 최적화 할 것
 Object* Evaluator::eval(Node* node, Environment* environment) { // program
     if (auto* program = dynamic_cast<Program*>(node)) {
         return evalProgram(program, environment);
@@ -58,7 +58,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         return evalBlockStatement(block_statement->statements, environment);
     }
     if (auto* if_statement = dynamic_cast<IfStatement*>(node)) {
-        auto* condition  = eval(if_statement->condition, environment);
+        auto* condition = eval(if_statement->condition, environment);
 
         if (auto* boolean = dynamic_cast<Boolean*>(condition)) {
             if (boolean->value) {
@@ -76,11 +76,12 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         return returnValue;
     }
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
-        auto* function       = new Function;
-        function->body       = function_statement->body;
+        auto* function = new Function;
+        function->body = function_statement->body;
 
         function->parameters = function_statement->parameters;
         function->env        = environment;
+        function->returnType = function_statement->returnType;
         function->type       = ObjectType::FUNCTION;
 
         environment->Set(function_statement->name, function);
@@ -111,6 +112,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         throw runtime_error("존재하지 않은 식별자입니다.");
     }
     if (auto* call_expression = dynamic_cast<CallExpression*>(node)) {
+        // 타입 체크는 applyFunction 내부에서 처리 중!
         Object* function = eval(call_expression->function, environment);
 
         vector<Object*> arguments;
@@ -122,10 +124,9 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         return applyFunction(function, arguments);
     }
     if (auto* index_expression = dynamic_cast<IndexExpression*>(node)) {
+        // 타입 체크 evalIndexExpression에서 처리 중!
         auto* left = eval(index_expression->name, environment);
-        // ERROR 처리?
         auto* index = eval(index_expression->index, environment);
-        // ERROR 처리?
         return evalIndexExpression(left, index);
     }
 
@@ -163,16 +164,15 @@ Object* Evaluator::evalProgram(const Program* program, Environment* environment)
     for (const auto statement : program->statements) {
         result = eval(statement, environment);
 
-        if (auto* return_value = dynamic_cast<ReturnValue*>(result)) {
-            return return_value->value;
+        if (dynamic_cast<ReturnValue*>(result)) {
+            return unwarpReturnValue(result);
         }
     }
 
     return result;
 }
 
-Object* Evaluator::evalBlockStatement(std::vector<Statement*> statements, Environment* environment) {
-    // nullptr를 반환할 수 있는 여지가 있음
+Object* Evaluator::evalBlockStatement(const std::vector<Statement*>& statements, Environment* environment) {
     Object* result = nullptr;
 
     for (const auto statement : statements) {
@@ -196,6 +196,8 @@ Object* Evaluator::evalInfixExpression(Token* token, Object* left, Object* right
     if (left->type == ObjectType::STRING && right->type == ObjectType::STRING) {
         return evalStringInfixExpression(token, left, right);
     }
+
+    throw runtime_error("infix expression, 좌항과 우항의 타입을 연산할 수 없습니다.");
 }
 
 Object* Evaluator::evalIntegerInfixExpression(Token* token, Object* left, Object* right) {
@@ -224,7 +226,7 @@ Object* Evaluator::evalIntegerInfixExpression(Token* token, Object* left, Object
         return new Boolean(left_value != right_value);
     }
 
-    // TODO: 에러 처리 (지원하지 않는 연산자)
+    throw runtime_error("integer 연산을 지원하지 않는 연산자입니다.");
 }
 
 Object* Evaluator::evalBooleanInfixExpression(Token* token, Object* left, Object* right) {
@@ -238,7 +240,7 @@ Object* Evaluator::evalBooleanInfixExpression(Token* token, Object* left, Object
         return new Boolean(left_boolean->value || right_boolean->value);
     }
 
-    // TODO: 에러 처리 (지원하지 않는 연산자)
+    throw runtime_error("boolean 연산을 지원하지 않는 연산자입니다.");
 }
 
 Object* Evaluator::evalStringInfixExpression(Token* token, Object* left, Object* right) {
@@ -255,14 +257,14 @@ Object* Evaluator::evalStringInfixExpression(Token* token, Object* left, Object*
         return new Boolean(left_string->value != right_string->value);
     }
 
-    // TODO: 에러 처리 (지원하지 않는 연산자)
+    throw runtime_error("string 연산을 지원하지 않는 연산자입니다.");
 }
 
 Object* Evaluator::evalIndexExpression(Object* left, Object* index) {
     if (left->type == ObjectType::ARRAY && index->type == ObjectType::INTEGER) {
         return evalArrayIndexExpression(left, index);
     }
-    // ERROR
+    throw runtime_error("index expression exception, 옳지 않은 형식입니다.");
 }
 
 Object* Evaluator::evalArrayIndexExpression(Object* array, Object* index) {
@@ -272,7 +274,7 @@ Object* Evaluator::evalArrayIndexExpression(Object* array, Object* index) {
         return array_object->elements[index_object->value];
     }
 
-    // ERROR
+    throw runtime_error("배열의 범위 밖 값이 index로 입력되었습니다.");
 }
 
 Object* Evaluator::evalPrefixExpression(Token* token, Object* right) {
@@ -282,45 +284,67 @@ Object* Evaluator::evalPrefixExpression(Token* token, Object* right) {
     if (token->type == TokenType::BANG) {
         return evalBangPrefixExpression(right);
     }
+
+    throw runtime_error("지원하지 않는 prefix 연산자입니다.");
 }
 
 Object* Evaluator::evalMinusPrefixExpression(Object* right) {
     if (auto integer = dynamic_cast<Integer*>(right)) {
         return new Integer(-integer->value);
     }
+
+    throw runtime_error("'-' 전위 연산자가 지원되지 않는 타입입니다.");
 }
 
 Object* Evaluator::evalBangPrefixExpression(Object* right) {
     if (auto boolean = dynamic_cast<Boolean*>(right)) {
         return new Boolean(!boolean->value);
     }
+
+    throw runtime_error("'!' 전위 연산자가 지원되지 않는 타입입니다.");
 }
 
 Object* Evaluator::applyFunction(Object* function, std::vector<Object*> arguments) {
     if (auto* function_object = dynamic_cast<Function*>(function)) {
-
         if (function_object->parameterTypes.size() != arguments.size()) {
             throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
         }
 
-        // arguments 타입 검사
         for (int i = 0; i < function_object->parameterTypes.size(); i++) {
-            typeCheck(function_object->parameterTypes[i], arguments[i]);
+            if (typeCheck(function_object->parameterTypes[i], arguments[i])) {
+                throw runtime_error("함수 인자 타입 오류");
+            }
         }
 
         // 함수 내부에서 사용할 env 확장, arguments 세팅
         Environment* extended_env = extendFunctionEnvironment(function_object, arguments);
 
+        // 함수 실행
         Object* evaluated = eval(function_object->body, extended_env);
 
-        // TODO: return type 검사를 하지 않고 있다. 또한 리턴 타입이 존재하는 지도 검사해야 함
-        return unwarpReturnValue(evaluated);
+        if ((function_object->returnType == nullptr && evaluated == nullptr)
+            || typeCheck(function_object->returnType, evaluated)) {
+            return unwarpReturnValue(evaluated);
+        }
+        throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
     }
 
     if (auto* builtin_object = dynamic_cast<Builtin*>(function)) {
-        // TODO: arguments 타입 검사
+        if (builtin_object->parameterTypes.size() != arguments.size()) {
+            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
+        }
+        for (int i = 0; i < builtin_object->parameterTypes.size(); i++) {
+            if (typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
+                throw runtime_error("함수 인자 타입 오류");
+            }
+        }
 
-        return builtin_object->function(arguments);
+        Object* evaluated = builtin_object->function(arguments);
+        if ((builtin_object->returnType == nullptr && evaluated == nullptr)
+            || typeCheck(builtin_object->returnType, evaluated)) {
+            return unwarpReturnValue(evaluated);
+        }
+        throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
     }
 
     throw runtime_error("함수가 존재하지 않습니다.");
@@ -331,27 +355,23 @@ Environment* Evaluator::extendFunctionEnvironment(Function* function, std::vecto
     environment->outer = function->env;
 
     for (int i = 0; i < function->parameters.size(); i++) {
+        // 동일한 변수명이 상위에 존재할 경우 가린다.
         environment->Set(function->parameters[i]->name, arguments[i]);
     }
 
     return environment;
 }
 
-// 지금 expression statement가 존재하고 있어 return value가 없더라고 마지막에
-// eval되어 결과 값으로 나온 Object가 자동으로 return 하게 끔 하고 있다. 추후에
-// expression statement가 삭제되면 수정할 필요가 있다
 Object* Evaluator::unwarpReturnValue(Object* object) {
     if (auto* return_value = dynamic_cast<ReturnValue*>(object)) {
         return return_value->value;
     }
 
+    // 지금 expression statement가 존재하고 있어 return value가 없더라고 마지막에
+    // eval되어 결과 값으로 나온 Object가 자동으로 return 하게 끔 하고 있다. 추후에
+    // expression statement가 삭제되면 수정할 필요가 있다
     return object;
 }
-
-Object* Evaluator::length(std::vector<Object*> arguments) {
-    return new Integer(arguments.size());
-}
-
 
 // 현재 버전에서 타입 체크는 기본형에 한해서만 제공한다.
 bool Evaluator::typeCheck(Token* type, Object* value) {
@@ -367,7 +387,8 @@ bool Evaluator::typeCheck(Token* type, Object* value) {
 }
 
 bool Evaluator::typeCheck(ObjectType type, Object* value) {
-    if (type != value->type)
+    if (type != value->type) {
         return false;
+    }
     return true;
 }
