@@ -57,6 +57,10 @@ add_library(HongIkLib STATIC
         ast/statements.h
         ast/expressions.h
         ast/literals.h
+        repl/repl.cpp
+        evaluator/evaluator.cpp
+        environment/environment.cpp
+        object/built_in.cpp
 )
 
 add_executable(HongIkTests
