@@ -1,8 +1,8 @@
 #include "lexer.h"
 
+#include "../exception/exception.h"
 #include <stdexcept>
 #include <unordered_map>
-#include "../exception/exception.h"
 
 using namespace std;
 
@@ -23,8 +23,6 @@ Lexer::Lexer() {
         {"+", TokenType::PLUS},
         {"*", TokenType::ASTERISK},
         {"/", TokenType::SLASH},
-        {"\n", TokenType::NEW_LINE},
-        {"\t", TokenType::TAB},
         {"(", TokenType::LPAREN},
         {")", TokenType::RPAREN},
         {"{", TokenType::LBRACE},
@@ -58,6 +56,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     this->characters      = characters;
     current_read_position = 0;
     next_read_position    = 1;
+    at_line_start         = true;
     line                  = 1;
     tokens.clear();
 
@@ -66,28 +65,65 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
         string next_character    = (next_read_position < characters.size()) ? characters[next_read_position] : "";
 
         // 공백 무시 (토큰 생성 안함)
-        // 나중에 공백 처리할 때 변경될 예정
+        if (at_line_start) {
+            int space_counter = 0;
+            while (characters[current_read_position] == " " || characters[current_read_position] == "\t") {
+                if (characters[current_read_position] == " ") {
+                    space_counter++;
+                }
+
+                if (characters[current_read_position] == "\t") {
+                    space_counter += 4;
+                }
+
+                current_read_position++;
+                next_read_position++;
+            }
+
+            const int current_indent = space_counter / 4;
+            if (indent < current_indent) {
+                for (int i = indent; i < current_indent; i++) {
+                    addToken(TokenType::START_BLOCK, "");
+                }
+            } else if (indent > current_indent) {
+                for (int i = indent; i > current_indent; i--) {
+                    addToken(TokenType::END_BLOCK, "");
+                }
+            }
+            indent = current_indent;
+            at_line_start = false;
+            continue;
+        }
+
         if (current_character == " ") {
             current_read_position++;
             next_read_position++;
             continue;
         }
 
+        if (current_character == "\n") {
+            addToken(TokenType::NEW_LINE, "\n");
+            line++;
+            current_read_position++;
+            next_read_position++;
+            at_line_start = true;
+            continue;
+        }
+
         // 2글자 연산자 처리
-        if (auto iterator = multiCharacterTokens.find(current_character + next_character); 
+        if (auto iterator = multiCharacterTokens.find(current_character + next_character);
             iterator != multiCharacterTokens.end()) {
             addToken(iterator->second, current_character + next_character);
             current_read_position += 2;
             next_read_position += 2;
             continue;
-        } 
+        }
         // handleMultiCharacterToken(current_character, next_character)) {
         //     continue;
         // }
 
         // 1글자 연산자 처리
-        if (auto iterator = singleCharacterTokens.find(current_character); 
-        iterator != singleCharacterTokens.end()) {
+        if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
             addToken(iterator->second);
             current_read_position++;
             next_read_position++;

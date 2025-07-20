@@ -131,14 +131,12 @@ ReturnStatement* Parser::parseReturnStatement() {
 
 BlockStatement* Parser::parseBlockStatement() {
     auto* statement = new BlockStatement();
-    skipToken(TokenType::LBRACE);
-    // 임시로 BRACE를 활용해서 BLOCK을 판별한다(C 스타일)
-    // 추후에 들여쓰기로 변경할 때 수정할 예정
+    skipToken(TokenType::START_BLOCK);
 
-    while (current_token->type != TokenType::RBRACE) {
+    while (current_token->type != TokenType::END_BLOCK) {
         statement->statements.push_back(parseStatement());
     }
-    skipToken(TokenType::RBRACE);
+    skipToken(TokenType::END_BLOCK);
 
     return statement;
 }
@@ -173,7 +171,6 @@ FunctionStatement* Parser::parseFunctionStatement() {
     FLAG:
         skipToken(TokenType::LBRACKET);
 
-        // TODO: type 체크 안하는 중 && 토큰 하나만 넘기는 중
         statement->parameterTypes.push_back(current_token);
         setNextToken();
 

@@ -13,6 +13,8 @@ public:
     std::vector<Token*> Tokenize(const std::vector<std::string>& characters);
 
 private:
+    bool at_line_start;
+    int indent = 0;
     std::vector<std::string> characters;
     std::vector<Token*> tokens;
     long long current_read_position;
