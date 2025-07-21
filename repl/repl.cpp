@@ -3,8 +3,8 @@
 #include "../lexer/lexer.h"
 #include "../token/token.h"
 #include "../utf8_converter/utf8_converter.h"
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 using namespace std;
 
@@ -23,13 +23,10 @@ void Repl::Run() {
 
     while (true) {
         try {
-            if (indent == 0) {
+            if (indent == 0)
                 cout << ">>> ";
-            } else {
-                for (int i = 0; i <= indent; i++) {
-                    cout << "    ";
-                }
-            }
+            else
+                cout << "    ";
 
             string code;
             getline(cin, code);
@@ -44,7 +41,7 @@ void Repl::Run() {
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
-            if (tokens.back()->type == TokenType::START_BLOCK) {
+            if (tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
             if (tokens.back()->type == TokenType::END_BLOCK) {
@@ -121,29 +118,33 @@ void Repl::TestLexer() {
 
     while (true) {
         try {
-            cout << ">>> ";
+            if (indent == 0)
+                cout << ">>> ";
+            else
+                cout << "    ";
 
             string code;
             getline(cin, code);
 
-            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩
+            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태,
+            // 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
             if (code == "종료하기") {
                 return;
             }
 
             vector<string> utf8_strings = Utf8Converter::Convert(code);
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+
+            for (auto token : new_tokens) {
+                if (token == new_tokens.back() && token->type == TokenType::COLON) {
+                    indent += 1;
+                }
+                if (token->type == TokenType::END_BLOCK) {
+                    indent -= 1;
+                }
+            }
+
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
-
-            if (new_tokens.empty())
-                continue;
-
-            if (tokens.back()->type == TokenType::START_BLOCK) {
-                indent += 1;
-            }
-            if (tokens.back()->type == TokenType::END_BLOCK) {
-                indent -= 1;
-            }
 
             if (indent != 0) {
                 continue;
@@ -163,30 +164,37 @@ void Repl::TestLexer() {
 }
 
 void Repl::TestParser() {
+    cout << "한국어 프로그래밍 언어 프로젝트 홍익" << endl;
+    cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
+    cout << "Parser Test Mode" << endl;
+
     vector<Token*> tokens;
     int indent = 0;
 
     while (true) {
         try {
-            string code;
-
-            if (indent == 0) {
+            if (indent == 0)
                 cout << ">>> ";
-            } else {
-                for (int i = 0; i <= indent; i++) {
-                    cout << "    ";
-                }
-            }
+            else
+                cout << "    ";
+
+            string code;
             getline(cin, code);
+
+            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태,
+            // 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
+            if (code == "종료하기") {
+                return;
+            }
 
             vector<string> utf8_strings = Utf8Converter::Convert(code);
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
-            if (tokens.back()->type == TokenType::LBRACE) {
+            if (tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
-            if (tokens.back()->type == TokenType::RBRACE) {
+            if (tokens.back()->type == TokenType::END_BLOCK) {
                 indent -= 1;
             }
 
@@ -205,3 +213,5 @@ void Repl::TestParser() {
         }
     }
 }
+
+

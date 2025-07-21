@@ -147,6 +147,7 @@ IfStatement* Parser::parseIfStatement() {
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::라면);
+    skipToken(TokenType::COLON);
 
     // new line 스킵은 추후에 추가
     // skipToken(TokenType::NEW_LINE);
@@ -155,6 +156,7 @@ IfStatement* Parser::parseIfStatement() {
 
     if (current_token != nullptr && current_token->type == TokenType::아니면) {
         skipToken(TokenType::아니면);
+        skipToken(TokenType::COLON);
         statement->then = parseBlockStatement();
     }
 

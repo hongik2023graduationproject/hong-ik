@@ -60,6 +60,14 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     line                  = 1;
     tokens.clear();
 
+    // 빈 문자열 예외 처리
+    // if (characters.empty()) {
+    //     for (int i = indent; i > current_indent; i--) {
+    //         addToken(TokenType::END_BLOCK, "");
+    //     }
+    // }
+
+
     while (current_read_position < characters.size()) {
         string current_character = characters[current_read_position];
         string next_character    = (next_read_position < characters.size()) ? characters[next_read_position] : "";

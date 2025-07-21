@@ -47,7 +47,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
 
         Object* value = eval(assignment_statement->value, environment);
 
-        if (typeCheck(before->type, value)) {
+        if (!typeCheck(before->type, value)) {
             throw runtime_error("값의 형식이 변수의 형식과 일치하지 않습니다.");
         }
 
@@ -311,7 +311,7 @@ Object* Evaluator::applyFunction(Object* function, std::vector<Object*> argument
         }
 
         for (int i = 0; i < function_object->parameterTypes.size(); i++) {
-            if (typeCheck(function_object->parameterTypes[i], arguments[i])) {
+            if (!typeCheck(function_object->parameterTypes[i], arguments[i])) {
                 throw runtime_error("함수 인자 타입 오류");
             }
         }
@@ -323,7 +323,7 @@ Object* Evaluator::applyFunction(Object* function, std::vector<Object*> argument
         Object* evaluated = eval(function_object->body, extended_env);
 
         if ((function_object->returnType == nullptr && evaluated == nullptr)
-            || typeCheck(function_object->returnType, evaluated)) {
+            || !typeCheck(function_object->returnType, evaluated)) {
             return unwarpReturnValue(evaluated);
         }
         throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
@@ -334,14 +334,14 @@ Object* Evaluator::applyFunction(Object* function, std::vector<Object*> argument
             throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
         }
         for (int i = 0; i < builtin_object->parameterTypes.size(); i++) {
-            if (typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
+            if (!typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
                 throw runtime_error("함수 인자 타입 오류");
             }
         }
 
         Object* evaluated = builtin_object->function(arguments);
         if ((builtin_object->returnType == nullptr && evaluated == nullptr)
-            || typeCheck(builtin_object->returnType, evaluated)) {
+            || !typeCheck(builtin_object->returnType, evaluated)) {
             return unwarpReturnValue(evaluated);
         }
         throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
