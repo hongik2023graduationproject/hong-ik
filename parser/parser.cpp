@@ -199,6 +199,8 @@ FunctionStatement* Parser::parseFunctionStatement() {
         skipToken(TokenType::RBRACKET);
     }
 
+    skipToken(TokenType::COLON);
+
     statement->body = parseBlockStatement();
 
     return statement;

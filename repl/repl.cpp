@@ -36,6 +36,7 @@ void Repl::Run() {
             if (code == "종료하기") {
                 return;
             }
+            code += "\n";
 
             vector<string> utf8_strings = Utf8Converter::Convert(code);
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
@@ -44,8 +45,9 @@ void Repl::Run() {
             if (tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
-            if (tokens.back()->type == TokenType::END_BLOCK) {
-                indent -= 1;
+            for (auto token : new_tokens) {
+                if (token->type == TokenType::END_BLOCK)
+                    indent -= 1;
             }
 
             if (indent != 0) {
@@ -131,6 +133,7 @@ void Repl::TestLexer() {
             if (code == "종료하기") {
                 return;
             }
+            code += "\n";
 
             vector<string> utf8_strings = Utf8Converter::Convert(code);
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
@@ -186,6 +189,7 @@ void Repl::TestParser() {
             if (code == "종료하기") {
                 return;
             }
+            code += "\n";
 
             vector<string> utf8_strings = Utf8Converter::Convert(code);
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);

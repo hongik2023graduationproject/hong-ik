@@ -79,6 +79,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         auto* function = new Function;
         function->body = function_statement->body;
 
+        function->parameterTypes = function_statement->parameterTypes;
         function->parameters = function_statement->parameters;
         function->env        = environment;
         function->returnType = function_statement->returnType;
@@ -109,7 +110,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
             return builtins[identifier_expression->name];
         }
 
-        throw runtime_error("존재하지 않은 식별자입니다.");
+        throw runtime_error(identifier_expression->String() + " 존재하지 않는 식별자입니다.");
     }
     if (auto* call_expression = dynamic_cast<CallExpression*>(node)) {
         // 타입 체크는 applyFunction 내부에서 처리 중!
@@ -307,7 +308,7 @@ Object* Evaluator::evalBangPrefixExpression(Object* right) {
 Object* Evaluator::applyFunction(Object* function, std::vector<Object*> arguments) {
     if (auto* function_object = dynamic_cast<Function*>(function)) {
         if (function_object->parameterTypes.size() != arguments.size()) {
-            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
+            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다." + std::to_string(function_object->parameterTypes.size()) + ' ' + std::to_string(arguments.size()));
         }
 
         for (int i = 0; i < function_object->parameterTypes.size(); i++) {
@@ -331,7 +332,7 @@ Object* Evaluator::applyFunction(Object* function, std::vector<Object*> argument
 
     if (auto* builtin_object = dynamic_cast<Builtin*>(function)) {
         if (builtin_object->parameterTypes.size() != arguments.size()) {
-            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.");
+            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다." + builtin_object->parameterTypes.size() + ' ' + arguments.size());
         }
         for (int i = 0; i < builtin_object->parameterTypes.size(); i++) {
             if (!typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
