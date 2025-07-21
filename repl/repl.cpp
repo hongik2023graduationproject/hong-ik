@@ -23,10 +23,11 @@ void Repl::Run() {
 
     while (true) {
         try {
-            if (indent == 0)
+            if (indent == 0) {
                 cout << ">>> ";
-            else
+            } else {
                 cout << "    ";
+            }
 
             string code;
             getline(cin, code);
@@ -42,12 +43,13 @@ void Repl::Run() {
             vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
-            if (tokens.back()->type == TokenType::COLON) {
+            if (tokens.size() >= 2 && (tokens[tokens.size() - 2]->type == TokenType::COLON)) {
                 indent += 1;
             }
             for (auto token : new_tokens) {
-                if (token->type == TokenType::END_BLOCK)
+                if (token->type == TokenType::END_BLOCK) {
                     indent -= 1;
+                }
             }
 
             if (indent != 0) {
@@ -57,7 +59,9 @@ void Repl::Run() {
             Program* program = parser->Parsing(tokens);
             Object* object   = evaluator->Evaluate(program);
 
-            cout << object->ToString() << endl;
+            if (object != nullptr) {
+                cout << object->ToString() << endl;
+            }
 
             tokens.clear();
         } catch (const exception& e) {
@@ -100,7 +104,10 @@ void Repl::FileMode(string& filename) {
             Program* program = parser->Parsing(tokens);
             Object* object   = evaluator->Evaluate(program);
 
-            cout << object->ToString() << endl;
+            if (object != nullptr) {
+                cout << object->ToString() << endl;
+            }
+
             tokens.clear();
         } catch (const exception& e) {
             cout << "Error: " << e.what() << endl;
@@ -120,10 +127,11 @@ void Repl::TestLexer() {
 
     while (true) {
         try {
-            if (indent == 0)
+            if (indent == 0) {
                 cout << ">>> ";
-            else
+            } else {
                 cout << "    ";
+            }
 
             string code;
             getline(cin, code);
@@ -176,10 +184,11 @@ void Repl::TestParser() {
 
     while (true) {
         try {
-            if (indent == 0)
+            if (indent == 0) {
                 cout << ">>> ";
-            else
+            } else {
                 cout << "    ";
+            }
 
             string code;
             getline(cin, code);
@@ -199,8 +208,9 @@ void Repl::TestParser() {
                 indent += 1;
             }
             for (auto token : new_tokens) {
-                if (token->type == TokenType::END_BLOCK)
+                if (token->type == TokenType::END_BLOCK) {
                     indent -= 1;
+                }
             }
 
             if (indent != 0) {
@@ -218,5 +228,3 @@ void Repl::TestParser() {
         }
     }
 }
-
-

@@ -10,6 +10,7 @@ class Length : public Builtin {
 
 class Print : public Builtin {
     Object* function(std::vector<Object*> parameters) override;
+    Token* returnType = nullptr;
 };
 
 class Push : public Builtin {

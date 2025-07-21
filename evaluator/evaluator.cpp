@@ -81,10 +81,10 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         function->body = function_statement->body;
 
         function->parameterTypes = function_statement->parameterTypes;
-        function->parameters = function_statement->parameters;
-        function->env        = environment;
-        function->returnType = function_statement->returnType;
-        function->type       = ObjectType::FUNCTION;
+        function->parameters     = function_statement->parameters;
+        function->env            = environment;
+        function->returnType     = function_statement->returnType;
+        function->type           = ObjectType::FUNCTION;
 
         environment->Set(function_statement->name, function);
         return function;
@@ -127,7 +127,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
     }
     if (auto* index_expression = dynamic_cast<IndexExpression*>(node)) {
         // 타입 체크 evalIndexExpression에서 처리 중!
-        auto* left = eval(index_expression->name, environment);
+        auto* left  = eval(index_expression->name, environment);
         auto* index = eval(index_expression->index, environment);
         return evalIndexExpression(left, index);
     }
@@ -309,7 +309,9 @@ Object* Evaluator::evalBangPrefixExpression(Object* right) {
 Object* Evaluator::applyFunction(Object* function, std::vector<Object*> arguments) {
     if (auto* function_object = dynamic_cast<Function*>(function)) {
         if (function_object->parameterTypes.size() != arguments.size()) {
-            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다." + std::to_string(function_object->parameterTypes.size()) + ' ' + std::to_string(arguments.size()));
+            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다."
+                                + std::to_string(function_object->parameterTypes.size()) + ' '
+                                + std::to_string(arguments.size()));
         }
 
         for (int i = 0; i < function_object->parameterTypes.size(); i++) {
@@ -332,21 +334,25 @@ Object* Evaluator::applyFunction(Object* function, std::vector<Object*> argument
     }
 
     if (auto* builtin_object = dynamic_cast<Builtin*>(function)) {
-        if (builtin_object->parameterTypes.size() != arguments.size()) {
-            throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다." + builtin_object->parameterTypes.size() + ' ' + arguments.size());
-        }
-        for (int i = 0; i < builtin_object->parameterTypes.size(); i++) {
-            if (!typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
-                throw runtime_error("함수 인자 타입 오류");
-            }
-        }
+        // if (builtin_object->parameterTypes.size() != arguments.size()) {
+        //     throw runtime_error("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다." +
+        //     builtin_object->parameterTypes.size() + ' ' + arguments.size());
+        // }
+        // for (int i = 0; i < builtin_object->parameterTypes.size(); i++) {
+        //     if (!typeCheck(builtin_object->parameterTypes[i], arguments[i])) {
+        //         throw runtime_error("함수 인자 타입 오류");
+        //     }
+        // }
 
         Object* evaluated = builtin_object->function(arguments);
-        if ((builtin_object->returnType == nullptr && evaluated == nullptr)
-            || !typeCheck(builtin_object->returnType, evaluated)) {
-            return unwarpReturnValue(evaluated);
+        if (builtin_object->returnType != nullptr && evaluated != nullptr) {
+            if (!typeCheck(builtin_object->returnType, evaluated)) {
+                return unwarpReturnValue(evaluated);
+            }
+
+            throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
         }
-        throw runtime_error("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.");
+        return nullptr;
     }
 
     throw runtime_error("함수가 존재하지 않습니다.");

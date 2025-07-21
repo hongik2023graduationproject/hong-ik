@@ -24,13 +24,13 @@ Object* Length::function(std::vector<Object*> parameters) {
 Object* Print::function(std::vector<Object*> parameters) {
     for (int i = 0; i < parameters.size(); i++) {
         if (auto string = dynamic_cast<String*>(parameters[i])) {
-            cout << string->value;
+            cout << string->value << endl;
         }
         if (auto integer = dynamic_cast<Integer*>(parameters[i])) {
-            cout << integer->value;
+            cout << integer->value << endl;
         }
         if (auto boolean = dynamic_cast<Boolean*>(parameters[i])) {
-            cout << boolean->value;
+            cout << boolean->value << endl;
         }
     }
 

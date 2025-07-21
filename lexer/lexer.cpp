@@ -57,7 +57,9 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     current_read_position = 0;
     next_read_position    = 1;
     at_line_start         = true;
-    line                  = 1;
+    if (indent == 0) {
+        line = 1;
+    }
     tokens.clear();
 
     // 빈 문자열 예외 처리
@@ -99,7 +101,7 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
                     addToken(TokenType::END_BLOCK, "");
                 }
             }
-            indent = current_indent;
+            indent        = current_indent;
             at_line_start = false;
             continue;
         }
@@ -110,9 +112,8 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
             continue;
         }
 
-        // new line은 별도 토큰 생성 X
         if (current_character == "\n") {
-            // addToken(TokenType::NEW_LINE, "\n");
+            addToken(TokenType::NEW_LINE, "\n");
             line++;
             current_read_position++;
             next_read_position++;

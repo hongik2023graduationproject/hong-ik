@@ -19,7 +19,9 @@ Program* Parser::Parsing(const std::vector<Token*>& tokens) {
             break;
         }
         auto* statement = parseStatement();
-        program->statements.push_back(statement);
+        if (statement != nullptr) {
+            program->statements.push_back(statement);
+        }
     }
 
     return program;
@@ -28,7 +30,7 @@ Program* Parser::Parsing(const std::vector<Token*>& tokens) {
 
 void Parser::initialization() {
     delete program;
-    program = new Program();
+    program               = new Program();
     current_read_position = 0;
     setToken();
 }
@@ -46,6 +48,9 @@ void Parser::setNextToken() {
 }
 
 void Parser::skipToken(const TokenType type) {
+    if (current_token == nullptr) {
+        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+    }
     if (current_token->type != type) {
         throw UnexpectedTokenException(current_token->type, type, current_token->line);
     }
@@ -80,6 +85,11 @@ Statement* Parser::parseStatement() {
     if (current_token->type == TokenType::함수) {
         return parseFunctionStatement();
     }
+    // 빈 문자열은 무시
+    if (current_token->type == TokenType::NEW_LINE) {
+        skipToken(TokenType::NEW_LINE);
+        return nullptr;
+    }
     return parseExpressionStatement();
 }
 
@@ -99,6 +109,7 @@ InitializationStatement* Parser::parseInitializationStatement() {
     skipToken(TokenType::ASSIGN);
     statement->value = parseExpression(Precedence::LOWEST);
     setNextToken();
+    skipToken(TokenType::NEW_LINE);
     return statement;
 }
 
@@ -113,6 +124,7 @@ AssignmentStatement* Parser::parseAssignmentStatement() {
 
     statement->value = parseExpression(Precedence::LOWEST);
     setNextToken();
+    skipToken(TokenType::NEW_LINE);
     return statement;
 }
 
@@ -120,6 +132,7 @@ ExpressionStatement* Parser::parseExpressionStatement() {
     auto* expressionStatement       = new ExpressionStatement();
     expressionStatement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
+    skipToken(TokenType::NEW_LINE);
     return expressionStatement;
 }
 
@@ -129,6 +142,7 @@ ReturnStatement* Parser::parseReturnStatement() {
     auto* statement       = new ReturnStatement();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
+    skipToken(TokenType::NEW_LINE);
     return statement;
 }
 
@@ -152,14 +166,15 @@ IfStatement* Parser::parseIfStatement() {
     skipToken(TokenType::라면);
     skipToken(TokenType::COLON);
 
-    // new line 스킵은 추후에 추가
-    // skipToken(TokenType::NEW_LINE);
+    skipToken(TokenType::NEW_LINE);
 
     statement->consequence = parseBlockStatement();
 
     if (current_token != nullptr && current_token->type == TokenType::아니면) {
         skipToken(TokenType::아니면);
         skipToken(TokenType::COLON);
+
+        skipToken(TokenType::NEW_LINE);
         statement->then = parseBlockStatement();
     }
 
@@ -203,6 +218,7 @@ FunctionStatement* Parser::parseFunctionStatement() {
     }
 
     skipToken(TokenType::COLON);
+    skipToken(TokenType::NEW_LINE);
 
     statement->body = parseBlockStatement();
 
