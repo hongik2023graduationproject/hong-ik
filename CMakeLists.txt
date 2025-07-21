@@ -15,6 +15,9 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+# For visual studio
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 enable_testing()
 
 add_executable(HongIk main.cpp
