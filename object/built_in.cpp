@@ -17,7 +17,8 @@ Object* Length::function(std::vector<Object*> parameters) {
         return new Integer(array->elements.size());
     }
 
-    // ERR
+    // TODO: ERR
+    return nullptr;
 }
 
 Object* Print::function(std::vector<Object*> parameters) {
@@ -32,6 +33,9 @@ Object* Print::function(std::vector<Object*> parameters) {
             cout << boolean->value;
         }
     }
+
+    // TODO: ERR
+    return nullptr;
 }
 
 Object* Push::function(std::vector<Object*> parameters) {
@@ -43,5 +47,6 @@ Object* Push::function(std::vector<Object*> parameters) {
         array->elements.push_back(parameters[1]);
     }
 
-    // ERR
+    // TODO: ERR
+    return nullptr;
 }
