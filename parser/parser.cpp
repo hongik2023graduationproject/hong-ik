@@ -53,6 +53,9 @@ void Parser::skipToken(const TokenType type) {
 }
 
 void Parser::checkToken(TokenType type) {
+    if (current_token == nullptr) {
+        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+    }
     if (current_token->type != type) {
         throw UnexpectedTokenException(current_token->type, type, current_token->line);
     }
