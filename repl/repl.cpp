@@ -198,8 +198,9 @@ void Repl::TestParser() {
             if (tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
-            if (tokens.back()->type == TokenType::END_BLOCK) {
-                indent -= 1;
+            for (auto token : new_tokens) {
+                if (token->type == TokenType::END_BLOCK)
+                    indent -= 1;
             }
 
             if (indent != 0) {

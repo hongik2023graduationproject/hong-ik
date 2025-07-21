@@ -63,7 +63,8 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         if (auto* boolean = dynamic_cast<Boolean*>(condition)) {
             if (boolean->value) {
                 return eval(if_statement->consequence, environment);
-            } else {
+            } else if (if_statement->then != nullptr) {
+
                 return eval(if_statement->then, environment);
             }
         }
@@ -156,7 +157,7 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
         return array;
     }
 
-    throw invalid_argument("알 수 없는 구문입니다.");
+    throw invalid_argument(node->String() + "알 수 없는 구문입니다.");
 }
 
 Object* Evaluator::evalProgram(const Program* program, Environment* environment) {
