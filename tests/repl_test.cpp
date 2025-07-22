@@ -211,7 +211,7 @@ TEST_F(ReplTest, functionTest) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    std::cout << "Result:\n" << output << std::endl; // 디버깅
+    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
     // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
     EXPECT_NE(output.find("함수:"), std::string::npos);

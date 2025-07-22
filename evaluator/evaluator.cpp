@@ -28,8 +28,11 @@ Object* Evaluator::eval(Node* node, Environment* environment) { // program
     }
     if (auto* initialization_statement = dynamic_cast<InitializationStatement*>(node)) {
         Object* value = eval(initialization_statement->value, environment);
+        // TODO: 수정해야 함 해당 오류는 environment 내부로 옮길 것
+        // 정책 문제로 돌릴만 함
         if (environment->Get(initialization_statement->name) != nullptr) {
             throw runtime_error("이미 선언된 변수명입니다.");
+            // 루프 내부에서 동일명 변수를 가릴 수 있음
         }
 
         if (!typeCheck(initialization_statement->type, value)) {
