@@ -302,7 +302,7 @@ Expression* Parser::parseCallExpression() {
     }
     skipToken(TokenType::RPAREN);
 
-    call_expression->function = parseExpression(Precedence::LOWEST);
+    call_expression->function = parseExpression(Precedence::CALL);
     // skipToken(TokenType::IDENTIFIER);
 
     return call_expression;

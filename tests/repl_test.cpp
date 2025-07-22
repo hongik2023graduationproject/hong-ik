@@ -184,9 +184,9 @@ TEST_F(ReplTest, functionTest) {
     user_input += "        리턴 0\n";
     user_input += "    만약 수 == 1 라면:\n";
     user_input += "        리턴 1\n";
-    user_input += "    리턴 :피보나치 (수 - 1) + :피보나치 (수 - 2)\n";
+    user_input += "    리턴 :(수 - 1)피보나치 + :(수 - 2)피보나치\n";
     user_input += "\n";
-    user_input += ":피보나치(10)\n";
+    user_input += ":(10)피보나치\n";
     user_input += "종료하기\n";
 
     // 1. 준비: 가상 입력 및 출력 버퍼 생성
@@ -211,7 +211,7 @@ TEST_F(ReplTest, functionTest) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
+    std::cout << "Result:\n" << output << std::endl; // 디버깅
 
     // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
     EXPECT_NE(output.find("함수:"), std::string::npos);
