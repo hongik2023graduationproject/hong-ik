@@ -289,19 +289,21 @@ Expression* Parser::parseCallExpression() {
     skipToken(TokenType::COLON);
 
     auto call_expression      = new CallExpression();
-    call_expression->function = parseExpression(Precedence::LOWEST);
-    skipToken(TokenType::IDENTIFIER);
 
     if (current_token != nullptr && current_token->type == TokenType::LPAREN) {
         skipToken(TokenType::LPAREN);
-    FLAG:
-        call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
+        FLAG:
+            call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
         setNextToken();
         if (current_token->type == TokenType::COMMA) {
             skipToken(TokenType::COMMA);
             goto FLAG;
         }
     }
+    skipToken(TokenType::RPAREN);
+
+    call_expression->function = parseExpression(Precedence::LOWEST);
+    // skipToken(TokenType::IDENTIFIER);
 
     return call_expression;
 }

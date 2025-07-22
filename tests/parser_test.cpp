@@ -27,7 +27,8 @@ TEST_F(ParserTest, OperatorTest) {
     const vector<Token*> tokens = {
         new Token{TokenType::INTEGER, "4", 1},
         new Token{TokenType::PLUS, "+", 1},
-        new Token{TokenType::INTEGER, "11", 1}
+        new Token{TokenType::INTEGER, "11", 1},
+        new Token{TokenType::NEW_LINE, "\n", 1},
     };
 
     auto actual = parser->Parsing(tokens);
