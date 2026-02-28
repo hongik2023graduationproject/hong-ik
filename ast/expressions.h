@@ -3,18 +3,20 @@
 
 #include "../token/token.h"
 #include "node.h"
+#include <memory>
 #include <vector>
 
 class Expression : public Node {};
 
 class InfixExpression : public Expression {
 public:
-    Token* token;
-    Expression* left;
-    Expression* right;
+    std::shared_ptr<Token> token;
+    std::shared_ptr<Expression> left;
+    std::shared_ptr<Expression> right;
 
     InfixExpression() = default;
-    InfixExpression(Token* token, Expression* left, Expression* right) : token(token), left(left), right(right) {}
+    InfixExpression(std::shared_ptr<Token> token, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right)
+        : token(std::move(token)), left(std::move(left)), right(std::move(right)) {}
 
     std::string String() override {
         return "(" + left->String() + " " + token->text + " " + right->String() + ")";
@@ -23,12 +25,11 @@ public:
 
 class PrefixExpression : public Expression {
 public:
-    Token* token;
-    Expression* right;
+    std::shared_ptr<Token> token;
+    std::shared_ptr<Expression> right;
 
     std::string String() override {
         return "(" + token->text + right->String() + ")";
-        ;
     }
 };
 
@@ -44,13 +45,13 @@ public:
 // 함수 호출을 위한 표현식
 class CallExpression : public Expression {
 public:
-    Expression* function;
-    std::vector<Expression*> arguments;
+    std::shared_ptr<Expression> function;
+    std::vector<std::shared_ptr<Expression>> arguments;
 
     std::string String() override {
         std::string s = ":" + function->String();
         s += " (";
-        for (auto arg : arguments) {
+        for (auto& arg : arguments) {
             s += arg->String();
             s += ", ";
         }
@@ -61,8 +62,8 @@ public:
 
 class IndexExpression : public Expression {
 public:
-    Expression* name;
-    Expression* index;
+    std::shared_ptr<Expression> name;
+    std::shared_ptr<Expression> index;
 
     std::string String() override {
         return name->String() + "[" + index->String() + "]";

@@ -5,57 +5,59 @@
 #include "../environment/environment.h"
 #include "../object/built_in.h"
 #include "../object/object.h"
+#include <memory>
 #include <vector>
 
 class Evaluator {
 public:
     Evaluator();
+    ~Evaluator();
 
-    Object* Evaluate(Program* program);
+    std::shared_ptr<Object> Evaluate(std::shared_ptr<Program> program);
 
 private:
-    Environment* environment;
+    std::shared_ptr<Environment> environment;
 
 
-    std::map<std::string, Builtin*> builtins = {
-        {"길이", new Length},
-        {"출력", new Print},
-        {"추가", new Push},
+    std::map<std::string, std::shared_ptr<Builtin>> builtins = {
+        {"길이", std::make_shared<Length>()},
+        {"출력", std::make_shared<Print>()},
+        {"추가", std::make_shared<Push>()},
     };
 
-    Object* evalProgram(const Program* program, Environment* environment);
+    std::shared_ptr<Object> evalProgram(const std::shared_ptr<Program>& program, Environment* environment);
 
-    Object* eval(Node* statement, Environment* environment);
+    std::shared_ptr<Object> eval(Node* statement, Environment* environment);
 
-    Object* evalBlockStatement(const std::vector<Statement*>& statements, Environment* environment);
+    std::shared_ptr<Object> evalBlockStatement(const std::vector<std::shared_ptr<Statement>>& statements, Environment* environment);
 
-    Object* evalInfixExpression(Token* token, Object* left, Object* right);
+    std::shared_ptr<Object> evalInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
-    Object* evalIntegerInfixExpression(Token* token, Object* left, Object* right);
+    std::shared_ptr<Object> evalIntegerInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
-    Object* evalBooleanInfixExpression(Token* token, Object* left, Object* right);
+    std::shared_ptr<Object> evalBooleanInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
-    Object* evalStringInfixExpression(Token* token, Object* left, Object* right);
+    std::shared_ptr<Object> evalStringInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
-    Object* evalPrefixExpression(Token* token, Object* right);
+    std::shared_ptr<Object> evalPrefixExpression(Token* token, std::shared_ptr<Object> right);
 
-    Object* evalMinusPrefixExpression(Object* right);
+    std::shared_ptr<Object> evalMinusPrefixExpression(std::shared_ptr<Object> right);
 
-    Object* evalBangPrefixExpression(Object* right);
+    std::shared_ptr<Object> evalBangPrefixExpression(std::shared_ptr<Object> right);
 
-    Object* evalIndexExpression(Object* left, Object* index);
+    std::shared_ptr<Object> evalIndexExpression(std::shared_ptr<Object> left, std::shared_ptr<Object> index);
 
-    Object* evalArrayIndexExpression(Object* array, Object* index);
+    std::shared_ptr<Object> evalArrayIndexExpression(std::shared_ptr<Object> array, std::shared_ptr<Object> index);
 
-    Object* applyFunction(Object* function, std::vector<Object*> arguments);
+    std::shared_ptr<Object> applyFunction(std::shared_ptr<Object> function, std::vector<std::shared_ptr<Object>> arguments);
 
-    Environment* extendFunctionEnvironment(Function* function, std::vector<Object*> arguments);
+    std::shared_ptr<Environment> extendFunctionEnvironment(Function* function, std::vector<std::shared_ptr<Object>> arguments);
 
-    Object* unwarpReturnValue(Object* object);
+    std::shared_ptr<Object> unwrapReturnValue(std::shared_ptr<Object> object);
 
-    bool typeCheck(Token* type, Object* value);
+    bool typeCheck(Token* type, const std::shared_ptr<Object>& value);
 
-    bool typeCheck(ObjectType type, Object* value);
+    bool typeCheck(ObjectType type, const std::shared_ptr<Object>& value);
 };
 
 

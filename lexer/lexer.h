@@ -2,6 +2,7 @@
 #define LEXER_H
 
 #include "../token/token.h"
+#include <memory>
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -10,13 +11,13 @@ class Lexer {
 public:
     Lexer();
 
-    std::vector<Token*> Tokenize(const std::vector<std::string>& characters);
+    std::vector<std::shared_ptr<Token>> Tokenize(const std::vector<std::string>& characters);
 
 private:
     bool at_line_start;
     int indent = 0;
     std::vector<std::string> characters;
-    std::vector<Token*> tokens;
+    std::vector<std::shared_ptr<Token>> tokens;
     long long current_read_position;
     long long next_read_position;
     long long line;

@@ -1,5 +1,6 @@
 #include "lexer/lexer.h"
 #include <gtest/gtest.h>
+#include <memory>
 
 using namespace std;
 
@@ -7,7 +8,7 @@ class LexerTest : public ::testing::Test {
 protected:
     Lexer lexer;
 
-    void ExpectTokensEqual(const vector<Token*>& actual, const vector<Token*>& expected) {
+    void ExpectTokensEqual(const vector<shared_ptr<Token>>& actual, const vector<shared_ptr<Token>>& expected) {
         ASSERT_EQ(actual.size(), expected.size()) << "벡터 길이가 일치하지 않습니다.!";
         for (size_t i = 0; i < expected.size(); ++i) {
             EXPECT_EQ(*actual[i], *expected[i])
@@ -19,13 +20,13 @@ protected:
 };
 
 TEST_F(LexerTest, OperatorTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::PLUS, "+", 1},
-        new Token{TokenType::MINUS, "-", 1},
-        new Token{TokenType::ASTERISK, "*", 1},
-        new Token{TokenType::SLASH, "/", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::PLUS, "+", 1}),
+        make_shared<Token>(Token{TokenType::MINUS, "-", 1}),
+        make_shared<Token>(Token{TokenType::ASTERISK, "*", 1}),
+        make_shared<Token>(Token{TokenType::SLASH, "/", 1}),
     };
-    vector<Token*> actual = lexer.Tokenize({
+    auto actual = lexer.Tokenize({
         "+",
         "-",
         "*",
@@ -35,25 +36,14 @@ TEST_F(LexerTest, OperatorTest) {
     ExpectTokensEqual(actual, expected);
 }
 
-// TODO: BLOCK 처리 마무리 하고 주석 풀기
-// TEST_F(LexerTest, EscapeSequenceTest) {
-//     vector<Token*> expected = {
-//         new Token{TokenType::TAB, "\t", 2},
-//         new Token{TokenType::NEW_LINE, "\n", 1},
-//     };
-//     vector<Token*> actual = lexer.Tokenize({"\t", "\n"});
-//
-//     ExpectTokensEqual(actual, expected);
-// }
-
 TEST_F(LexerTest, IdentifierTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::IDENTIFIER, "사과", 1},
-        new Token{TokenType::IDENTIFIER, "_바나나", 1},
-        new Token{TokenType::IDENTIFIER, "호박_보석", 1},
-        new Token{TokenType::IDENTIFIER, "book", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::IDENTIFIER, "사과", 1}),
+        make_shared<Token>(Token{TokenType::IDENTIFIER, "_바나나", 1}),
+        make_shared<Token>(Token{TokenType::IDENTIFIER, "호박_보석", 1}),
+        make_shared<Token>(Token{TokenType::IDENTIFIER, "book", 1}),
     };
-    vector<Token*> actual = lexer.Tokenize(
+    auto actual = lexer.Tokenize(
         {"사", "과", " ", "_", "바", "나", "나", " ", "호", "박", "_", "보", "석", " ", "b", "o", "o", "k"});
 
     ExpectTokensEqual(actual, expected);
@@ -61,19 +51,19 @@ TEST_F(LexerTest, IdentifierTest) {
 
 
 TEST_F(LexerTest, SeparatorTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::LPAREN, "(", 1},
-        new Token{TokenType::RPAREN, ")", 1},
-        new Token{TokenType::LBRACE, "{", 1},
-        new Token{TokenType::RBRACE, "}", 1},
-        new Token{TokenType::LBRACKET, "[", 1},
-        new Token{TokenType::RBRACKET, "]", 1},
-        new Token{TokenType::COLON, ":", 1},
-        new Token{TokenType::SEMICOLON, ";", 1},
-        new Token{TokenType::COMMA, ",", 1},
-        new Token{TokenType::RIGHT_ARROW, "->", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::LPAREN, "(", 1}),
+        make_shared<Token>(Token{TokenType::RPAREN, ")", 1}),
+        make_shared<Token>(Token{TokenType::LBRACE, "{", 1}),
+        make_shared<Token>(Token{TokenType::RBRACE, "}", 1}),
+        make_shared<Token>(Token{TokenType::LBRACKET, "[", 1}),
+        make_shared<Token>(Token{TokenType::RBRACKET, "]", 1}),
+        make_shared<Token>(Token{TokenType::COLON, ":", 1}),
+        make_shared<Token>(Token{TokenType::SEMICOLON, ";", 1}),
+        make_shared<Token>(Token{TokenType::COMMA, ",", 1}),
+        make_shared<Token>(Token{TokenType::RIGHT_ARROW, "->", 1}),
     };
-    vector<Token*> actual = lexer.Tokenize({
+    auto actual = lexer.Tokenize({
         "(",
         ")",
         "{",
@@ -91,21 +81,21 @@ TEST_F(LexerTest, SeparatorTest) {
 }
 
 TEST_F(LexerTest, LogicalOperatorTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::EQUAL, "==", 1},
-        new Token{TokenType::ASSIGN, "=", 1},
-        new Token{TokenType::NOT_EQUAL, "!=", 1},
-        new Token{TokenType::BANG, "!", 1},
-        new Token{TokenType::LOGICAL_AND, "&&", 1},
-        new Token{TokenType::BITWISE_AND, "&", 1},
-        new Token{TokenType::LOGICAL_OR, "||", 1},
-        new Token{TokenType::BITWISE_OR, "|", 1},
-        new Token{TokenType::LESS_THAN, "<", 1},
-        new Token{TokenType::LESS_EQUAL, "<=", 1},
-        new Token{TokenType::GREATER_THAN, ">", 1},
-        new Token{TokenType::GREATER_EQUAL, ">=", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::EQUAL, "==", 1}),
+        make_shared<Token>(Token{TokenType::ASSIGN, "=", 1}),
+        make_shared<Token>(Token{TokenType::NOT_EQUAL, "!=", 1}),
+        make_shared<Token>(Token{TokenType::BANG, "!", 1}),
+        make_shared<Token>(Token{TokenType::LOGICAL_AND, "&&", 1}),
+        make_shared<Token>(Token{TokenType::BITWISE_AND, "&", 1}),
+        make_shared<Token>(Token{TokenType::LOGICAL_OR, "||", 1}),
+        make_shared<Token>(Token{TokenType::BITWISE_OR, "|", 1}),
+        make_shared<Token>(Token{TokenType::LESS_THAN, "<", 1}),
+        make_shared<Token>(Token{TokenType::LESS_EQUAL, "<=", 1}),
+        make_shared<Token>(Token{TokenType::GREATER_THAN, ">", 1}),
+        make_shared<Token>(Token{TokenType::GREATER_EQUAL, ">=", 1}),
     };
-    vector<Token*> actual =
+    auto actual =
         lexer.Tokenize({"=", "=", "=", "!", "=", "!", "&", "&", "&", "|", "|", "|", "<", "<", "=", ">", ">", "="});
 
     ExpectTokensEqual(actual, expected);
@@ -113,18 +103,18 @@ TEST_F(LexerTest, LogicalOperatorTest) {
 
 
 TEST_F(LexerTest, KeywordTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::정수, "정수", 1},
-        new Token{TokenType::실수, "실수", 1},
-        new Token{TokenType::문자, "문자", 1},
-        new Token{TokenType::리턴, "리턴", 1},
-        new Token{TokenType::만약, "만약", 1},
-        new Token{TokenType::라면, "라면", 1},
-        new Token{TokenType::함수, "함수", 1},
-        new Token{TokenType::TRUE, "true", 1},
-        new Token{TokenType::FALSE, "false", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::정수, "정수", 1}),
+        make_shared<Token>(Token{TokenType::실수, "실수", 1}),
+        make_shared<Token>(Token{TokenType::문자, "문자", 1}),
+        make_shared<Token>(Token{TokenType::리턴, "리턴", 1}),
+        make_shared<Token>(Token{TokenType::만약, "만약", 1}),
+        make_shared<Token>(Token{TokenType::라면, "라면", 1}),
+        make_shared<Token>(Token{TokenType::함수, "함수", 1}),
+        make_shared<Token>(Token{TokenType::TRUE, "true", 1}),
+        make_shared<Token>(Token{TokenType::FALSE, "false", 1}),
     };
-    vector<Token*> actual = lexer.Tokenize({
+    auto actual = lexer.Tokenize({
         "정",
         "수",
         " ",
@@ -165,12 +155,12 @@ TEST_F(LexerTest, KeywordTest) {
 
 
 TEST_F(LexerTest, LiteralTest) {
-    vector<Token*> expected = {
-        new Token{TokenType::INTEGER, "31", 1},
-        new Token{TokenType::INTEGER, "7", 1},
-        new Token{TokenType::STRING, "apple", 1},
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::INTEGER, "31", 1}),
+        make_shared<Token>(Token{TokenType::INTEGER, "7", 1}),
+        make_shared<Token>(Token{TokenType::STRING, "apple", 1}),
     };
-    vector<Token*> actual = lexer.Tokenize({
+    auto actual = lexer.Tokenize({
         "3",
         "1",
         " ",

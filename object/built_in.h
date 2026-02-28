@@ -5,16 +5,15 @@
 
 
 class Length : public Builtin {
-    Object* function(std::vector<Object*> parameters) override;
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
 class Print : public Builtin {
-    Object* function(std::vector<Object*> parameters) override;
-    Token* returnType = nullptr;
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
 class Push : public Builtin {
-    Object* function(std::vector<Object*> parameters) override;
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
 #endif // BUILT_IN_H

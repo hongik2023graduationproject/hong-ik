@@ -6,12 +6,12 @@
 #include "parser/parser.h"
 #include "repl/repl.h"
 #include <gtest/gtest.h>
+#include <memory>
 
 using namespace std;
 
 class ReplTest : public ::testing::Test {
 protected:
-    Repl* repl = new Repl();
 };
 
 
@@ -46,9 +46,8 @@ TEST_F(ReplTest, testTest) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
-    // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
+    // 7. 원하는 결과가 출력됐는지 확인
     EXPECT_NE(output.find("3"), std::string::npos);
     EXPECT_NE(output.find("10"), std::string::npos);
     EXPECT_NE(output.find("15"), std::string::npos);
@@ -86,13 +85,11 @@ TEST_F(ReplTest, ifTest1) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
-    // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
+    // 7. 원하는 결과가 출력됐는지 확인
     EXPECT_NE(output.find("11"), std::string::npos);
     EXPECT_NE(output.find("5"), std::string::npos);
 }
-
 
 
 
@@ -128,9 +125,8 @@ TEST_F(ReplTest, ifTest2) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
-    // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
+    // 7. 원하는 결과가 출력됐는지 확인
     EXPECT_NE(output.find("11"), std::string::npos);
     EXPECT_NE(output.find("5"), std::string::npos);
 }
@@ -169,9 +165,8 @@ TEST_F(ReplTest, ifTest3) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
-    // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
+    // 7. 원하는 결과가 출력됐는지 확인
     EXPECT_NE(output.find("15"), std::string::npos);
     EXPECT_NE(output.find("10"), std::string::npos);
 }
@@ -211,9 +206,8 @@ TEST_F(ReplTest, functionTest) {
 
     // 6. 실제 출력 결과 검사
     std::string output = fakeStdout.str();
-    // std::cout << "Result:\n" << output << std::endl; // 디버깅
 
-    // 7. 원하는 결과가 출력됐는지 확인 (예: "3")
+    // 7. 원하는 결과가 출력됐는지 확인
     EXPECT_NE(output.find("함수:"), std::string::npos);
     EXPECT_NE(output.find("55"), std::string::npos);
 }

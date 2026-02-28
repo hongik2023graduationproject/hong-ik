@@ -14,11 +14,17 @@ Repl::Repl() {
     evaluator = new Evaluator();
 }
 
+Repl::~Repl() {
+    delete lexer;
+    delete parser;
+    delete evaluator;
+}
+
 void Repl::Run() {
     cout << "한국어 프로그래밍 언어 프로젝트 홍익" << endl;
     cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
 
-    vector<Token*> tokens;
+    vector<shared_ptr<Token>> tokens;
     int indent = 0;
 
     while (true) {
@@ -32,21 +38,19 @@ void Repl::Run() {
             string code;
             getline(cin, code);
 
-            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태,
-            // 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
-            if (code == "종료하기") {
+            if (code == EXIT_COMMAND) {
                 return;
             }
             code += "\n";
 
-            vector<string> utf8_strings = Utf8Converter::Convert(code);
-            vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+            vector<string> utf8_strings        = Utf8Converter::Convert(code);
+            vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
             if (tokens.size() >= 2 && (tokens[tokens.size() - 2]->type == TokenType::COLON)) {
                 indent += 1;
             }
-            for (auto token : new_tokens) {
+            for (auto& token : new_tokens) {
                 if (token->type == TokenType::END_BLOCK) {
                     indent -= 1;
                 }
@@ -56,8 +60,8 @@ void Repl::Run() {
                 continue;
             }
 
-            Program* program = parser->Parsing(tokens);
-            Object* object   = evaluator->Evaluate(program);
+            auto program = parser->Parsing(tokens);
+            auto object  = evaluator->Evaluate(program);
 
             if (object != nullptr) {
                 cout << object->ToString() << endl;
@@ -72,8 +76,8 @@ void Repl::Run() {
     }
 }
 
-void Repl::FileMode(string& filename) {
-    vector<Token*> tokens;
+void Repl::FileMode(const string& filename) {
+    vector<shared_ptr<Token>> tokens;
     int indent = 0;
 
     // 파일 스트림 생성 및 열기
@@ -86,8 +90,8 @@ void Repl::FileMode(string& filename) {
     string code;
     while (getline(file, code)) {
         try {
-            vector<string> utf8_strings = Utf8Converter::Convert(code);
-            vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+            vector<string> utf8_strings        = Utf8Converter::Convert(code);
+            vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
             if (tokens.back()->type == TokenType::START_BLOCK) {
@@ -101,8 +105,8 @@ void Repl::FileMode(string& filename) {
                 continue;
             }
 
-            Program* program = parser->Parsing(tokens);
-            Object* object   = evaluator->Evaluate(program);
+            auto program = parser->Parsing(tokens);
+            auto object  = evaluator->Evaluate(program);
 
             if (object != nullptr) {
                 cout << object->ToString() << endl;
@@ -122,7 +126,7 @@ void Repl::TestLexer() {
     cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
     cout << "Lexer Test Mode" << endl;
 
-    vector<Token*> tokens;
+    vector<shared_ptr<Token>> tokens;
     int indent = 0;
 
     while (true) {
@@ -136,17 +140,15 @@ void Repl::TestLexer() {
             string code;
             getline(cin, code);
 
-            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태,
-            // 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
-            if (code == "종료하기") {
+            if (code == EXIT_COMMAND) {
                 return;
             }
             code += "\n";
 
-            vector<string> utf8_strings = Utf8Converter::Convert(code);
-            vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+            vector<string> utf8_strings        = Utf8Converter::Convert(code);
+            vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
 
-            for (auto token : new_tokens) {
+            for (auto& token : new_tokens) {
                 if (token == new_tokens.back() && token->type == TokenType::COLON) {
                     indent += 1;
                 }
@@ -161,7 +163,7 @@ void Repl::TestLexer() {
                 continue;
             }
 
-            for (auto token : tokens) {
+            for (auto& token : tokens) {
                 cout << token->line << ' ' << TokenTypeToString(token->type) << ' ' << token->text << endl;
             }
 
@@ -179,7 +181,7 @@ void Repl::TestParser() {
     cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
     cout << "Parser Test Mode" << endl;
 
-    vector<Token*> tokens;
+    vector<shared_ptr<Token>> tokens;
     int indent = 0;
 
     while (true) {
@@ -193,21 +195,19 @@ void Repl::TestParser() {
             string code;
             getline(cin, code);
 
-            // Repl 프롬포트를 끝내기 위한 명령어로 "종료하기"를 하드 코딩한 상태,
-            // 별도 함수로 빼거나 하드 코딩 하지 않는 편이 좋아 보임
-            if (code == "종료하기") {
+            if (code == EXIT_COMMAND) {
                 return;
             }
             code += "\n";
 
-            vector<string> utf8_strings = Utf8Converter::Convert(code);
-            vector<Token*> new_tokens   = lexer->Tokenize(utf8_strings);
+            vector<string> utf8_strings        = Utf8Converter::Convert(code);
+            vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
             if (tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
-            for (auto token : new_tokens) {
+            for (auto& token : new_tokens) {
                 if (token->type == TokenType::END_BLOCK) {
                     indent -= 1;
                 }
@@ -217,7 +217,7 @@ void Repl::TestParser() {
                 continue;
             }
 
-            Program* program = parser->Parsing(tokens);
+            auto program = parser->Parsing(tokens);
 
             cout << program->String() << endl;
             tokens.clear();

@@ -10,15 +10,15 @@
 
 using namespace std;
 
-Program* Parser::Parsing(const std::vector<Token*>& tokens) {
+shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& tokens) {
     this->tokens = tokens;
     initialization();
 
-    while (current_read_position < tokens.size()) {
+    while (current_read_position < static_cast<long long>(tokens.size())) {
         if (current_token->type == TokenType::END_OF_FILE) {
             break;
         }
-        auto* statement = parseStatement();
+        auto statement = parseStatement();
         if (statement != nullptr) {
             program->statements.push_back(statement);
         }
@@ -29,17 +29,16 @@ Program* Parser::Parsing(const std::vector<Token*>& tokens) {
 
 
 void Parser::initialization() {
-    delete program;
-    program               = new Program();
+    program               = make_shared<Program>();
     current_read_position = 0;
     setToken();
 }
 
 
 void Parser::setToken() {
-    current_token   = tokens.size() > current_read_position ? tokens[current_read_position] : nullptr;
-    next_token      = tokens.size() > current_read_position + 1 ? tokens[current_read_position + 1] : nullptr;
-    next_next_token = tokens.size() > current_read_position + 2 ? tokens[current_read_position + 2] : nullptr;
+    current_token   = static_cast<long long>(tokens.size()) > current_read_position ? tokens[current_read_position] : nullptr;
+    next_token      = static_cast<long long>(tokens.size()) > current_read_position + 1 ? tokens[current_read_position + 1] : nullptr;
+    next_next_token = static_cast<long long>(tokens.size()) > current_read_position + 2 ? tokens[current_read_position + 2] : nullptr;
 }
 
 void Parser::setNextToken() {
@@ -68,7 +67,7 @@ void Parser::checkToken(TokenType type) {
 
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
-Statement* Parser::parseStatement() {
+shared_ptr<Statement> Parser::parseStatement() {
     if (current_token->type == TokenType::LBRACKET) {
         return parseInitializationStatement();
     }
@@ -93,12 +92,10 @@ Statement* Parser::parseStatement() {
     return parseExpressionStatement();
 }
 
-InitializationStatement* Parser::parseInitializationStatement() {
-    auto* statement = new InitializationStatement();
+shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
+    auto statement = make_shared<InitializationStatement>();
     skipToken(TokenType::LBRACKET);
 
-    // TODO: 현재는 자료형 자리에 적절한 자료형이 왔는 지 체크하지 않는다. 추후에 체크하는 로직 추가 예정
-    // 25.07.17(tolelom): 런타임에 추가되는 타입이 있을 수 있으므로 evaluator에 위임해도 될 것으로 보임
     statement->type = current_token;
     setNextToken();
 
@@ -113,8 +110,8 @@ InitializationStatement* Parser::parseInitializationStatement() {
     return statement;
 }
 
-AssignmentStatement* Parser::parseAssignmentStatement() {
-    auto* statement = new AssignmentStatement();
+shared_ptr<AssignmentStatement> Parser::parseAssignmentStatement() {
+    auto statement = make_shared<AssignmentStatement>();
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -128,8 +125,8 @@ AssignmentStatement* Parser::parseAssignmentStatement() {
     return statement;
 }
 
-ExpressionStatement* Parser::parseExpressionStatement() {
-    auto* expressionStatement       = new ExpressionStatement();
+shared_ptr<ExpressionStatement> Parser::parseExpressionStatement() {
+    auto expressionStatement       = make_shared<ExpressionStatement>();
     expressionStatement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::NEW_LINE);
@@ -137,29 +134,32 @@ ExpressionStatement* Parser::parseExpressionStatement() {
 }
 
 
-ReturnStatement* Parser::parseReturnStatement() {
+shared_ptr<ReturnStatement> Parser::parseReturnStatement() {
     skipToken(TokenType::리턴);
-    auto* statement       = new ReturnStatement();
+    auto statement       = make_shared<ReturnStatement>();
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::NEW_LINE);
     return statement;
 }
 
-BlockStatement* Parser::parseBlockStatement() {
-    auto* statement = new BlockStatement();
+shared_ptr<BlockStatement> Parser::parseBlockStatement() {
+    auto statement = make_shared<BlockStatement>();
     skipToken(TokenType::START_BLOCK);
 
     while (current_token->type != TokenType::END_BLOCK) {
-        statement->statements.push_back(parseStatement());
+        auto stmt = parseStatement();
+        if (stmt != nullptr) {
+            statement->statements.push_back(stmt);
+        }
     }
     skipToken(TokenType::END_BLOCK);
 
     return statement;
 }
 
-IfStatement* Parser::parseIfStatement() {
-    auto* statement = new IfStatement();
+shared_ptr<IfStatement> Parser::parseIfStatement() {
+    auto statement = make_shared<IfStatement>();
     skipToken(TokenType::만약);
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -181,28 +181,28 @@ IfStatement* Parser::parseIfStatement() {
     return statement;
 }
 
-FunctionStatement* Parser::parseFunctionStatement() {
-    auto* statement = new FunctionStatement();
+shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
+    auto statement = make_shared<FunctionStatement>();
     skipToken(TokenType::함수);
     skipToken(TokenType::COLON);
 
     if (current_token->type == TokenType::LBRACKET) {
-        // TODO: goto 문 제거하기
-    FLAG:
-        skipToken(TokenType::LBRACKET);
+        do {
+            skipToken(TokenType::LBRACKET);
 
-        statement->parameterTypes.push_back(current_token);
-        setNextToken();
+            statement->parameterTypes.push_back(current_token);
+            setNextToken();
 
-        skipToken(TokenType::RBRACKET);
+            skipToken(TokenType::RBRACKET);
 
-        statement->parameters.push_back(dynamic_cast<IdentifierExpression*>(parseExpression(Precedence::LOWEST)));
-        setNextToken();
-
-        if (current_token->type == TokenType::COMMA) {
-            skipToken(TokenType::COMMA);
-            goto FLAG;
-        }
+            auto expr = parseExpression(Precedence::LOWEST);
+            auto ident = dynamic_pointer_cast<IdentifierExpression>(expr);
+            if (!ident) {
+                throw runtime_error("함수 파라미터가 식별자가 아닙니다.");
+            }
+            statement->parameters.push_back(ident);
+            setNextToken();
+        } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
     }
 
     checkToken(TokenType::IDENTIFIER);
@@ -225,13 +225,13 @@ FunctionStatement* Parser::parseFunctionStatement() {
     return statement;
 }
 
-Expression* Parser::parseExpression(Precedence precedence) {
+shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
     }
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
-    Expression* expression                  = (this->*prefixParseFunction)();
+    shared_ptr<Expression> expression       = (this->*prefixParseFunction)();
 
     while (next_token != nullptr && precedence < getPrecedence[next_token->type]) {
         if (!infixParseFunctions.contains(next_token->type)) {
@@ -245,10 +245,10 @@ Expression* Parser::parseExpression(Precedence precedence) {
     return expression;
 }
 
-Expression* Parser::parseInfixExpression(Expression* left) {
-    InfixExpression* infixExpression = new InfixExpression;
-    infixExpression->token           = current_token;
-    infixExpression->left            = left;
+shared_ptr<Expression> Parser::parseInfixExpression(shared_ptr<Expression> left) {
+    auto infixExpression   = make_shared<InfixExpression>();
+    infixExpression->token = current_token;
+    infixExpression->left  = std::move(left);
 
     Precedence precedence = getPrecedence[current_token->type];
     setNextToken();
@@ -258,9 +258,9 @@ Expression* Parser::parseInfixExpression(Expression* left) {
     return infixExpression;
 }
 
-Expression* Parser::parsePrefixExpression() {
-    PrefixExpression* prefixExpression = new PrefixExpression;
-    prefixExpression->token            = current_token;
+shared_ptr<Expression> Parser::parsePrefixExpression() {
+    auto prefixExpression   = make_shared<PrefixExpression>();
+    prefixExpression->token = current_token;
     setNextToken();
 
     prefixExpression->right = parseExpression(Precedence::PREFIX);
@@ -269,36 +269,33 @@ Expression* Parser::parsePrefixExpression() {
 }
 
 
-Expression* Parser::parseGroupedExpression() {
+shared_ptr<Expression> Parser::parseGroupedExpression() {
     skipToken(TokenType::LPAREN);
-    Expression* expression = parseExpression(Precedence::LOWEST);
+    auto expression = parseExpression(Precedence::LOWEST);
     setNextToken(); // current_token을 )으로 세팅하는 과정
     checkToken(TokenType::RPAREN);
     return expression;
 }
 
-Expression* Parser::parseIdentifierExpression() {
+shared_ptr<Expression> Parser::parseIdentifierExpression() {
     checkToken(TokenType::IDENTIFIER);
 
-    auto identifier_expression  = new IdentifierExpression();
+    auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->name = current_token->text;
     return identifier_expression;
 }
 
-Expression* Parser::parseCallExpression() {
+shared_ptr<Expression> Parser::parseCallExpression() {
     skipToken(TokenType::COLON);
 
-    auto call_expression = new CallExpression();
+    auto call_expression = make_shared<CallExpression>();
 
     if (current_token != nullptr && current_token->type == TokenType::LPAREN) {
         skipToken(TokenType::LPAREN);
-    FLAG:
-        call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
-        setNextToken();
-        if (current_token->type == TokenType::COMMA) {
-            skipToken(TokenType::COMMA);
-            goto FLAG;
-        }
+        do {
+            call_expression->arguments.push_back(parseExpression(Precedence::LOWEST));
+            setNextToken();
+        } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
         skipToken(TokenType::RPAREN);
     }
 
@@ -307,9 +304,9 @@ Expression* Parser::parseCallExpression() {
     return call_expression;
 }
 
-Expression* Parser::parseIndexExpression(Expression* left) {
-    auto index_expression  = new IndexExpression();
-    index_expression->name = left;
+shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left) {
+    auto index_expression  = make_shared<IndexExpression>();
+    index_expression->name = std::move(left);
     skipToken(TokenType::LBRACKET);
     index_expression->index = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -319,41 +316,41 @@ Expression* Parser::parseIndexExpression(Expression* left) {
 }
 
 
-Expression* Parser::parseIntegerLiteral() {
-    auto* integerLiteral  = new IntegerLiteral();
+shared_ptr<Expression> Parser::parseIntegerLiteral() {
+    auto integerLiteral  = make_shared<IntegerLiteral>();
     integerLiteral->token = current_token;
-    integerLiteral->value = stoll(current_token->text);
+    try {
+        integerLiteral->value = stoll(current_token->text);
+    } catch (const std::exception&) {
+        throw runtime_error("정수 리터럴 파싱 실패: " + current_token->text);
+    }
     return integerLiteral;
 }
 
-Expression* Parser::parseBooleanLiteral() {
-    auto* booleanLiteral  = new BooleanLiteral();
+shared_ptr<Expression> Parser::parseBooleanLiteral() {
+    auto booleanLiteral  = make_shared<BooleanLiteral>();
     booleanLiteral->token = current_token;
     booleanLiteral->value = current_token->type == TokenType::TRUE;
     return booleanLiteral;
 }
 
-Expression* Parser::parseStringLiteral() {
-    auto* stringLiteral  = new StringLiteral();
+shared_ptr<Expression> Parser::parseStringLiteral() {
+    auto stringLiteral  = make_shared<StringLiteral>();
     stringLiteral->token = current_token;
     stringLiteral->value = current_token->text;
     return stringLiteral;
 }
 
-Expression* Parser::parseArrayLiteral() {
-    auto* arrayLiteral = new ArrayLiteral();
+shared_ptr<Expression> Parser::parseArrayLiteral() {
+    auto arrayLiteral = make_shared<ArrayLiteral>();
 
     skipToken(TokenType::LBRACKET);
-    while (current_token != nullptr && current_token->type != TokenType::RBRACKET) {
-    flag:
-        Expression* element = parseExpression(Precedence::LOWEST);
-        arrayLiteral->elements.push_back(element);
-        setNextToken();
-
-        if (current_token != nullptr && current_token->type == TokenType::COMMA) {
-            skipToken(TokenType::COMMA);
-            goto flag;
-        }
+    if (current_token != nullptr && current_token->type != TokenType::RBRACKET) {
+        do {
+            auto element = parseExpression(Precedence::LOWEST);
+            arrayLiteral->elements.push_back(element);
+            setNextToken();
+        } while (current_token != nullptr && current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
     }
 
     return arrayLiteral;

@@ -4,19 +4,20 @@
 #include "../ast/program.h"
 #include "../token/token.h"
 #include <map>
+#include <memory>
 #include <vector>
 
 class Parser {
 public:
-    Program* Parsing(const std::vector<Token*>& tokens);
+    std::shared_ptr<Program> Parsing(const std::vector<std::shared_ptr<Token>>& tokens);
 
 private:
-    std::vector<Token*> tokens;
+    std::vector<std::shared_ptr<Token>> tokens;
 
-    Program* program;
-    Token* current_token;
-    Token* next_token;
-    Token* next_next_token;
+    std::shared_ptr<Program> program;
+    std::shared_ptr<Token> current_token;
+    std::shared_ptr<Token> next_token;
+    std::shared_ptr<Token> next_next_token;
     long long current_read_position;
 
     void initialization();
@@ -29,25 +30,25 @@ private:
 
     void checkToken(TokenType type);
 
-    Statement* parseStatement();
+    std::shared_ptr<Statement> parseStatement();
 
-    InitializationStatement* parseInitializationStatement();
+    std::shared_ptr<InitializationStatement> parseInitializationStatement();
 
-    AssignmentStatement* parseAssignmentStatement();
+    std::shared_ptr<AssignmentStatement> parseAssignmentStatement();
 
-    ExpressionStatement* parseExpressionStatement();
+    std::shared_ptr<ExpressionStatement> parseExpressionStatement();
 
-    ReturnStatement* parseReturnStatement();
+    std::shared_ptr<ReturnStatement> parseReturnStatement();
 
-    BlockStatement* parseBlockStatement();
+    std::shared_ptr<BlockStatement> parseBlockStatement();
 
-    IfStatement* parseIfStatement();
+    std::shared_ptr<IfStatement> parseIfStatement();
 
-    FunctionStatement* parseFunctionStatement();
+    std::shared_ptr<FunctionStatement> parseFunctionStatement();
 
 
-    using PrefixParseFunction                                     = Expression* (Parser::*) ();
-    using InfixParseFunction                                      = Expression* (Parser::*) (Expression*);
+    using PrefixParseFunction                                     = std::shared_ptr<Expression> (Parser::*) ();
+    using InfixParseFunction                                      = std::shared_ptr<Expression> (Parser::*) (std::shared_ptr<Expression>);
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
         {TokenType::LPAREN, &Parser::parseGroupedExpression},
         {TokenType::MINUS, &Parser::parsePrefixExpression},
@@ -92,32 +93,31 @@ private:
         {TokenType::ASTERISK, Precedence::PRODUCT}, {TokenType::SLASH, Precedence::PRODUCT},
         {TokenType::LBRACKET, Precedence::INDEX}, {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
         {TokenType::LOGICAL_OR, Precedence::LOGICAL_OR},
-        // {TokenType::COLON, Precedence::CALL}, // TODO: 이 부분은 검증할 것(생각대로 작성만 함)
     };
 
-    Expression* parseExpression(Precedence precedence);
+    std::shared_ptr<Expression> parseExpression(Precedence precedence);
 
-    Expression* parseInfixExpression(Expression* left);
+    std::shared_ptr<Expression> parseInfixExpression(std::shared_ptr<Expression> left);
 
-    Expression* parseIndexExpression(Expression* left);
-
-
-    Expression* parsePrefixExpression();
-
-    Expression* parseGroupedExpression();
-
-    Expression* parseIdentifierExpression();
-
-    Expression* parseCallExpression();
+    std::shared_ptr<Expression> parseIndexExpression(std::shared_ptr<Expression> left);
 
 
-    Expression* parseIntegerLiteral();
+    std::shared_ptr<Expression> parsePrefixExpression();
 
-    Expression* parseBooleanLiteral();
+    std::shared_ptr<Expression> parseGroupedExpression();
 
-    Expression* parseStringLiteral();
+    std::shared_ptr<Expression> parseIdentifierExpression();
 
-    Expression* parseArrayLiteral();
+    std::shared_ptr<Expression> parseCallExpression();
+
+
+    std::shared_ptr<Expression> parseIntegerLiteral();
+
+    std::shared_ptr<Expression> parseBooleanLiteral();
+
+    std::shared_ptr<Expression> parseStringLiteral();
+
+    std::shared_ptr<Expression> parseArrayLiteral();
 };
 
 

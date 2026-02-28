@@ -52,7 +52,7 @@ Lexer::Lexer() {
 }
 
 
-std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) {
+std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::string>& characters) {
     this->characters      = characters;
     current_read_position = 0;
     next_read_position    = 1;
@@ -71,14 +71,15 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
     }
 
 
-    while (current_read_position < characters.size()) {
+    while (current_read_position < static_cast<long long>(characters.size())) {
         string current_character = characters[current_read_position];
-        string next_character    = (next_read_position < characters.size()) ? characters[next_read_position] : "";
+        string next_character    = (next_read_position < static_cast<long long>(characters.size())) ? characters[next_read_position] : "";
 
         // 공백 무시 (토큰 생성 안함)
         if (at_line_start) {
             int space_counter = 0;
-            while (characters[current_read_position] == " " || characters[current_read_position] == "\t") {
+            while (current_read_position < static_cast<long long>(characters.size())
+                   && (characters[current_read_position] == " " || characters[current_read_position] == "\t")) {
                 if (characters[current_read_position] == " ") {
                     space_counter++;
                 }
@@ -129,9 +130,6 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
             next_read_position += 2;
             continue;
         }
-        // handleMultiCharacterToken(current_character, next_character)) {
-        //     continue;
-        // }
 
         // 1글자 연산자 처리
         if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
@@ -165,8 +163,6 @@ std::vector<Token*> Lexer::Tokenize(const std::vector<std::string>& characters) 
         throw UnknownCharacterException(current_character, line);
     }
 
-    // EOF는 표현할 수 있는 문자열이 없으므로 빈 문자열을 추가
-    // tokens.push_back(new Token(TokenType::END_OF_FILE, "", line));
     return tokens;
 }
 
@@ -178,7 +174,7 @@ bool Lexer::isNumber(const std::string& s) {
 string Lexer::readInteger() {
     string integer_string;
 
-    while (current_read_position < characters.size() && isNumber(characters[current_read_position])) {
+    while (current_read_position < static_cast<long long>(characters.size()) && isNumber(characters[current_read_position])) {
         integer_string += characters[current_read_position];
         current_read_position++;
         next_read_position++;
@@ -188,13 +184,13 @@ string Lexer::readInteger() {
 }
 
 bool Lexer::isLetter(const std::string& s) {
-    return ("a" <= s && s <= "z" || "A" <= s && s <= "Z" || s == "_" || "가" <= s && s <= "힣");
+    return (("a" <= s && s <= "z") || ("A" <= s && s <= "Z") || s == "_" || ("가" <= s && s <= "힣"));
 }
 
 std::string Lexer::readLetter() {
     string identifier;
 
-    while (current_read_position < characters.size()
+    while (current_read_position < static_cast<long long>(characters.size())
            && (isLetter(characters[current_read_position]) || isNumber(characters[current_read_position]))) {
         identifier += characters[current_read_position];
         current_read_position++;
@@ -211,7 +207,7 @@ string Lexer::readString() {
     current_read_position++;
     next_read_position++;
 
-    while (current_read_position < characters.size()) {
+    while (current_read_position < static_cast<long long>(characters.size())) {
         string current_character = characters[current_read_position];
 
         // 이스케이프 모드
@@ -256,14 +252,13 @@ string Lexer::readString() {
 
 // literal이 주어지지 않는 경우 lexer가 바라보는 토큰을 literal으로 전달한다.
 void Lexer::addToken(TokenType type) {
-    addToken(type, characters[current_read_position]);
+    if (current_read_position < static_cast<long long>(characters.size())) {
+        addToken(type, characters[current_read_position]);
+    }
 }
 
 void Lexer::addToken(TokenType type, string literal) {
-    tokens.push_back(new Token{type, literal, line});
-    if (type == TokenType::NEW_LINE) {
-        line++;
-    }
+    tokens.push_back(make_shared<Token>(Token{type, std::move(literal), line}));
 }
 
 void Lexer::handleIdentifierAndKeywords(std::string& identifier) {

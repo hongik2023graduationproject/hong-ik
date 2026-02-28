@@ -3,14 +3,15 @@
 
 #include "expressions.h"
 #include "node.h"
+#include <memory>
 
 class Statement : public Node {};
 
 class InitializationStatement : public Statement {
 public:
-    Token* type; // TODO: ast에서는 Token을 사용하지 않게끔 변경하고 싶다.
+    std::shared_ptr<Token> type;
     std::string name;
-    Expression* value;
+    std::shared_ptr<Expression> value;
 
     std::string String() override {
         return "[" + type->text + "] " + name + " = " + value->String();
@@ -19,9 +20,8 @@ public:
 
 class AssignmentStatement : public Statement {
 public:
-    Token* type;
     std::string name;
-    Expression* value;
+    std::shared_ptr<Expression> value;
 
     std::string String() override {
         return name + " = " + value->String();
@@ -30,10 +30,10 @@ public:
 
 class ExpressionStatement : public Statement {
 public:
-    Expression* expression;
+    std::shared_ptr<Expression> expression;
 
     ExpressionStatement() = default;
-    explicit ExpressionStatement(Expression* expression) : expression(expression) {}
+    explicit ExpressionStatement(std::shared_ptr<Expression> expression) : expression(std::move(expression)) {}
 
     std::string String() override {
         if (expression == nullptr) {
@@ -45,7 +45,7 @@ public:
 
 class ReturnStatement : public Statement {
 public:
-    Expression* expression;
+    std::shared_ptr<Expression> expression;
 
     std::string String() override {
         return "return " + expression->String();
@@ -54,11 +54,11 @@ public:
 
 class BlockStatement : public Statement {
 public:
-    std::vector<Statement*> statements;
+    std::vector<std::shared_ptr<Statement>> statements;
 
     std::string String() override {
         std::string s;
-        for (Statement* stm : statements) {
+        for (auto& stm : statements) {
             s += "  " + stm->String() + '\n';
         }
         return s;
@@ -67,9 +67,9 @@ public:
 
 class IfStatement : public Statement {
 public:
-    Expression* condition;
-    BlockStatement* consequence;
-    BlockStatement* then;
+    std::shared_ptr<Expression> condition;
+    std::shared_ptr<BlockStatement> consequence;
+    std::shared_ptr<BlockStatement> then;
 
     std::string String() override {
         std::string s = "만약 " + condition->String() + " 라면\n" + consequence->String();
@@ -82,16 +82,16 @@ public:
 
 class FunctionStatement : public Statement {
 public:
-    std::vector<Token*> parameterTypes;
-    std::vector<IdentifierExpression*> parameters;
+    std::vector<std::shared_ptr<Token>> parameterTypes;
+    std::vector<std::shared_ptr<IdentifierExpression>> parameters;
     std::string name;
-    BlockStatement* body;
-    Token* returnType;
+    std::shared_ptr<BlockStatement> body;
+    std::shared_ptr<Token> returnType;
 
     std::string String() override {
         std::string str = "함수: ";
 
-        for (int i = 0; i < parameterTypes.size(); i++) {
+        for (size_t i = 0; i < parameterTypes.size(); i++) {
             str += "[" + parameterTypes[i]->text += "]" + parameters[i]->String() + ", ";
         }
         str += name;

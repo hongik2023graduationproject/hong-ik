@@ -7,11 +7,11 @@ class Literal : public Expression {};
 
 class IntegerLiteral : public Literal {
 public:
-    Token* token;
+    std::shared_ptr<Token> token;
     long long value;
 
     IntegerLiteral() = default;
-    IntegerLiteral(Token* token, long long value) : token(token), value(value) {}
+    IntegerLiteral(std::shared_ptr<Token> token, long long value) : token(std::move(token)), value(value) {}
 
     std::string String() override {
         return token->text;
@@ -20,7 +20,7 @@ public:
 
 class BooleanLiteral : public Literal {
 public:
-    Token* token;
+    std::shared_ptr<Token> token;
     bool value;
 
     std::string String() override {
@@ -30,7 +30,7 @@ public:
 
 class StringLiteral : public Literal {
 public:
-    Token* token;
+    std::shared_ptr<Token> token;
     std::string value;
 
     std::string String() override {
@@ -40,15 +40,15 @@ public:
 
 class ArrayLiteral : public Literal {
 public:
-    Token* token;
-    std::vector<Expression*> elements;
+    std::shared_ptr<Token> token;
+    std::vector<std::shared_ptr<Expression>> elements;
 
     std::string String() override {
         std::string s;
         s += "[";
-        for (int i = 0; i < elements.size(); i++) {
+        for (size_t i = 0; i < elements.size(); i++) {
+            if (i > 0) s += ", ";
             s += elements[i]->String();
-            s += ", ";
         }
         s += "]";
         return s;

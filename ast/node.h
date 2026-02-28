@@ -5,6 +5,7 @@
 
 class Node {
 public:
+    virtual ~Node() = default;
     // String 함수는 AST가 잘 생성되었는 지 디버깅 용도
     virtual std::string String() = 0;
 };

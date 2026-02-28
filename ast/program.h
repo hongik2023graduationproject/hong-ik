@@ -3,15 +3,15 @@
 
 #include "node.h"
 #include "statements.h"
+#include <memory>
 #include <vector>
 
 class Program : public Node {
 public:
-    std::vector<Statement*> statements;
-
+    std::vector<std::shared_ptr<Statement>> statements;
 
     Program() = default;
-    explicit Program(std::vector<Statement*> statements) : statements(statements) {}
+    explicit Program(std::vector<std::shared_ptr<Statement>> statements) : statements(std::move(statements)) {}
 
     std::string String() override {
         std::string s;

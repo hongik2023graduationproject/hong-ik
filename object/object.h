@@ -4,6 +4,7 @@
 #include "../ast/expressions.h"
 #include "../ast/statements.h"
 #include "object_type.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -48,7 +49,7 @@ public:
 
 class String final : public Object {
 public:
-    String(std::string value) : value(value) {
+    String(std::string value) : value(std::move(value)) {
         type = ObjectType::STRING;
     }
 
@@ -61,38 +62,48 @@ public:
 
 class ReturnValue final : public Object {
 public:
-    Object* value;
+    std::shared_ptr<Object> value = nullptr;
+
+    ReturnValue() {
+        type = ObjectType::RETURN_VALUE;
+    }
 
     std::string ToString() override {
-        return value->ToString();
+        return value ? value->ToString() : "";
     }
 };
 
 class Function final : public Object {
 public:
-    std::vector<Token*> parameterTypes;
-    std::vector<IdentifierExpression*> parameters;
-    BlockStatement* body;
-    Environment* env;
-    Token* returnType;
+    std::vector<std::shared_ptr<Token>> parameterTypes;
+    std::vector<std::shared_ptr<IdentifierExpression>> parameters;
+    std::shared_ptr<BlockStatement> body;
+    std::shared_ptr<Environment> env;
+    std::shared_ptr<Token> returnType;
 
-    // TODO: 미구현 상태
+    Function() {
+        type = ObjectType::FUNCTION;
+    }
+
     std::string ToString() override {
         std::string s = "함수: ";
-
         return s;
     }
 };
 
 class Array final : public Object {
 public:
-    std::vector<Object*> elements;
+    std::vector<std::shared_ptr<Object>> elements;
+
+    Array() {
+        type = ObjectType::ARRAY;
+    }
 
     std::string ToString() override {
         std::string s = "[";
-        for (auto& element : elements) {
-            s += element->ToString();
-            s += ", ";
+        for (size_t i = 0; i < elements.size(); i++) {
+            if (i > 0) s += ", ";
+            s += elements[i]->ToString();
         }
         s += "]";
         return s;
@@ -101,9 +112,13 @@ public:
 
 class Builtin : public Object {
 public:
-    virtual Object* function(std::vector<Object*> args) = 0;
-    std::vector<Token*> parameterTypes;
-    Token* returnType;
+    virtual std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> args) = 0;
+    std::vector<std::shared_ptr<Token>> parameterTypes;
+    std::shared_ptr<Token> returnType;
+
+    Builtin() {
+        type = ObjectType::BUILTIN_FUNCTION;
+    }
 
     std::string ToString() override {
         return "";

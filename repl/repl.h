@@ -8,16 +8,19 @@
 class Repl {
 public:
     Repl();
+    ~Repl();
 
     void Run();
 
-    void FileMode(std::string& filename);
+    void FileMode(const std::string& filename);
 
     void TestLexer();
 
     void TestParser();
 
 private:
+    static constexpr const char* EXIT_COMMAND = "종료하기";
+
     Lexer* lexer;
     Parser* parser;
     Evaluator* evaluator;

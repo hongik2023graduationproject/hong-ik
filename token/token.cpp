@@ -59,7 +59,7 @@ std::string TokenTypeToString(TokenType type) {
     case TokenType::문자:
         return "문자";
     case TokenType::리턴:
-        return "리턴`";
+        return "리턴";
     case TokenType::만약:
         return "만약";
     case TokenType::라면:
@@ -102,8 +102,5 @@ std::string TokenTypeToString(TokenType type) {
     default:
         break;
     }
-    // 토큰 타입이 알 수 없는 경우는 일반적으로 발생하지 않지만
-    // 토큰 타입이 지정되지 않은 토큰이 있을 경우가 있을 수 있음
-    // 에러 처리 하는 게 현명해 보임
     return "UNKNOWN";
 }

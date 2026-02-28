@@ -3,18 +3,22 @@
 
 #include "../object/object.h"
 #include <map>
+#include <memory>
 #include <string>
 
 // Environment
 // scope 내의 변수들을 저장하는 환경
-class Environment {
+class Environment : public std::enable_shared_from_this<Environment> {
 public:
-    std::map<std::string, Object*> store;
-    Environment* outer;
+    std::map<std::string, std::shared_ptr<Object>> store;
+    std::shared_ptr<Environment> outer;
 
-    Object* Get(const std::string& name);
+    Environment() = default;
+    explicit Environment(std::shared_ptr<Environment> outer) : outer(std::move(outer)) {}
 
-    Object* Set(const std::string& name, Object* object);
+    std::shared_ptr<Object> Get(const std::string& name);
+
+    std::shared_ptr<Object> Set(const std::string& name, std::shared_ptr<Object> object);
 };
 
 #endif // ENVIRONMENT_H

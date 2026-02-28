@@ -5,8 +5,11 @@ using namespace std;
 std::vector<std::string> Utf8Converter::Convert(const std::string& input) {
     vector<string> characters;
 
-    for (int position = 0, length; position < input.length(); position += length) {
+    for (int position = 0, length; position < static_cast<int>(input.length()); position += length) {
         length = getCharacterLength(input, position);
+        if (length == 0) {
+            length = 1; // 무한루프 방지
+        }
         characters.push_back(input.substr(position, length));
     }
 
@@ -14,7 +17,7 @@ std::vector<std::string> Utf8Converter::Convert(const std::string& input) {
 }
 
 int Utf8Converter::getCharacterLength(const std::string& input, const int position) {
-    if (position < 0 || position >= input.size()) {
+    if (position < 0 || position >= static_cast<int>(input.size())) {
         return 0; // 유효하지 않은 위치
     }
 
@@ -28,5 +31,5 @@ int Utf8Converter::getCharacterLength(const std::string& input, const int positi
         return 4; // 4바이트 문자
     }
 
-    return 0; // 잘못된 UTF-8 인코딩, TODO: 오류를 뱉는게 나을 수도 있다.
+    return 0; // 잘못된 UTF-8 인코딩
 }

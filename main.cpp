@@ -26,8 +26,6 @@ int main(int argc, char* argv[]) {
     // 인터프리터 모드
     if (argc == 1) {
         Repl repl;
-        // repl.TestLexer();
-        // repl.TestParser();
         repl.Run();
     }
 
