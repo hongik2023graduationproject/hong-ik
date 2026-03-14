@@ -7,6 +7,15 @@
 
 class Statement : public Node {};
 
+class ImportStatement : public Statement {
+public:
+    std::string filename;
+
+    std::string String() override {
+        return "가져오기 \"" + filename + "\"";
+    }
+};
+
 class InitializationStatement : public Statement {
 public:
     std::shared_ptr<Token> type;
@@ -76,6 +85,62 @@ public:
         if (then != nullptr) {
             s += "아니면\n" + then->String();
         }
+        return s;
+    }
+};
+
+class WhileStatement : public Statement {
+public:
+    std::shared_ptr<Expression> condition;
+    std::shared_ptr<BlockStatement> body;
+
+    std::string String() override {
+        std::string s = "반복 " + condition->String() + " 동안\n" + body->String();
+        return s;
+    }
+};
+
+class BreakStatement : public Statement {
+public:
+    std::string String() override {
+        return "중단";
+    }
+};
+
+class CompoundAssignmentStatement : public Statement {
+public:
+    std::string name;
+    std::shared_ptr<Token> op;
+    std::shared_ptr<Expression> value;
+
+    std::string String() override {
+        return name + " " + op->text + " " + value->String();
+    }
+};
+
+class ForEachStatement : public Statement {
+public:
+    std::shared_ptr<Token> elementType;
+    std::string elementName;
+    std::shared_ptr<Expression> iterable;
+    std::shared_ptr<BlockStatement> body;
+
+    std::string String() override {
+        std::string s = "각각 [" + elementType->text + "]" + elementName + " ";
+        s += iterable->String() + " 에서\n" + body->String();
+        return s;
+    }
+};
+
+class TryCatchStatement : public Statement {
+public:
+    std::shared_ptr<BlockStatement> tryBody;
+    std::string errorName;
+    std::shared_ptr<BlockStatement> catchBody;
+
+    std::string String() override {
+        std::string s = "시도\n" + tryBody->String();
+        s += "실패 " + errorName + "\n" + catchBody->String();
         return s;
     }
 };

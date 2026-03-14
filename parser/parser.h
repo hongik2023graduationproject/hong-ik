@@ -30,11 +30,15 @@ private:
 
     void checkToken(TokenType type);
 
+    bool isTypeKeyword(TokenType type);
+
     std::shared_ptr<Statement> parseStatement();
 
     std::shared_ptr<InitializationStatement> parseInitializationStatement();
 
     std::shared_ptr<AssignmentStatement> parseAssignmentStatement();
+
+    std::shared_ptr<CompoundAssignmentStatement> parseCompoundAssignmentStatement();
 
     std::shared_ptr<ExpressionStatement> parseExpressionStatement();
 
@@ -44,7 +48,15 @@ private:
 
     std::shared_ptr<IfStatement> parseIfStatement();
 
+    std::shared_ptr<WhileStatement> parseWhileStatement();
+
+    std::shared_ptr<ForEachStatement> parseForEachStatement();
+
+    std::shared_ptr<TryCatchStatement> parseTryCatchStatement();
+
     std::shared_ptr<FunctionStatement> parseFunctionStatement();
+
+    std::shared_ptr<ImportStatement> parseImportStatement();
 
 
     using PrefixParseFunction                                     = std::shared_ptr<Expression> (Parser::*) ();
@@ -52,24 +64,32 @@ private:
     std::map<TokenType, PrefixParseFunction> prefixParseFunctions = {
         {TokenType::LPAREN, &Parser::parseGroupedExpression},
         {TokenType::MINUS, &Parser::parsePrefixExpression},
+        {TokenType::BANG, &Parser::parsePrefixExpression},
         {TokenType::IDENTIFIER, &Parser::parseIdentifierExpression},
-        {TokenType::COLON, &Parser::parseCallExpression},
         {TokenType::INTEGER, &Parser::parseIntegerLiteral},
+        {TokenType::FLOAT, &Parser::parseFloatLiteral},
         {TokenType::TRUE, &Parser::parseBooleanLiteral},
         {TokenType::FALSE, &Parser::parseBooleanLiteral},
         {TokenType::STRING, &Parser::parseStringLiteral},
         {TokenType::LBRACKET, &Parser::parseArrayLiteral},
+        {TokenType::LBRACE, &Parser::parseHashMapLiteral},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
         {TokenType::PLUS, &Parser::parseInfixExpression},
         {TokenType::MINUS, &Parser::parseInfixExpression},
         {TokenType::ASTERISK, &Parser::parseInfixExpression},
         {TokenType::SLASH, &Parser::parseInfixExpression},
+        {TokenType::PERCENT, &Parser::parseInfixExpression},
         {TokenType::EQUAL, &Parser::parseInfixExpression},
         {TokenType::NOT_EQUAL, &Parser::parseInfixExpression},
+        {TokenType::LESS_THAN, &Parser::parseInfixExpression},
+        {TokenType::GREATER_THAN, &Parser::parseInfixExpression},
+        {TokenType::LESS_EQUAL, &Parser::parseInfixExpression},
+        {TokenType::GREATER_EQUAL, &Parser::parseInfixExpression},
         {TokenType::LOGICAL_AND, &Parser::parseInfixExpression},
         {TokenType::LOGICAL_OR, &Parser::parseInfixExpression},
         {TokenType::LBRACKET, &Parser::parseIndexExpression},
+        {TokenType::LPAREN, &Parser::parseCallInfixExpression},
     };
 
     enum class Precedence {
@@ -79,9 +99,9 @@ private:
         EQUALS, // ==
         LESS_GREATER, // <, >
         SUM, // +, -
-        PRODUCT, // *, /
+        PRODUCT, // *, /, %
         PREFIX, // -X, !X
-        CALL, // myFunction(x)
+        CALL, // function(x)
         INDEX, // array[index]
     };
 
@@ -91,7 +111,10 @@ private:
         {TokenType::LESS_EQUAL, Precedence::LESS_GREATER}, {TokenType::GREATER_EQUAL, Precedence::LESS_GREATER},
         {TokenType::PLUS, Precedence::SUM}, {TokenType::MINUS, Precedence::SUM},
         {TokenType::ASTERISK, Precedence::PRODUCT}, {TokenType::SLASH, Precedence::PRODUCT},
-        {TokenType::LBRACKET, Precedence::INDEX}, {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
+        {TokenType::PERCENT, Precedence::PRODUCT},
+        {TokenType::LPAREN, Precedence::CALL},
+        {TokenType::LBRACKET, Precedence::INDEX},
+        {TokenType::LOGICAL_AND, Precedence::LOGICAL_AND},
         {TokenType::LOGICAL_OR, Precedence::LOGICAL_OR},
     };
 
@@ -101,6 +124,8 @@ private:
 
     std::shared_ptr<Expression> parseIndexExpression(std::shared_ptr<Expression> left);
 
+    std::shared_ptr<Expression> parseCallInfixExpression(std::shared_ptr<Expression> left);
+
 
     std::shared_ptr<Expression> parsePrefixExpression();
 
@@ -108,16 +133,20 @@ private:
 
     std::shared_ptr<Expression> parseIdentifierExpression();
 
-    std::shared_ptr<Expression> parseCallExpression();
-
 
     std::shared_ptr<Expression> parseIntegerLiteral();
+
+    std::shared_ptr<Expression> parseFloatLiteral();
 
     std::shared_ptr<Expression> parseBooleanLiteral();
 
     std::shared_ptr<Expression> parseStringLiteral();
 
     std::shared_ptr<Expression> parseArrayLiteral();
+
+    std::shared_ptr<Expression> parseHashMapLiteral();
+
+    bool isCompoundAssignToken(TokenType type);
 };
 
 

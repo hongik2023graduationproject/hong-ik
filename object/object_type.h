@@ -3,12 +3,15 @@
 
 enum class ObjectType {
     INTEGER,
+    FLOAT,
     BOOLEAN,
     STRING,
     RETURN_VALUE,
     FUNCTION,
     BUILTIN_FUNCTION,
     ARRAY,
+    HASH_MAP,
+    BREAK_SIGNAL,
 };
 
 #endif // OBJECT_TYPE_H

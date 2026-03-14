@@ -19,6 +19,9 @@ public:
     std::shared_ptr<Object> Get(const std::string& name);
 
     std::shared_ptr<Object> Set(const std::string& name, std::shared_ptr<Object> object);
+
+    // 외부 스코프까지 탐색하여 변수를 업데이트
+    std::shared_ptr<Object> Update(const std::string& name, std::shared_ptr<Object> object);
 };
 
 #endif // ENVIRONMENT_H

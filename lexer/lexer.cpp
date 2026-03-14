@@ -16,6 +16,17 @@ Lexer::Lexer() {
         {"라면", TokenType::라면},
         {"아니면", TokenType::아니면},
         {"함수", TokenType::함수},
+        {"반복", TokenType::반복},
+        {"동안", TokenType::동안},
+        {"중단", TokenType::중단},
+        {"논리", TokenType::논리},
+        {"배열", TokenType::배열},
+        {"사전", TokenType::사전},
+        {"가져오기", TokenType::가져오기},
+        {"각각", TokenType::각각},
+        {"에서", TokenType::에서},
+        {"시도", TokenType::시도},
+        {"실패", TokenType::실패},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
     };
@@ -23,6 +34,7 @@ Lexer::Lexer() {
         {"+", TokenType::PLUS},
         {"*", TokenType::ASTERISK},
         {"/", TokenType::SLASH},
+        {"%", TokenType::PERCENT},
         {"(", TokenType::LPAREN},
         {")", TokenType::RPAREN},
         {"{", TokenType::LBRACE},
@@ -48,6 +60,11 @@ Lexer::Lexer() {
         {"||", TokenType::LOGICAL_OR},
         {"<=", TokenType::LESS_EQUAL},
         {">=", TokenType::GREATER_EQUAL},
+        {"+=", TokenType::PLUS_ASSIGN},
+        {"-=", TokenType::MINUS_ASSIGN},
+        {"*=", TokenType::ASTERISK_ASSIGN},
+        {"/=", TokenType::SLASH_ASSIGN},
+        {"%=", TokenType::PERCENT_ASSIGN},
     };
 }
 
@@ -122,6 +139,18 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
             continue;
         }
 
+        // 한 줄 주석 처리 (//)
+        if (current_character == "/" && next_character == "/") {
+            skipLineComment();
+            continue;
+        }
+
+        // 여러 줄 주석 처리 (/* */)
+        if (current_character == "/" && next_character == "*") {
+            skipBlockComment();
+            continue;
+        }
+
         // 2글자 연산자 처리
         if (auto iterator = multiCharacterTokens.find(current_character + next_character);
             iterator != multiCharacterTokens.end()) {
@@ -146,10 +175,15 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
             continue;
         }
 
-        // 숫자 (나중에 부동소수점 수 추가하면 수정)
+        // 숫자 (정수 또는 실수)
         if (isNumber(current_character)) {
-            string number_string = readInteger();
-            addToken(TokenType::INTEGER, number_string);
+            bool isFloat = false;
+            string number_string = readNumber(isFloat);
+            if (isFloat) {
+                addToken(TokenType::FLOAT, number_string);
+            } else {
+                addToken(TokenType::INTEGER, number_string);
+            }
             continue;
         }
 
@@ -171,16 +205,32 @@ bool Lexer::isNumber(const std::string& s) {
     return "0" <= s && s <= "9";
 }
 
-string Lexer::readInteger() {
-    string integer_string;
+string Lexer::readNumber(bool& isFloat) {
+    string number_string;
+    isFloat = false;
 
     while (current_read_position < static_cast<long long>(characters.size()) && isNumber(characters[current_read_position])) {
-        integer_string += characters[current_read_position];
+        number_string += characters[current_read_position];
         current_read_position++;
         next_read_position++;
     }
 
-    return integer_string;
+    // 소수점 처리
+    if (current_read_position < static_cast<long long>(characters.size()) && characters[current_read_position] == "."
+        && next_read_position < static_cast<long long>(characters.size()) && isNumber(characters[next_read_position])) {
+        isFloat = true;
+        number_string += ".";
+        current_read_position++;
+        next_read_position++;
+
+        while (current_read_position < static_cast<long long>(characters.size()) && isNumber(characters[current_read_position])) {
+            number_string += characters[current_read_position];
+            current_read_position++;
+            next_read_position++;
+        }
+    }
+
+    return number_string;
 }
 
 bool Lexer::isLetter(const std::string& s) {
@@ -248,6 +298,43 @@ string Lexer::readString() {
     }
 
     throw UnterminatedStringException(string_value, line);
+}
+
+void Lexer::skipLineComment() {
+    // "//" 이후 줄 끝까지 무시
+    current_read_position += 2;
+    next_read_position += 2;
+
+    while (current_read_position < static_cast<long long>(characters.size())
+           && characters[current_read_position] != "\n") {
+        current_read_position++;
+        next_read_position++;
+    }
+}
+
+void Lexer::skipBlockComment() {
+    // "/*" 이후 "*/" 까지 무시
+    current_read_position += 2;
+    next_read_position += 2;
+
+    while (current_read_position < static_cast<long long>(characters.size())) {
+        string current_character = characters[current_read_position];
+        string next_character = (next_read_position < static_cast<long long>(characters.size()))
+                                    ? characters[next_read_position] : "";
+
+        if (current_character == "\n") {
+            line++;
+        }
+
+        if (current_character == "*" && next_character == "/") {
+            current_read_position += 2;
+            next_read_position += 2;
+            return;
+        }
+
+        current_read_position++;
+        next_read_position++;
+    }
 }
 
 // literal이 주어지지 않는 경우 lexer가 바라보는 토큰을 literal으로 전달한다.

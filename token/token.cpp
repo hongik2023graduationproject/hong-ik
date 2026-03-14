@@ -30,12 +30,24 @@ std::string TokenTypeToString(TokenType type) {
         return "ASTERISK";
     case TokenType::SLASH:
         return "SLASH";
+    case TokenType::PERCENT:
+        return "PERCENT";
     case TokenType::ASSIGN:
         return "ASSIGN";
     case TokenType::EQUAL:
         return "EQUAL";
     case TokenType::NOT_EQUAL:
         return "NOT_EQUAL";
+    case TokenType::PLUS_ASSIGN:
+        return "PLUS_ASSIGN";
+    case TokenType::MINUS_ASSIGN:
+        return "MINUS_ASSIGN";
+    case TokenType::ASTERISK_ASSIGN:
+        return "ASTERISK_ASSIGN";
+    case TokenType::SLASH_ASSIGN:
+        return "SLASH_ASSIGN";
+    case TokenType::PERCENT_ASSIGN:
+        return "PERCENT_ASSIGN";
     case TokenType::LPAREN:
         return "LPAREN";
     case TokenType::RPAREN:
@@ -72,6 +84,28 @@ std::string TokenTypeToString(TokenType type) {
         return "TRUE";
     case TokenType::FALSE:
         return "FALSE";
+    case TokenType::반복:
+        return "반복";
+    case TokenType::동안:
+        return "동안";
+    case TokenType::중단:
+        return "중단";
+    case TokenType::논리:
+        return "논리";
+    case TokenType::배열:
+        return "배열";
+    case TokenType::사전:
+        return "사전";
+    case TokenType::가져오기:
+        return "가져오기";
+    case TokenType::각각:
+        return "각각";
+    case TokenType::에서:
+        return "에서";
+    case TokenType::시도:
+        return "시도";
+    case TokenType::실패:
+        return "실패";
     case TokenType::BITWISE_AND:
         return "BITWISE_AND";
     case TokenType::LOGICAL_AND:

@@ -25,12 +25,14 @@ TEST_F(LexerTest, OperatorTest) {
         make_shared<Token>(Token{TokenType::MINUS, "-", 1}),
         make_shared<Token>(Token{TokenType::ASTERISK, "*", 1}),
         make_shared<Token>(Token{TokenType::SLASH, "/", 1}),
+        make_shared<Token>(Token{TokenType::PERCENT, "%", 1}),
     };
     auto actual = lexer.Tokenize({
         "+",
         "-",
         "*",
         "/",
+        "%",
     });
 
     ExpectTokensEqual(actual, expected);
@@ -111,47 +113,29 @@ TEST_F(LexerTest, KeywordTest) {
         make_shared<Token>(Token{TokenType::만약, "만약", 1}),
         make_shared<Token>(Token{TokenType::라면, "라면", 1}),
         make_shared<Token>(Token{TokenType::함수, "함수", 1}),
+        make_shared<Token>(Token{TokenType::반복, "반복", 1}),
+        make_shared<Token>(Token{TokenType::동안, "동안", 1}),
+        make_shared<Token>(Token{TokenType::중단, "중단", 1}),
         make_shared<Token>(Token{TokenType::TRUE, "true", 1}),
         make_shared<Token>(Token{TokenType::FALSE, "false", 1}),
     };
     auto actual = lexer.Tokenize({
-        "정",
-        "수",
-        " ",
-        "실",
-        "수",
-        " ",
-        "문",
-        "자",
-        " ",
-        "리",
-        "턴",
-        " ",
-        "만",
-        "약",
-        " ",
-        "라",
-        "면",
-        " ",
-        "함",
-        "수",
-        " ",
-        "t",
-        "r",
-        "u",
-        "e",
-        " ",
-        "f",
-        "a",
-        "l",
-        "s",
-        "e",
+        "정", "수", " ",
+        "실", "수", " ",
+        "문", "자", " ",
+        "리", "턴", " ",
+        "만", "약", " ",
+        "라", "면", " ",
+        "함", "수", " ",
+        "반", "복", " ",
+        "동", "안", " ",
+        "중", "단", " ",
+        "t", "r", "u", "e", " ",
+        "f", "a", "l", "s", "e",
     });
 
     ExpectTokensEqual(actual, expected);
 }
-
-
 
 
 TEST_F(LexerTest, LiteralTest) {
@@ -172,6 +156,64 @@ TEST_F(LexerTest, LiteralTest) {
         "l",
         "e",
         "\"",
+    });
+
+    ExpectTokensEqual(actual, expected);
+}
+
+TEST_F(LexerTest, FloatLiteralTest) {
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::FLOAT, "3.14", 1}),
+        make_shared<Token>(Token{TokenType::FLOAT, "0.5", 1}),
+        make_shared<Token>(Token{TokenType::INTEGER, "42", 1}),
+    };
+    auto actual = lexer.Tokenize({
+        "3", ".", "1", "4", " ",
+        "0", ".", "5", " ",
+        "4", "2",
+    });
+
+    ExpectTokensEqual(actual, expected);
+}
+
+TEST_F(LexerTest, CompoundAssignTest) {
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::PLUS_ASSIGN, "+=", 1}),
+        make_shared<Token>(Token{TokenType::MINUS_ASSIGN, "-=", 1}),
+        make_shared<Token>(Token{TokenType::ASTERISK_ASSIGN, "*=", 1}),
+        make_shared<Token>(Token{TokenType::SLASH_ASSIGN, "/=", 1}),
+        make_shared<Token>(Token{TokenType::PERCENT_ASSIGN, "%=", 1}),
+    };
+    auto actual = lexer.Tokenize({
+        "+", "=", " ",
+        "-", "=", " ",
+        "*", "=", " ",
+        "/", "=", " ",
+        "%", "=",
+    });
+
+    ExpectTokensEqual(actual, expected);
+}
+
+TEST_F(LexerTest, LineCommentTest) {
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::INTEGER, "42", 1}),
+    };
+    auto actual = lexer.Tokenize({
+        "4", "2", " ", "/", "/", " ", "주", "석",
+    });
+
+    ExpectTokensEqual(actual, expected);
+}
+
+TEST_F(LexerTest, BlockCommentTest) {
+    vector<shared_ptr<Token>> expected = {
+        make_shared<Token>(Token{TokenType::INTEGER, "1", 1}),
+        make_shared<Token>(Token{TokenType::PLUS, "+", 1}),
+        make_shared<Token>(Token{TokenType::INTEGER, "2", 1}),
+    };
+    auto actual = lexer.Tokenize({
+        "1", " ", "/", "*", " ", "주", "석", " ", "*", "/", " ", "+", " ", "2",
     });
 
     ExpectTokensEqual(actual, expected);

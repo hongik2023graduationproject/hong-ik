@@ -4,6 +4,7 @@
 #include "../ast/expressions.h"
 #include "../ast/statements.h"
 #include "object_type.h"
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -31,6 +32,27 @@ public:
 
     std::string ToString() override {
         return std::to_string(value);
+    }
+};
+
+class Float final : public Object {
+public:
+    Float(double value) : value(value) {
+        type = ObjectType::FLOAT;
+    }
+
+    double value;
+
+    std::string ToString() override {
+        std::string s = std::to_string(value);
+        // 불필요한 후행 0 제거
+        size_t dot = s.find('.');
+        if (dot != std::string::npos) {
+            size_t last = s.find_last_not_of('0');
+            if (last == dot) last++;
+            s = s.substr(0, last + 1);
+        }
+        return s;
     }
 };
 
@@ -110,6 +132,27 @@ public:
     }
 };
 
+class HashMap final : public Object {
+public:
+    std::map<std::string, std::shared_ptr<Object>> pairs;
+
+    HashMap() {
+        type = ObjectType::HASH_MAP;
+    }
+
+    std::string ToString() override {
+        std::string s = "{";
+        size_t i = 0;
+        for (auto& [key, value] : pairs) {
+            if (i > 0) s += ", ";
+            s += "\"" + key + "\": " + value->ToString();
+            i++;
+        }
+        s += "}";
+        return s;
+    }
+};
+
 class Builtin : public Object {
 public:
     virtual std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> args) = 0;
@@ -118,6 +161,17 @@ public:
 
     Builtin() {
         type = ObjectType::BUILTIN_FUNCTION;
+    }
+
+    std::string ToString() override {
+        return "";
+    }
+};
+
+class BreakSignal final : public Object {
+public:
+    BreakSignal() {
+        type = ObjectType::BREAK_SIGNAL;
     }
 
     std::string ToString() override {

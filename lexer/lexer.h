@@ -30,14 +30,15 @@ private:
     bool isNumber(const std::string& s);
     bool isLetter(const std::string& s);
 
-    std::string readInteger();
+    std::string readNumber(bool& isFloat);
     std::string readLetter();
     std::string readString();
 
+    void skipLineComment();
+    void skipBlockComment();
+
     void addToken(TokenType type);
     void addToken(TokenType type, std::string literal);
-
-
 };
 
 

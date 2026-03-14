@@ -22,9 +22,17 @@ enum class TokenType {
     MINUS, // -
     ASTERISK, // *
     SLASH, // /
+    PERCENT, // %
     ASSIGN, // =
     EQUAL, // ==
     NOT_EQUAL, // !=
+
+    // 복합 대입 연산자
+    PLUS_ASSIGN, // +=
+    MINUS_ASSIGN, // -=
+    ASTERISK_ASSIGN, // *=
+    SLASH_ASSIGN, // /=
+    PERCENT_ASSIGN, // %=
 
     LPAREN, // (
     RPAREN, // )
@@ -47,6 +55,17 @@ enum class TokenType {
     함수,
     TRUE,
     FALSE,
+    반복, // while 루프
+    동안, // while 조건 종료 키워드
+    중단, // break
+    논리, // boolean type
+    배열, // array type
+    사전, // map type
+    각각, // for-each
+    에서, // in (for-each)
+    시도, // try
+    실패, // catch
+    가져오기, // import
 
     BITWISE_AND, // &
     LOGICAL_AND, // &&

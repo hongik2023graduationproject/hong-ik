@@ -4,11 +4,11 @@
 #include "../evaluator/evaluator.h"
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
+#include <memory>
 
 class Repl {
 public:
     Repl();
-    ~Repl();
 
     void Run();
 
@@ -21,9 +21,9 @@ public:
 private:
     static constexpr const char* EXIT_COMMAND = "종료하기";
 
-    Lexer* lexer;
-    Parser* parser;
-    Evaluator* evaluator;
+    std::unique_ptr<Lexer> lexer;
+    std::unique_ptr<Parser> parser;
+    std::unique_ptr<Evaluator> evaluator;
 };
 
 

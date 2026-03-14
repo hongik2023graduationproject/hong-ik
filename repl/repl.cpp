@@ -9,15 +9,9 @@
 using namespace std;
 
 Repl::Repl() {
-    lexer     = new Lexer();
-    parser    = new Parser();
-    evaluator = new Evaluator();
-}
-
-Repl::~Repl() {
-    delete lexer;
-    delete parser;
-    delete evaluator;
+    lexer     = make_unique<Lexer>();
+    parser    = make_unique<Parser>();
+    evaluator = make_unique<Evaluator>();
 }
 
 void Repl::Run() {

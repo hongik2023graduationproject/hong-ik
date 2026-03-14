@@ -6,6 +6,8 @@
 #include "../object/built_in.h"
 #include "../object/object.h"
 #include <memory>
+#include <set>
+#include <string>
 #include <vector>
 
 class Evaluator {
@@ -19,11 +21,7 @@ private:
     std::shared_ptr<Environment> environment;
 
 
-    std::map<std::string, std::shared_ptr<Builtin>> builtins = {
-        {"길이", std::make_shared<Length>()},
-        {"출력", std::make_shared<Print>()},
-        {"추가", std::make_shared<Push>()},
-    };
+    std::map<std::string, std::shared_ptr<Builtin>> builtins;
 
     std::shared_ptr<Object> evalProgram(const std::shared_ptr<Program>& program, Environment* environment);
 
@@ -34,6 +32,8 @@ private:
     std::shared_ptr<Object> evalInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
     std::shared_ptr<Object> evalIntegerInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
+
+    std::shared_ptr<Object> evalFloatInfixExpression(Token* token, double left_val, double right_val);
 
     std::shared_ptr<Object> evalBooleanInfixExpression(Token* token, std::shared_ptr<Object> left, std::shared_ptr<Object> right);
 
@@ -49,6 +49,10 @@ private:
 
     std::shared_ptr<Object> evalArrayIndexExpression(std::shared_ptr<Object> array, std::shared_ptr<Object> index);
 
+    std::shared_ptr<Object> evalStringIndexExpression(std::shared_ptr<Object> str, std::shared_ptr<Object> index);
+
+    std::shared_ptr<Object> evalHashMapIndexExpression(std::shared_ptr<Object> hashmap, std::shared_ptr<Object> key);
+
     std::shared_ptr<Object> applyFunction(std::shared_ptr<Object> function, std::vector<std::shared_ptr<Object>> arguments);
 
     std::shared_ptr<Environment> extendFunctionEnvironment(Function* function, std::vector<std::shared_ptr<Object>> arguments);
@@ -58,6 +62,12 @@ private:
     bool typeCheck(Token* type, const std::shared_ptr<Object>& value);
 
     bool typeCheck(ObjectType type, const std::shared_ptr<Object>& value);
+
+    TokenType compoundToArithmeticOp(TokenType compoundOp);
+
+    std::set<std::string> importedFiles;
+
+    std::shared_ptr<Object> evalImport(const std::string& filename, Environment* environment);
 };
 
 
