@@ -179,4 +179,69 @@ public:
     }
 };
 
+class Null final : public Object {
+public:
+    Null() {
+        type = ObjectType::NULL_OBJ;
+    }
+
+    std::string ToString() override {
+        return "없음";
+    }
+};
+
+class Tuple final : public Object {
+public:
+    std::vector<std::shared_ptr<Object>> elements;
+
+    Tuple() {
+        type = ObjectType::TUPLE;
+    }
+
+    std::string ToString() override {
+        std::string s = "(";
+        for (size_t i = 0; i < elements.size(); i++) {
+            if (i > 0) s += ", ";
+            s += elements[i]->ToString();
+        }
+        s += ")";
+        return s;
+    }
+};
+
+class ClassDef : public Object {
+public:
+    std::string name;
+    std::vector<std::shared_ptr<Token>> fieldTypes;
+    std::vector<std::string> fieldNames;
+    std::vector<std::shared_ptr<Token>> constructorParamTypes;
+    std::vector<std::shared_ptr<IdentifierExpression>> constructorParams;
+    std::shared_ptr<BlockStatement> constructorBody;
+    std::vector<std::shared_ptr<Function>> methods;
+    std::vector<std::string> methodNames;
+    std::shared_ptr<Environment> env;
+
+    ClassDef() {
+        type = ObjectType::CLASS_DEF;
+    }
+
+    std::string ToString() override {
+        return "클래스 " + name;
+    }
+};
+
+class Instance final : public Object {
+public:
+    std::shared_ptr<ClassDef> classDef;
+    std::shared_ptr<Environment> fields;
+
+    Instance() {
+        type = ObjectType::INSTANCE;
+    }
+
+    std::string ToString() override {
+        return classDef->name + " 인스턴스";
+    }
+};
+
 #endif // OBJECT_H

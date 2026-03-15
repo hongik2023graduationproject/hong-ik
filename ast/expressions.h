@@ -60,6 +60,33 @@ public:
     }
 };
 
+class MemberAccessExpression : public Expression {
+public:
+    std::shared_ptr<Expression> object;
+    std::string member;
+
+    std::string String() override {
+        return object->String() + "." + member;
+    }
+};
+
+class MethodCallExpression : public Expression {
+public:
+    std::shared_ptr<Expression> object;
+    std::string method;
+    std::vector<std::shared_ptr<Expression>> arguments;
+
+    std::string String() override {
+        std::string s = object->String() + "." + method + "(";
+        for (size_t i = 0; i < arguments.size(); i++) {
+            if (i > 0) s += ", ";
+            s += arguments[i]->String();
+        }
+        s += ")";
+        return s;
+    }
+};
+
 class IndexExpression : public Expression {
 public:
     std::shared_ptr<Expression> name;

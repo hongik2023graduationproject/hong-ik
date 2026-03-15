@@ -85,6 +85,38 @@ shared_ptr<Statement> Parser::parseStatement() {
         && next_next_token->type == TokenType::ASSIGN) {
         return parseInitializationStatement();
     }
+    // 클래스 타입 변수 선언: 클래스명 변수명 = 값
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
+        && next_token->type == TokenType::IDENTIFIER && next_next_token != nullptr
+        && next_next_token->type == TokenType::ASSIGN) {
+        return parseInitializationStatement();
+    }
+    // 멤버 대입: 자기.필드 = 값
+    if (current_token->type == TokenType::자기 && next_token != nullptr
+        && next_token->type == TokenType::DOT) {
+        // 멤버 대입인지 확인: 자기.필드 = 값 또는 자기.필드 += 값
+        // 이 경우는 expression statement로 처리하되, 특별한 대입 처리는 evaluator에서 함
+        // 여기서는 parseExpressionStatement로 넘김
+        // 하지만 대입문인지 확인 필요
+        // tokens[pos]=자기, pos+1=DOT, pos+2=IDENTIFIER, pos+3=ASSIGN?
+        auto pos = current_read_position;
+        if (pos + 3 < static_cast<long long>(tokens.size())
+            && tokens[pos + 1]->type == TokenType::DOT
+            && tokens[pos + 2]->type == TokenType::IDENTIFIER
+            && tokens[pos + 3]->type == TokenType::ASSIGN) {
+            // 멤버 대입문: 자기.필드 = 값
+            auto stmt = make_shared<AssignmentStatement>();
+            skipToken(TokenType::자기);
+            skipToken(TokenType::DOT);
+            stmt->name = "자기." + current_token->text;
+            skipToken(TokenType::IDENTIFIER);
+            skipToken(TokenType::ASSIGN);
+            stmt->value = parseExpression(Precedence::LOWEST);
+            setNextToken();
+            skipToken(TokenType::NEW_LINE);
+            return stmt;
+        }
+    }
     if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
         && next_token->type == TokenType::ASSIGN) {
         return parseAssignmentStatement();
@@ -118,6 +150,12 @@ shared_ptr<Statement> Parser::parseStatement() {
     }
     if (current_token->type == TokenType::가져오기) {
         return parseImportStatement();
+    }
+    if (current_token->type == TokenType::비교) {
+        return parseMatchStatement();
+    }
+    if (current_token->type == TokenType::클래스) {
+        return parseClassStatement();
     }
     // 빈 줄은 무시
     if (current_token->type == TokenType::NEW_LINE) {
@@ -338,6 +376,119 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
     return statement;
 }
 
+// 비교 표현식:
+//     경우 값1:
+//         ...
+//     경우 값2:
+//         ...
+//     기본:
+//         ...
+shared_ptr<MatchStatement> Parser::parseMatchStatement() {
+    auto statement = make_shared<MatchStatement>();
+    skipToken(TokenType::비교);
+    statement->subject = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    skipToken(TokenType::COLON);
+    skipToken(TokenType::NEW_LINE);
+
+    skipToken(TokenType::START_BLOCK);
+
+    while (current_token != nullptr && current_token->type != TokenType::END_BLOCK) {
+        if (current_token->type == TokenType::경우) {
+            skipToken(TokenType::경우);
+            auto caseValue = parseExpression(Precedence::LOWEST);
+            statement->caseValues.push_back(caseValue);
+            setNextToken();
+            skipToken(TokenType::COLON);
+            skipToken(TokenType::NEW_LINE);
+            statement->caseBodies.push_back(parseBlockStatement());
+        } else if (current_token->type == TokenType::기본) {
+            skipToken(TokenType::기본);
+            skipToken(TokenType::COLON);
+            skipToken(TokenType::NEW_LINE);
+            statement->defaultBody = parseBlockStatement();
+        } else if (current_token->type == TokenType::NEW_LINE) {
+            skipToken(TokenType::NEW_LINE);
+        } else {
+            break;
+        }
+    }
+
+    skipToken(TokenType::END_BLOCK);
+    return statement;
+}
+
+// 클래스 이름:
+//     타입 필드명
+//     생성(타입 파라미터):
+//         자기.필드 = 값
+//     함수 메서드(타입 파라미터) -> 리턴타입:
+//         ...
+shared_ptr<ClassStatement> Parser::parseClassStatement() {
+    auto statement = make_shared<ClassStatement>();
+    skipToken(TokenType::클래스);
+
+    checkToken(TokenType::IDENTIFIER);
+    statement->name = current_token->text;
+    skipToken(TokenType::IDENTIFIER);
+    skipToken(TokenType::COLON);
+    skipToken(TokenType::NEW_LINE);
+
+    skipToken(TokenType::START_BLOCK);
+
+    while (current_token != nullptr && current_token->type != TokenType::END_BLOCK) {
+        if (current_token->type == TokenType::NEW_LINE) {
+            skipToken(TokenType::NEW_LINE);
+            continue;
+        }
+
+        // 필드 선언: 타입 필드명
+        if (isTypeKeyword(current_token->type) && next_token != nullptr
+            && next_token->type == TokenType::IDENTIFIER
+            && (next_next_token == nullptr || next_next_token->type == TokenType::NEW_LINE)) {
+            statement->fieldTypes.push_back(current_token);
+            setNextToken();
+            statement->fieldNames.push_back(current_token->text);
+            skipToken(TokenType::IDENTIFIER);
+            skipToken(TokenType::NEW_LINE);
+            continue;
+        }
+
+        // 생성자: 생성(타입 파라미터):
+        if (current_token->type == TokenType::생성) {
+            skipToken(TokenType::생성);
+            skipToken(TokenType::LPAREN);
+            if (current_token->type != TokenType::RPAREN) {
+                do {
+                    statement->constructorParamTypes.push_back(current_token);
+                    setNextToken();
+                    checkToken(TokenType::IDENTIFIER);
+                    auto ident = make_shared<IdentifierExpression>();
+                    ident->name = current_token->text;
+                    statement->constructorParams.push_back(ident);
+                    skipToken(TokenType::IDENTIFIER);
+                } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
+            }
+            skipToken(TokenType::RPAREN);
+            skipToken(TokenType::COLON);
+            skipToken(TokenType::NEW_LINE);
+            statement->constructorBody = parseBlockStatement();
+            continue;
+        }
+
+        // 메서드: 함수 이름(타입 파라미터) -> 리턴타입:
+        if (current_token->type == TokenType::함수) {
+            statement->methods.push_back(parseFunctionStatement());
+            continue;
+        }
+
+        break;
+    }
+
+    skipToken(TokenType::END_BLOCK);
+    return statement;
+}
+
 shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
         throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
@@ -385,6 +536,21 @@ shared_ptr<Expression> Parser::parsePrefixExpression() {
 shared_ptr<Expression> Parser::parseGroupedExpression() {
     skipToken(TokenType::LPAREN);
     auto expression = parseExpression(Precedence::LOWEST);
+
+    // 튜플 체크: (a, b, c)
+    if (next_token != nullptr && next_token->type == TokenType::COMMA) {
+        auto tuple = make_shared<TupleLiteral>();
+        tuple->elements.push_back(expression);
+        setNextToken(); // expression 뒤로
+        while (current_token->type == TokenType::COMMA) {
+            skipToken(TokenType::COMMA);
+            tuple->elements.push_back(parseExpression(Precedence::LOWEST));
+            setNextToken();
+        }
+        checkToken(TokenType::RPAREN);
+        return tuple;
+    }
+
     setNextToken();
     checkToken(TokenType::RPAREN);
     return expression;
@@ -396,6 +562,42 @@ shared_ptr<Expression> Parser::parseIdentifierExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->name = current_token->text;
     return identifier_expression;
+}
+
+shared_ptr<Expression> Parser::parseSelfExpression() {
+    auto identifier_expression  = make_shared<IdentifierExpression>();
+    identifier_expression->name = "자기";
+    return identifier_expression;
+}
+
+// object.member 또는 object.method(args)
+shared_ptr<Expression> Parser::parseMemberAccessExpression(shared_ptr<Expression> left) {
+    skipToken(TokenType::DOT);
+
+    checkToken(TokenType::IDENTIFIER);
+    string memberName = current_token->text;
+
+    // 메서드 호출 체크: object.method(args)
+    if (next_token != nullptr && next_token->type == TokenType::LPAREN) {
+        auto methodCall = make_shared<MethodCallExpression>();
+        methodCall->object = std::move(left);
+        methodCall->method = memberName;
+        skipToken(TokenType::IDENTIFIER);
+        skipToken(TokenType::LPAREN);
+        if (current_token != nullptr && current_token->type != TokenType::RPAREN) {
+            do {
+                methodCall->arguments.push_back(parseExpression(Precedence::LOWEST));
+                setNextToken();
+            } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
+        }
+        checkToken(TokenType::RPAREN);
+        return methodCall;
+    }
+
+    auto memberAccess = make_shared<MemberAccessExpression>();
+    memberAccess->object = std::move(left);
+    memberAccess->member = memberName;
+    return memberAccess;
 }
 
 // 함수명(인자1, 인자2) - LPAREN이 infix로 동작
@@ -496,6 +698,12 @@ shared_ptr<Expression> Parser::parseHashMapLiteral() {
     checkToken(TokenType::RBRACE);
 
     return hashMapLiteral;
+}
+
+shared_ptr<Expression> Parser::parseNullLiteral() {
+    auto nullLiteral = make_shared<NullLiteral>();
+    nullLiteral->token = current_token;
+    return nullLiteral;
 }
 
 // 가져오기 "파일명.hik"

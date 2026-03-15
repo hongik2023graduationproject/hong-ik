@@ -1,7 +1,10 @@
 #include "built_in.h"
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 
@@ -42,6 +45,12 @@ std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> par
             cout << hashmap->ToString();
         } else if (auto func = dynamic_cast<Function*>(parameters[i].get())) {
             cout << func->ToString();
+        } else if (dynamic_cast<Null*>(parameters[i].get())) {
+            cout << "없음";
+        } else if (auto tuple = dynamic_cast<Tuple*>(parameters[i].get())) {
+            cout << tuple->ToString();
+        } else if (auto inst = dynamic_cast<Instance*>(parameters[i].get())) {
+            cout << inst->ToString();
         } else {
             throw runtime_error("출력 함수에서 지원하지 않는 타입입니다.");
         }
@@ -81,6 +90,10 @@ std::shared_ptr<Object> TypeOf::function(std::vector<std::shared_ptr<Object>> pa
     case ObjectType::HASH_MAP: return make_shared<String>("사전");
     case ObjectType::FUNCTION: return make_shared<String>("함수");
     case ObjectType::BUILTIN_FUNCTION: return make_shared<String>("내장함수");
+    case ObjectType::NULL_OBJ: return make_shared<String>("없음");
+    case ObjectType::TUPLE: return make_shared<String>("튜플");
+    case ObjectType::CLASS_DEF: return make_shared<String>("클래스");
+    case ObjectType::INSTANCE: return make_shared<String>("인스턴스");
     default: return make_shared<String>("알수없음");
     }
 }
@@ -283,4 +296,263 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
 
     file << content->value;
     return nullptr;
+}
+
+// ===== 수학 내장함수 =====
+
+std::shared_ptr<Object> Abs::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("절대값 함수는 인자를 1개만 받습니다.");
+    }
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        return make_shared<Integer>(std::abs(i->value));
+    }
+    if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        return make_shared<Float>(std::abs(f->value));
+    }
+    throw runtime_error("절대값 함수는 정수 또는 실수만 지원합니다.");
+}
+
+std::shared_ptr<Object> Sqrt::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("제곱근 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("제곱근 함수는 정수 또는 실수만 지원합니다.");
+    }
+    if (val < 0) {
+        throw runtime_error("음수의 제곱근은 구할 수 없습니다.");
+    }
+    return make_shared<Float>(std::sqrt(val));
+}
+
+std::shared_ptr<Object> Max::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("최대 함수는 인자를 2개 받습니다.");
+    }
+    if (auto* a = dynamic_cast<Integer*>(parameters[0].get())) {
+        if (auto* b = dynamic_cast<Integer*>(parameters[1].get())) {
+            return make_shared<Integer>(std::max(a->value, b->value));
+        }
+    }
+    // 실수로 변환하여 비교
+    double va, vb;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) va = static_cast<double>(i->value);
+    else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) va = f->value;
+    else throw runtime_error("최대 함수는 숫자만 지원합니다.");
+    if (auto* i = dynamic_cast<Integer*>(parameters[1].get())) vb = static_cast<double>(i->value);
+    else if (auto* f = dynamic_cast<Float*>(parameters[1].get())) vb = f->value;
+    else throw runtime_error("최대 함수는 숫자만 지원합니다.");
+    return make_shared<Float>(std::max(va, vb));
+}
+
+std::shared_ptr<Object> Min::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("최소 함수는 인자를 2개 받습니다.");
+    }
+    if (auto* a = dynamic_cast<Integer*>(parameters[0].get())) {
+        if (auto* b = dynamic_cast<Integer*>(parameters[1].get())) {
+            return make_shared<Integer>(std::min(a->value, b->value));
+        }
+    }
+    double va, vb;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) va = static_cast<double>(i->value);
+    else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) va = f->value;
+    else throw runtime_error("최소 함수는 숫자만 지원합니다.");
+    if (auto* i = dynamic_cast<Integer*>(parameters[1].get())) vb = static_cast<double>(i->value);
+    else if (auto* f = dynamic_cast<Float*>(parameters[1].get())) vb = f->value;
+    else throw runtime_error("최소 함수는 숫자만 지원합니다.");
+    return make_shared<Float>(std::min(va, vb));
+}
+
+std::shared_ptr<Object> Random::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("난수 함수는 인자를 2개 받습니다 (최소, 최대).");
+    }
+    auto* minVal = dynamic_cast<Integer*>(parameters[0].get());
+    auto* maxVal = dynamic_cast<Integer*>(parameters[1].get());
+    if (!minVal || !maxVal) {
+        throw runtime_error("난수 함수의 인자는 정수이어야 합니다.");
+    }
+    static std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<long long> dist(minVal->value, maxVal->value);
+    return make_shared<Integer>(dist(gen));
+}
+
+// ===== 문자열 내장함수 =====
+
+std::shared_ptr<Object> Split::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("분리 함수는 인자를 2개 받습니다 (문자열, 구분자).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* delim = dynamic_cast<String*>(parameters[1].get());
+    if (!str || !delim) {
+        throw runtime_error("분리 함수의 인자는 문자열이어야 합니다.");
+    }
+
+    auto result = make_shared<Array>();
+    string s = str->value;
+    string d = delim->value;
+
+    if (d.empty()) {
+        for (char c : s) {
+            result->elements.push_back(make_shared<String>(string(1, c)));
+        }
+        return result;
+    }
+
+    size_t pos = 0;
+    while ((pos = s.find(d)) != string::npos) {
+        result->elements.push_back(make_shared<String>(s.substr(0, pos)));
+        s.erase(0, pos + d.length());
+    }
+    result->elements.push_back(make_shared<String>(s));
+    return result;
+}
+
+std::shared_ptr<Object> ToUpper::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("대문자 함수는 인자를 1개만 받습니다.");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    if (!str) throw runtime_error("대문자 함수의 인자는 문자열이어야 합니다.");
+    string result = str->value;
+    for (auto& c : result) c = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+    return make_shared<String>(result);
+}
+
+std::shared_ptr<Object> ToLower::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("소문자 함수는 인자를 1개만 받습니다.");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    if (!str) throw runtime_error("소문자 함수의 인자는 문자열이어야 합니다.");
+    string result = str->value;
+    for (auto& c : result) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return make_shared<String>(result);
+}
+
+std::shared_ptr<Object> Replace::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 3) {
+        throw runtime_error("치환 함수는 인자를 3개 받습니다 (원본, 대상, 교체).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* target = dynamic_cast<String*>(parameters[1].get());
+    auto* replacement = dynamic_cast<String*>(parameters[2].get());
+    if (!str || !target || !replacement) {
+        throw runtime_error("치환 함수의 인자는 모두 문자열이어야 합니다.");
+    }
+    string result = str->value;
+    size_t pos = 0;
+    while ((pos = result.find(target->value, pos)) != string::npos) {
+        result.replace(pos, target->value.length(), replacement->value);
+        pos += replacement->value.length();
+    }
+    return make_shared<String>(result);
+}
+
+std::shared_ptr<Object> Trim::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("자르기 함수는 인자를 1개만 받습니다.");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    if (!str) throw runtime_error("자르기 함수의 인자는 문자열이어야 합니다.");
+    string result = str->value;
+    size_t start = result.find_first_not_of(" \t\n\r");
+    size_t end = result.find_last_not_of(" \t\n\r");
+    if (start == string::npos) return make_shared<String>("");
+    return make_shared<String>(result.substr(start, end - start + 1));
+}
+
+// ===== 배열 내장함수 =====
+
+std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("정렬 함수는 인자를 1개만 받습니다.");
+    }
+    auto* arr = dynamic_cast<Array*>(parameters[0].get());
+    if (!arr) throw runtime_error("정렬 함수의 인자는 배열이어야 합니다.");
+
+    auto result = make_shared<Array>();
+    result->elements = arr->elements;
+
+    std::sort(result->elements.begin(), result->elements.end(),
+              [](const shared_ptr<Object>& a, const shared_ptr<Object>& b) {
+                  // 정수 비교
+                  auto* ai = dynamic_cast<Integer*>(a.get());
+                  auto* bi = dynamic_cast<Integer*>(b.get());
+                  if (ai && bi) return ai->value < bi->value;
+                  // 실수 비교
+                  auto* af = dynamic_cast<Float*>(a.get());
+                  auto* bf = dynamic_cast<Float*>(b.get());
+                  if (af && bf) return af->value < bf->value;
+                  // 문자열 비교
+                  return a->ToString() < b->ToString();
+              });
+    return result;
+}
+
+std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("뒤집기 함수는 인자를 1개만 받습니다.");
+    }
+    if (auto* arr = dynamic_cast<Array*>(parameters[0].get())) {
+        auto result = make_shared<Array>();
+        result->elements = arr->elements;
+        std::reverse(result->elements.begin(), result->elements.end());
+        return result;
+    }
+    if (auto* str = dynamic_cast<String*>(parameters[0].get())) {
+        string result = str->value;
+        std::reverse(result.begin(), result.end());
+        return make_shared<String>(result);
+    }
+    throw runtime_error("뒤집기 함수는 배열 또는 문자열만 지원합니다.");
+}
+
+std::shared_ptr<Object> Find::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("찾기 함수는 인자를 2개 받습니다 (배열, 값).");
+    }
+    auto* arr = dynamic_cast<Array*>(parameters[0].get());
+    if (!arr) throw runtime_error("찾기 함수의 첫 번째 인자는 배열이어야 합니다.");
+
+    for (size_t i = 0; i < arr->elements.size(); i++) {
+        if (arr->elements[i]->ToString() == parameters[1]->ToString()
+            && arr->elements[i]->type == parameters[1]->type) {
+            return make_shared<Integer>(static_cast<long long>(i));
+        }
+    }
+    return make_shared<Integer>(-1);
+}
+
+std::shared_ptr<Object> Slice::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 3) {
+        throw runtime_error("조각 함수는 인자를 3개 받습니다 (배열, 시작, 끝).");
+    }
+    auto* arr = dynamic_cast<Array*>(parameters[0].get());
+    auto* start = dynamic_cast<Integer*>(parameters[1].get());
+    auto* end = dynamic_cast<Integer*>(parameters[2].get());
+    if (!arr || !start || !end) {
+        throw runtime_error("조각 함수의 인자 형식이 잘못되었습니다 (배열, 정수, 정수).");
+    }
+
+    long long s = start->value;
+    long long e = end->value;
+    long long len = static_cast<long long>(arr->elements.size());
+    if (s < 0) s = 0;
+    if (e > len) e = len;
+    if (s >= e) return make_shared<Array>();
+
+    auto result = make_shared<Array>();
+    for (long long i = s; i < e; i++) {
+        result->elements.push_back(arr->elements[i]);
+    }
+    return result;
 }

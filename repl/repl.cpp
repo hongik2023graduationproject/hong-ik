@@ -8,15 +8,20 @@
 
 using namespace std;
 
-Repl::Repl() {
+Repl::Repl(bool useVM) : useVM(useVM) {
     lexer     = make_unique<Lexer>();
     parser    = make_unique<Parser>();
-    evaluator = make_unique<Evaluator>();
+    if (!useVM) {
+        evaluator = make_unique<Evaluator>();
+    }
 }
 
 void Repl::Run() {
     cout << "한국어 프로그래밍 언어 프로젝트 홍익" << endl;
     cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
+    if (useVM) {
+        cout << "[VM 모드]" << endl;
+    }
 
     vector<shared_ptr<Token>> tokens;
     int indent = 0;
@@ -55,10 +60,20 @@ void Repl::Run() {
             }
 
             auto program = parser->Parsing(tokens);
-            auto object  = evaluator->Evaluate(program);
 
-            if (object != nullptr) {
-                cout << object->ToString() << endl;
+            if (useVM) {
+                Compiler compiler;
+                auto bytecode = compiler.Compile(program);
+                VM vm;
+                auto object = vm.Execute(bytecode);
+                if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
+                    cout << object->ToString() << endl;
+                }
+            } else {
+                auto object = evaluator->Evaluate(program);
+                if (object != nullptr) {
+                    cout << object->ToString() << endl;
+                }
             }
 
             tokens.clear();
@@ -74,13 +89,46 @@ void Repl::FileMode(const string& filename) {
     vector<shared_ptr<Token>> tokens;
     int indent = 0;
 
-    // 파일 스트림 생성 및 열기
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cout << "Error: cannot open file: " << filename << std::endl;
         return;
     }
 
+    if (useVM) {
+        // VM 모드: 파일 전체를 한 번에 파싱 후 컴파일/실행
+        string code;
+        while (getline(file, code)) {
+            code += "\n";
+            auto utf8 = Utf8Converter::Convert(code);
+            auto newTokens = lexer->Tokenize(utf8);
+            tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
+            for (auto& t : newTokens) {
+                if (t->type == TokenType::START_BLOCK) indent++;
+                if (t->type == TokenType::END_BLOCK) indent--;
+            }
+        }
+        for (int i = 0; i < indent; i++) {
+            tokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
+        }
+        if (tokens.empty()) return;
+
+        try {
+            auto program = parser->Parsing(tokens);
+            Compiler compiler;
+            auto bytecode = compiler.Compile(program);
+            VM vm;
+            auto object = vm.Execute(bytecode);
+            if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
+                cout << object->ToString() << endl;
+            }
+        } catch (const exception& e) {
+            cout << "Error: " << e.what() << endl;
+        }
+        return;
+    }
+
+    // 트리워킹 모드
     string code;
     while (getline(file, code)) {
         try {

@@ -43,7 +43,7 @@ TEST_F(EvaluatorTest, DivisionByZeroTest) {
             make_shared<IntegerLiteral>(make_shared<Token>(Token{TokenType::INTEGER, "0", 1}), 0))),
     });
 
-    EXPECT_THROW(evaluator_->Evaluate(program), runtime_error);
+    EXPECT_THROW(evaluator_->Evaluate(program), std::exception);
 }
 
 TEST_F(EvaluatorTest, ComparisonTest) {

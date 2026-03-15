@@ -173,4 +173,42 @@ public:
     }
 };
 
+class MatchStatement : public Statement {
+public:
+    std::shared_ptr<Expression> subject;
+    std::vector<std::shared_ptr<Expression>> caseValues;
+    std::vector<std::shared_ptr<BlockStatement>> caseBodies;
+    std::shared_ptr<BlockStatement> defaultBody;
+
+    std::string String() override {
+        std::string s = "비교 " + subject->String() + ":\n";
+        for (size_t i = 0; i < caseValues.size(); i++) {
+            s += "  경우 " + caseValues[i]->String() + ":\n" + caseBodies[i]->String();
+        }
+        if (defaultBody) {
+            s += "  기본:\n" + defaultBody->String();
+        }
+        return s;
+    }
+};
+
+class ClassStatement : public Statement {
+public:
+    std::string name;
+    std::vector<std::shared_ptr<Token>> fieldTypes;
+    std::vector<std::string> fieldNames;
+    std::vector<std::shared_ptr<Token>> constructorParamTypes;
+    std::vector<std::shared_ptr<IdentifierExpression>> constructorParams;
+    std::shared_ptr<BlockStatement> constructorBody;
+    std::vector<std::shared_ptr<FunctionStatement>> methods;
+
+    std::string String() override {
+        std::string s = "클래스 " + name + ":\n";
+        for (size_t i = 0; i < fieldTypes.size(); i++) {
+            s += "  " + fieldTypes[i]->text + " " + fieldNames[i] + "\n";
+        }
+        return s;
+    }
+};
+
 #endif // STATEMENTS_H

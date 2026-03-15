@@ -68,6 +68,30 @@ public:
     }
 };
 
+class NullLiteral : public Literal {
+public:
+    std::shared_ptr<Token> token;
+
+    std::string String() override {
+        return "없음";
+    }
+};
+
+class TupleLiteral : public Literal {
+public:
+    std::vector<std::shared_ptr<Expression>> elements;
+
+    std::string String() override {
+        std::string s = "(";
+        for (size_t i = 0; i < elements.size(); i++) {
+            if (i > 0) s += ", ";
+            s += elements[i]->String();
+        }
+        s += ")";
+        return s;
+    }
+};
+
 class HashMapLiteral : public Literal {
 public:
     std::vector<std::shared_ptr<Expression>> keys;

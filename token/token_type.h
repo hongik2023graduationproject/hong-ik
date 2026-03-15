@@ -66,6 +66,13 @@ enum class TokenType {
     시도, // try
     실패, // catch
     가져오기, // import
+    없음, // null
+    비교, // match/switch
+    경우, // case
+    기본, // default
+    클래스, // class
+    생성, // constructor
+    자기, // self/this
 
     BITWISE_AND, // &
     LOGICAL_AND, // &&
@@ -85,6 +92,9 @@ enum class TokenType {
     GREATER_THAN, // >
     LESS_EQUAL, // <=
     GREATER_EQUAL, // >=
+
+    DOT, // .
+    ELLIPSIS, // ...
 };
 
 #endif // TOKEN_TYPE_H

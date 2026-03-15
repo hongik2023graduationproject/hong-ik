@@ -27,6 +27,13 @@ Lexer::Lexer() {
         {"에서", TokenType::에서},
         {"시도", TokenType::시도},
         {"실패", TokenType::실패},
+        {"없음", TokenType::없음},
+        {"비교", TokenType::비교},
+        {"경우", TokenType::경우},
+        {"기본", TokenType::기본},
+        {"클래스", TokenType::클래스},
+        {"생성", TokenType::생성},
+        {"자기", TokenType::자기},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
     };
@@ -191,6 +198,23 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
         if (isLetter(current_character)) {
             string identifier = readLetter();
             handleIdentifierAndKeywords(identifier);
+            continue;
+        }
+
+        // DOT 또는 ELLIPSIS
+        if (current_character == ".") {
+            // ... (ELLIPSIS) 체크
+            if (next_character == "."
+                && next_read_position + 1 < static_cast<long long>(characters.size())
+                && characters[next_read_position + 1] == ".") {
+                addToken(TokenType::ELLIPSIS, "...");
+                current_read_position += 3;
+                next_read_position += 3;
+                continue;
+            }
+            addToken(TokenType::DOT, ".");
+            current_read_position++;
+            next_read_position++;
             continue;
         }
 

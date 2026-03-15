@@ -29,10 +29,16 @@ add_library(HongIkLib STATIC
         evaluator/evaluator.cpp
         environment/environment.cpp
         object/built_in.cpp
+        vm/compiler.cpp
+        vm/vm.cpp
 )
 
 add_executable(HongIk main.cpp)
 target_link_libraries(HongIk HongIkLib)
+
+add_executable(HongIkBench tests/benchmark.cpp)
+target_include_directories(HongIkBench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(HongIkBench HongIkLib)
 
 add_executable(HongIkTests
         tests/lexer_test.cpp
@@ -40,6 +46,7 @@ add_executable(HongIkTests
         tests/parser_test.cpp
         tests/evaluator_test.cpp
         tests/repl_test.cpp
+        tests/vm_test.cpp
 )
 
 # 헤더 파일 경로 추가

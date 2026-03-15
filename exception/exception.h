@@ -91,4 +91,22 @@ public:
 };
 
 
+// evaluator exception
+class RuntimeException : public std::exception {
+private:
+    std::string message;
+
+public:
+    RuntimeException(const std::string& msg, long long line)
+        : message("line " + std::to_string(line) + ": " + msg) {}
+
+    explicit RuntimeException(const std::string& msg)
+        : message(msg) {}
+
+    const char* what() const noexcept override {
+        return message.c_str();
+    }
+};
+
+
 #endif // EXCEPTION_H

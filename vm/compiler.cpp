@@ -1,0 +1,681 @@
+#include "compiler.h"
+#include "../exception/exception.h"
+#include <stdexcept>
+
+using namespace std;
+
+CompiledFunction& Compiler::chunk() {
+    return *current->function;
+}
+
+void Compiler::emitConstant(shared_ptr<Object> value, long long line) {
+    uint16_t idx = chunk().addConstant(std::move(value));
+    chunk().emitOpAndUint16(OpCode::OP_CONSTANT, idx, line);
+}
+
+uint16_t Compiler::identifierConstant(const string& name) {
+    return chunk().addConstant(make_shared<String>(name));
+}
+
+void Compiler::beginScope() {
+    current->scopeDepth++;
+}
+
+void Compiler::endScope(long long line) {
+    current->scopeDepth--;
+    while (!current->locals.empty() && current->locals.back().depth > current->scopeDepth) {
+        chunk().emitOp(OpCode::OP_POP, line);
+        current->locals.pop_back();
+    }
+}
+
+uint16_t Compiler::declareLocal(const string& name) {
+    current->locals.push_back({name, current->scopeDepth});
+    return static_cast<uint16_t>(current->locals.size() - 1);
+}
+
+int Compiler::resolveLocal(const string& name) {
+    for (int i = static_cast<int>(current->locals.size()) - 1; i >= 0; i--) {
+        if (current->locals[i].name == name) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+shared_ptr<CompiledFunction> Compiler::Compile(shared_ptr<Program> program) {
+    CompilerState state;
+    state.function = make_shared<CompiledFunction>();
+    state.function->name = "";
+    current = &state;
+
+    for (size_t i = 0; i < program->statements.size(); i++) {
+        bool isLast = (i == program->statements.size() - 1);
+        auto* stmt = program->statements[i].get();
+
+        // 마지막 문이 ExpressionStatement이면 결과를 스택에 유지 (POP 안 함)
+        if (isLast && dynamic_cast<ExpressionStatement*>(stmt)) {
+            compileExpression(dynamic_cast<ExpressionStatement*>(stmt)->expression.get());
+            chunk().emitOp(OpCode::OP_RETURN, 0);
+        } else {
+            compileStatement(stmt);
+        }
+    }
+
+    // 마지막이 ExpressionStatement가 아닌 경우
+    if (program->statements.empty() || !dynamic_cast<ExpressionStatement*>(program->statements.back().get())) {
+        chunk().emitOp(OpCode::OP_NULL, 0);
+        chunk().emitOp(OpCode::OP_RETURN, 0);
+    }
+
+    current->function->localCount = static_cast<int>(current->locals.size());
+    return state.function;
+}
+
+void Compiler::compileStatement(Statement* stmt) {
+    if (auto* s = dynamic_cast<ExpressionStatement*>(stmt)) {
+        compileExpression(s->expression.get());
+        chunk().emitOp(OpCode::OP_POP, 0);
+        return;
+    }
+    if (auto* s = dynamic_cast<InitializationStatement*>(stmt)) {
+        compileInitialization(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<AssignmentStatement*>(stmt)) {
+        compileAssignment(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<CompoundAssignmentStatement*>(stmt)) {
+        compileCompoundAssignment(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<ReturnStatement*>(stmt)) {
+        compileReturn(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<IfStatement*>(stmt)) {
+        compileIf(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<WhileStatement*>(stmt)) {
+        compileWhile(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<ForEachStatement*>(stmt)) {
+        compileForEach(s);
+        return;
+    }
+    if (dynamic_cast<BreakStatement*>(stmt)) {
+        if (!current->loops.empty()) {
+            auto& loop = current->loops.back();
+            size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
+            loop.breakJumps.push_back(jumpOffset);
+        }
+        return;
+    }
+    if (auto* s = dynamic_cast<FunctionStatement*>(stmt)) {
+        compileFunction(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<ClassStatement*>(stmt)) {
+        compileClass(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<MatchStatement*>(stmt)) {
+        compileMatch(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<TryCatchStatement*>(stmt)) {
+        compileTryCatch(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<ImportStatement*>(stmt)) {
+        compileImport(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<BlockStatement*>(stmt)) {
+        compileBlock(s);
+        return;
+    }
+}
+
+void Compiler::compileExpression(Expression* expr) {
+    if (auto* e = dynamic_cast<IntegerLiteral*>(expr)) {
+        long long line = e->token ? e->token->line : 0;
+        emitConstant(make_shared<Integer>(e->value), line);
+        return;
+    }
+    if (auto* e = dynamic_cast<FloatLiteral*>(expr)) {
+        long long line = e->token ? e->token->line : 0;
+        emitConstant(make_shared<Float>(e->value), line);
+        return;
+    }
+    if (auto* e = dynamic_cast<BooleanLiteral*>(expr)) {
+        long long line = e->token ? e->token->line : 0;
+        chunk().emitOp(e->value ? OpCode::OP_TRUE : OpCode::OP_FALSE, line);
+        return;
+    }
+    if (auto* e = dynamic_cast<StringLiteral*>(expr)) {
+        long long line = e->token ? e->token->line : 0;
+        // 문자열 보간 처리
+        const string& val = e->value;
+        if (val.find('{') != string::npos) {
+            // 보간 세그먼트 파싱
+            vector<string> segments;
+            vector<string> varNames;
+            size_t i = 0;
+            string current_seg;
+            while (i < val.size()) {
+                if (val[i] == '{') {
+                    size_t end = val.find('}', i);
+                    if (end != string::npos) {
+                        segments.push_back(current_seg);
+                        current_seg.clear();
+                        varNames.push_back(val.substr(i + 1, end - i - 1));
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                current_seg += val[i];
+                i++;
+            }
+            segments.push_back(current_seg);
+
+            // 세그먼트와 변수를 번갈아 push
+            int count = 0;
+            for (size_t si = 0; si < segments.size(); si++) {
+                if (!segments[si].empty()) {
+                    emitConstant(make_shared<String>(segments[si]), line);
+                    count++;
+                }
+                if (si < varNames.size()) {
+                    // 변수를 문자열로 변환하기 위해 식별자 로드
+                    compileIdentifier(varNames[si], line);
+                    count++;
+                }
+            }
+            chunk().emitOpAndUint16(OpCode::OP_INTERPOLATE, static_cast<uint16_t>(count), line);
+            return;
+        }
+        emitConstant(make_shared<String>(val), line);
+        return;
+    }
+    if (dynamic_cast<NullLiteral*>(expr)) {
+        chunk().emitOp(OpCode::OP_NULL, 0);
+        return;
+    }
+    if (auto* e = dynamic_cast<ArrayLiteral*>(expr)) {
+        long long line = e->token ? e->token->line : 0;
+        for (auto& elem : e->elements) {
+            compileExpression(elem.get());
+        }
+        chunk().emitOpAndUint16(OpCode::OP_BUILD_ARRAY, static_cast<uint16_t>(e->elements.size()), line);
+        return;
+    }
+    if (auto* e = dynamic_cast<HashMapLiteral*>(expr)) {
+        for (size_t i = 0; i < e->keys.size(); i++) {
+            compileExpression(e->keys[i].get());
+            compileExpression(e->values[i].get());
+        }
+        chunk().emitOpAndUint16(OpCode::OP_BUILD_HASHMAP, static_cast<uint16_t>(e->keys.size()), 0);
+        return;
+    }
+    if (auto* e = dynamic_cast<TupleLiteral*>(expr)) {
+        for (auto& elem : e->elements) {
+            compileExpression(elem.get());
+        }
+        chunk().emitOpAndUint16(OpCode::OP_BUILD_TUPLE, static_cast<uint16_t>(e->elements.size()), 0);
+        return;
+    }
+    if (auto* e = dynamic_cast<InfixExpression*>(expr)) {
+        compileInfix(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<PrefixExpression*>(expr)) {
+        compilePrefix(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<IdentifierExpression*>(expr)) {
+        compileIdentifier(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<CallExpression*>(expr)) {
+        compileCall(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<MemberAccessExpression*>(expr)) {
+        compileMemberAccess(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<MethodCallExpression*>(expr)) {
+        compileMethodCall(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<IndexExpression*>(expr)) {
+        compileIndex(e);
+        return;
+    }
+}
+
+void Compiler::compileIdentifier(IdentifierExpression* expr) {
+    compileIdentifier(expr->name, 0);
+}
+
+void Compiler::compileIdentifier(const string& name, long long line) {
+    int slot = resolveLocal(name);
+    if (slot != -1) {
+        chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, static_cast<uint16_t>(slot), line);
+    } else {
+        // 전역 변수 또는 내장 함수
+        uint16_t nameIdx = identifierConstant(name);
+        chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
+    }
+}
+
+void Compiler::compileInfix(InfixExpression* expr) {
+    long long line = expr->token ? expr->token->line : 0;
+    compileExpression(expr->left.get());
+    compileExpression(expr->right.get());
+
+    switch (expr->token->type) {
+    case TokenType::PLUS: chunk().emitOp(OpCode::OP_ADD, line); break;
+    case TokenType::MINUS: chunk().emitOp(OpCode::OP_SUB, line); break;
+    case TokenType::ASTERISK: chunk().emitOp(OpCode::OP_MUL, line); break;
+    case TokenType::SLASH: chunk().emitOp(OpCode::OP_DIV, line); break;
+    case TokenType::PERCENT: chunk().emitOp(OpCode::OP_MOD, line); break;
+    case TokenType::BITWISE_AND: chunk().emitOp(OpCode::OP_BITWISE_AND, line); break;
+    case TokenType::BITWISE_OR: chunk().emitOp(OpCode::OP_BITWISE_OR, line); break;
+    case TokenType::EQUAL: chunk().emitOp(OpCode::OP_EQUAL, line); break;
+    case TokenType::NOT_EQUAL: chunk().emitOp(OpCode::OP_NOT_EQUAL, line); break;
+    case TokenType::LESS_THAN: chunk().emitOp(OpCode::OP_LESS, line); break;
+    case TokenType::GREATER_THAN: chunk().emitOp(OpCode::OP_GREATER, line); break;
+    case TokenType::LESS_EQUAL: chunk().emitOp(OpCode::OP_LESS_EQUAL, line); break;
+    case TokenType::GREATER_EQUAL: chunk().emitOp(OpCode::OP_GREATER_EQUAL, line); break;
+    case TokenType::LOGICAL_AND: chunk().emitOp(OpCode::OP_AND, line); break;
+    case TokenType::LOGICAL_OR: chunk().emitOp(OpCode::OP_OR, line); break;
+    default:
+        throw RuntimeException("알 수 없는 중위 연산자입니다.", line);
+    }
+}
+
+void Compiler::compilePrefix(PrefixExpression* expr) {
+    long long line = expr->token ? expr->token->line : 0;
+    compileExpression(expr->right.get());
+    if (expr->token->type == TokenType::MINUS) {
+        chunk().emitOp(OpCode::OP_NEGATE, line);
+    } else if (expr->token->type == TokenType::BANG) {
+        chunk().emitOp(OpCode::OP_NOT, line);
+    }
+}
+
+void Compiler::compileInitialization(InitializationStatement* stmt) {
+    long long line = stmt->type ? stmt->type->line : 0;
+    compileExpression(stmt->value.get());
+
+    if (current->scopeDepth > 0) {
+        declareLocal(stmt->name);
+    } else {
+        uint16_t nameIdx = identifierConstant(stmt->name);
+        chunk().emitOpAndUint16(OpCode::OP_DEFINE_GLOBAL, nameIdx, line);
+    }
+}
+
+void Compiler::compileAssignment(AssignmentStatement* stmt) {
+    compileExpression(stmt->value.get());
+
+    // 멤버 대입: 자기.필드
+    if (stmt->name.size() > 6 && stmt->name.substr(0, 7) == "자기.") {
+        // "자기."는 UTF-8로 9바이트 (자기=6 + .=1... wait)
+        // Actually in this codebase, 자기 is Korean UTF-8 chars stored as string
+        // The parser stores "자기.필드" as the name
+        string fieldName = stmt->name.substr(stmt->name.find('.') + 1);
+        // 자기를 스택에 로드
+        compileIdentifier("자기", 0);
+        uint16_t nameIdx = identifierConstant(fieldName);
+        chunk().emitOpAndUint16(OpCode::OP_SET_MEMBER, nameIdx, 0);
+        return;
+    }
+
+    int slot = resolveLocal(stmt->name);
+    if (slot != -1) {
+        chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, static_cast<uint16_t>(slot), 0);
+    } else {
+        uint16_t nameIdx = identifierConstant(stmt->name);
+        chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, 0);
+    }
+}
+
+void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
+    long long line = stmt->op ? stmt->op->line : 0;
+
+    // 현재 값 로드
+    int slot = resolveLocal(stmt->name);
+    if (slot != -1) {
+        chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, static_cast<uint16_t>(slot), line);
+    } else {
+        uint16_t nameIdx = identifierConstant(stmt->name);
+        chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
+    }
+
+    // 우항 컴파일
+    compileExpression(stmt->value.get());
+
+    // 연산
+    switch (stmt->op->type) {
+    case TokenType::PLUS_ASSIGN: chunk().emitOp(OpCode::OP_ADD, line); break;
+    case TokenType::MINUS_ASSIGN: chunk().emitOp(OpCode::OP_SUB, line); break;
+    case TokenType::ASTERISK_ASSIGN: chunk().emitOp(OpCode::OP_MUL, line); break;
+    case TokenType::SLASH_ASSIGN: chunk().emitOp(OpCode::OP_DIV, line); break;
+    case TokenType::PERCENT_ASSIGN: chunk().emitOp(OpCode::OP_MOD, line); break;
+    default: break;
+    }
+
+    // 결과 저장
+    if (slot != -1) {
+        chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, static_cast<uint16_t>(slot), line);
+    } else {
+        uint16_t nameIdx = identifierConstant(stmt->name);
+        chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, line);
+    }
+}
+
+void Compiler::compileBlock(BlockStatement* stmt) {
+    beginScope();
+    for (auto& s : stmt->statements) {
+        compileStatement(s.get());
+    }
+    endScope(0);
+}
+
+void Compiler::compileIf(IfStatement* stmt) {
+    compileExpression(stmt->condition.get());
+
+    size_t elseJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+    compileBlock(stmt->consequence.get());
+
+    if (stmt->then) {
+        size_t endJump = chunk().emitJump(OpCode::OP_JUMP, 0);
+        chunk().patchJump(elseJump);
+        compileBlock(stmt->then.get());
+        chunk().patchJump(endJump);
+    } else {
+        chunk().patchJump(elseJump);
+    }
+}
+
+void Compiler::compileWhile(WhileStatement* stmt) {
+    size_t loopStart = chunk().code.size();
+    current->loops.push_back({loopStart, {}, current->scopeDepth});
+
+    compileExpression(stmt->condition.get());
+    size_t exitJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+    beginScope();
+    for (auto& s : stmt->body->statements) {
+        compileStatement(s.get());
+    }
+    endScope(0);
+
+    chunk().emitLoop(loopStart, 0);
+    chunk().patchJump(exitJump);
+
+    // break 점프 패치
+    auto& loop = current->loops.back();
+    for (auto offset : loop.breakJumps) {
+        chunk().patchJump(offset);
+    }
+    current->loops.pop_back();
+}
+
+void Compiler::compileForEach(ForEachStatement* stmt) {
+    // iterable을 스택에 로드
+    compileExpression(stmt->iterable.get());
+    chunk().emitOp(OpCode::OP_ITER_INIT, 0);
+
+    // 이터레이터를 로컬로 저장
+    beginScope();
+    uint16_t iterSlot = declareLocal("__iter__");
+    (void)iterSlot;
+
+    size_t loopStart = chunk().code.size();
+    current->loops.push_back({loopStart, {}, current->scopeDepth});
+
+    size_t exitJump = chunk().emitJump(OpCode::OP_ITER_NEXT, 0);
+
+    chunk().emitOp(OpCode::OP_ITER_VALUE, 0);
+    uint16_t elemSlot = declareLocal(stmt->elementName);
+    (void)elemSlot;
+
+    for (auto& s : stmt->body->statements) {
+        compileStatement(s.get());
+    }
+
+    // 원소 로컬 제거
+    chunk().emitOp(OpCode::OP_POP, 0);
+    current->locals.pop_back();
+
+    chunk().emitLoop(loopStart, 0);
+    chunk().patchJump(exitJump);
+
+    auto& loop = current->loops.back();
+    for (auto offset : loop.breakJumps) {
+        chunk().patchJump(offset);
+    }
+    current->loops.pop_back();
+
+    endScope(0);
+}
+
+void Compiler::compileReturn(ReturnStatement* stmt) {
+    compileExpression(stmt->expression.get());
+    chunk().emitOp(OpCode::OP_RETURN, 0);
+}
+
+void Compiler::compileFunction(FunctionStatement* stmt) {
+    // 새 컴파일러 상태 생성
+    CompilerState funcState;
+    funcState.function = make_shared<CompiledFunction>();
+    funcState.function->name = stmt->name;
+    funcState.function->arity = static_cast<int>(stmt->parameters.size());
+    funcState.scopeDepth = 1; // 함수 내부는 scope 1
+
+    CompilerState* enclosing = current;
+    current = &funcState;
+
+    // 파라미터를 로컬로 선언
+    for (auto& param : stmt->parameters) {
+        declareLocal(param->name);
+    }
+
+    // 본문 컴파일
+    for (auto& s : stmt->body->statements) {
+        compileStatement(s.get());
+    }
+
+    // 암묵적 null 반환
+    chunk().emitOp(OpCode::OP_NULL, 0);
+    chunk().emitOp(OpCode::OP_RETURN, 0);
+
+    current->function->localCount = static_cast<int>(current->locals.size());
+    current = enclosing;
+
+    // 함수를 상수로 추가하고 전역에 정의
+    uint16_t constIdx = chunk().addConstant(funcState.function);
+    chunk().emitOpAndUint16(OpCode::OP_CONSTANT, constIdx, 0);
+
+    uint16_t nameIdx = identifierConstant(stmt->name);
+    chunk().emitOpAndUint16(OpCode::OP_DEFINE_GLOBAL, nameIdx, 0);
+}
+
+void Compiler::compileClass(ClassStatement* stmt) {
+    uint16_t nameIdx = identifierConstant(stmt->name);
+
+    // 생성자 컴파일
+    shared_ptr<CompiledFunction> constructorFn;
+    if (stmt->constructorBody) {
+        CompilerState ctorState;
+        ctorState.function = make_shared<CompiledFunction>();
+        ctorState.function->name = stmt->name + ".생성";
+        ctorState.scopeDepth = 1;
+
+        CompilerState* enclosing = current;
+        current = &ctorState;
+
+        declareLocal("자기");
+        for (auto& param : stmt->constructorParams) {
+            declareLocal(param->name);
+        }
+        current->function->arity = static_cast<int>(stmt->constructorParams.size());
+
+        for (auto& s : stmt->constructorBody->statements) {
+            compileStatement(s.get());
+        }
+        // 생성자는 자기를 반환
+        compileIdentifier("자기", 0);
+        chunk().emitOp(OpCode::OP_RETURN, 0);
+        current->function->localCount = static_cast<int>(current->locals.size());
+        constructorFn = ctorState.function;
+        current = enclosing;
+    }
+
+    // 메서드 컴파일
+    map<string, shared_ptr<CompiledFunction>> compiledMethods;
+    for (auto& method : stmt->methods) {
+        CompilerState methodState;
+        methodState.function = make_shared<CompiledFunction>();
+        methodState.function->name = stmt->name + "." + method->name;
+        methodState.scopeDepth = 1;
+
+        CompilerState* enclosing = current;
+        current = &methodState;
+
+        declareLocal("자기");
+        for (auto& param : method->parameters) {
+            declareLocal(param->name);
+        }
+        current->function->arity = static_cast<int>(method->parameters.size());
+
+        for (auto& s : method->body->statements) {
+            compileStatement(s.get());
+        }
+        chunk().emitOp(OpCode::OP_NULL, 0);
+        chunk().emitOp(OpCode::OP_RETURN, 0);
+        current->function->localCount = static_cast<int>(current->locals.size());
+        compiledMethods[method->name] = methodState.function;
+        current = enclosing;
+    }
+
+    // CompiledClassDef 생성
+    auto classDef = make_shared<CompiledClassDef>();
+    classDef->name = stmt->name;
+    classDef->fieldNames = stmt->fieldNames;
+    classDef->fieldTypes = stmt->fieldTypes;
+    classDef->compiledConstructor = constructorFn;
+    classDef->compiledMethods = compiledMethods;
+
+    uint16_t classConstIdx = chunk().addConstant(classDef);
+    chunk().emitOpAndUint16(OpCode::OP_CONSTANT, classConstIdx, 0);
+    chunk().emitOpAndUint16(OpCode::OP_DEFINE_GLOBAL, nameIdx, 0);
+}
+
+void Compiler::compileMatch(MatchStatement* stmt) {
+    compileExpression(stmt->subject.get());
+
+    vector<size_t> endJumps;
+
+    for (size_t i = 0; i < stmt->caseValues.size(); i++) {
+        chunk().emitOp(OpCode::OP_DUP, 0); // subject 복사
+        compileExpression(stmt->caseValues[i].get());
+        chunk().emitOp(OpCode::OP_EQUAL, 0);
+        size_t skipJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+        chunk().emitOp(OpCode::OP_POP, 0); // subject 제거
+        beginScope();
+        for (auto& s : stmt->caseBodies[i]->statements) {
+            compileStatement(s.get());
+        }
+        endScope(0);
+        endJumps.push_back(chunk().emitJump(OpCode::OP_JUMP, 0));
+
+        chunk().patchJump(skipJump);
+    }
+
+    // default
+    chunk().emitOp(OpCode::OP_POP, 0); // subject 제거
+    if (stmt->defaultBody) {
+        beginScope();
+        for (auto& s : stmt->defaultBody->statements) {
+            compileStatement(s.get());
+        }
+        endScope(0);
+    }
+
+    for (auto offset : endJumps) {
+        chunk().patchJump(offset);
+    }
+}
+
+void Compiler::compileTryCatch(TryCatchStatement* stmt) {
+    size_t tryBeginOffset = chunk().emitJump(OpCode::OP_TRY_BEGIN, 0);
+
+    beginScope();
+    for (auto& s : stmt->tryBody->statements) {
+        compileStatement(s.get());
+    }
+    endScope(0);
+
+    chunk().emitOp(OpCode::OP_TRY_END, 0);
+    size_t skipCatch = chunk().emitJump(OpCode::OP_JUMP, 0);
+
+    chunk().patchJump(tryBeginOffset);
+
+    // catch 블록: 에러가 스택에 있음
+    beginScope();
+    declareLocal(stmt->errorName);
+    for (auto& s : stmt->catchBody->statements) {
+        compileStatement(s.get());
+    }
+    endScope(0);
+
+    chunk().patchJump(skipCatch);
+}
+
+void Compiler::compileImport(ImportStatement* stmt) {
+    // 파일명을 상수로 추가하고 VM에서 처리
+    emitConstant(make_shared<String>(stmt->filename), 0);
+    // VM에서 특별 처리 (현재 미구현 - 트리워킹 방식과 동일하게 처리해야 함)
+    chunk().emitOp(OpCode::OP_POP, 0);
+}
+
+void Compiler::compileCall(CallExpression* expr) {
+    compileExpression(expr->function.get());
+    for (auto& arg : expr->arguments) {
+        compileExpression(arg.get());
+    }
+    chunk().emitByte(static_cast<uint8_t>(OpCode::OP_CALL), 0);
+    chunk().emitByte(static_cast<uint8_t>(expr->arguments.size()), 0);
+}
+
+void Compiler::compileMemberAccess(MemberAccessExpression* expr) {
+    compileExpression(expr->object.get());
+    uint16_t nameIdx = identifierConstant(expr->member);
+    chunk().emitOpAndUint16(OpCode::OP_GET_MEMBER, nameIdx, 0);
+}
+
+void Compiler::compileMethodCall(MethodCallExpression* expr) {
+    compileExpression(expr->object.get());
+    for (auto& arg : expr->arguments) {
+        compileExpression(arg.get());
+    }
+    uint16_t nameIdx = identifierConstant(expr->method);
+    chunk().emitOpAndUint16(OpCode::OP_INVOKE, nameIdx, 0);
+    chunk().emitByte(static_cast<uint8_t>(expr->arguments.size()), 0);
+}
+
+void Compiler::compileIndex(IndexExpression* expr) {
+    compileExpression(expr->name.get());
+    compileExpression(expr->index.get());
+    chunk().emitOp(OpCode::OP_INDEX_GET, 0);
+}

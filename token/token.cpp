@@ -98,6 +98,20 @@ std::string TokenTypeToString(TokenType type) {
         return "사전";
     case TokenType::가져오기:
         return "가져오기";
+    case TokenType::없음:
+        return "없음";
+    case TokenType::비교:
+        return "비교";
+    case TokenType::경우:
+        return "경우";
+    case TokenType::기본:
+        return "기본";
+    case TokenType::클래스:
+        return "클래스";
+    case TokenType::생성:
+        return "생성";
+    case TokenType::자기:
+        return "자기";
     case TokenType::각각:
         return "각각";
     case TokenType::에서:
@@ -132,6 +146,10 @@ std::string TokenTypeToString(TokenType type) {
         return "LESS_EQUAL";
     case TokenType::GREATER_EQUAL:
         return "GREATER_EQUAL";
+    case TokenType::DOT:
+        return "DOT";
+    case TokenType::ELLIPSIS:
+        return "ELLIPSIS";
 
     default:
         break;

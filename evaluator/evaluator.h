@@ -65,9 +65,26 @@ private:
 
     TokenType compoundToArithmeticOp(TokenType compoundOp);
 
+    // 현재 실행 중인 줄 번호 (에러 메시지용)
+    long long current_line = 0;
+
+    // 노드에서 줄 번호를 추출
+    long long getLineFromNode(Node* node);
+
     std::set<std::string> importedFiles;
 
     std::shared_ptr<Object> evalImport(const std::string& filename, Environment* environment);
+
+    // 문자열 보간
+    std::string interpolateString(const std::string& str, Environment* environment);
+
+    // 클래스 관련
+    std::shared_ptr<Object> instantiateClass(ClassDef* classDef, std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
+
+    std::shared_ptr<Object> evalMemberAccess(std::shared_ptr<Object> obj, const std::string& member);
+
+    std::shared_ptr<Object> evalMethodCall(std::shared_ptr<Object> obj, const std::string& method,
+                                            std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
 };
 
 

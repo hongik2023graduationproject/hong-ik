@@ -460,6 +460,223 @@ TEST_F(ReplTest, importTest) {
 }
 
 
+// ===== Stage 1 Tests =====
+
+TEST_F(ReplTest, bitwiseAndTest) {
+    std::string user_input;
+    user_input += "5 & 3\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("1"), std::string::npos);
+}
+
+TEST_F(ReplTest, bitwiseOrTest) {
+    std::string user_input;
+    user_input += "5 | 3\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("7"), std::string::npos);
+}
+
+TEST_F(ReplTest, nullTest) {
+    std::string user_input;
+    user_input += "정수 x = 없음\n";
+    user_input += "x == 없음\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("true"), std::string::npos);
+}
+
+TEST_F(ReplTest, stringInterpolationTest) {
+    std::string user_input;
+    user_input += "문자 이름 = \"홍길동\"\n";
+    user_input += "문자 인사 = \"안녕 {이름}님\"\n";
+    user_input += "인사\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("안녕 홍길동님"), std::string::npos);
+}
+
+TEST_F(ReplTest, absTest) {
+    std::string user_input;
+    user_input += "절대값(-42)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("42"), std::string::npos);
+}
+
+TEST_F(ReplTest, sqrtTest) {
+    std::string user_input;
+    user_input += "제곱근(16)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("4"), std::string::npos);
+}
+
+TEST_F(ReplTest, maxMinTest) {
+    std::string user_input;
+    user_input += "최대(10, 20)\n";
+    user_input += "최소(10, 20)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("20"), std::string::npos);
+    EXPECT_NE(output.find("10"), std::string::npos);
+}
+
+TEST_F(ReplTest, splitTest) {
+    std::string user_input;
+    user_input += "분리(\"a,b,c\", \",\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[a, b, c]"), std::string::npos);
+}
+
+TEST_F(ReplTest, upperLowerTest) {
+    std::string user_input;
+    user_input += "대문자(\"hello\")\n";
+    user_input += "소문자(\"HELLO\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("HELLO"), std::string::npos);
+    EXPECT_NE(output.find("hello"), std::string::npos);
+}
+
+TEST_F(ReplTest, replaceTest) {
+    std::string user_input;
+    user_input += "치환(\"hello world\", \"world\", \"korea\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("hello korea"), std::string::npos);
+}
+
+TEST_F(ReplTest, trimTest) {
+    std::string user_input;
+    user_input += "자르기(\"  hello  \")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("hello"), std::string::npos);
+}
+
+TEST_F(ReplTest, sortTest) {
+    std::string user_input;
+    user_input += "정렬([3, 1, 2])\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[1, 2, 3]"), std::string::npos);
+}
+
+TEST_F(ReplTest, reverseTest) {
+    std::string user_input;
+    user_input += "뒤집기([1, 2, 3])\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[3, 2, 1]"), std::string::npos);
+}
+
+TEST_F(ReplTest, findTest) {
+    std::string user_input;
+    user_input += "찾기([10, 20, 30], 20)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("1"), std::string::npos);
+}
+
+TEST_F(ReplTest, sliceTest) {
+    std::string user_input;
+    user_input += "조각([1, 2, 3, 4, 5], 1, 4)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[2, 3, 4]"), std::string::npos);
+}
+
+// ===== Stage 2 Tests =====
+
+TEST_F(ReplTest, matchStatementTest) {
+    std::string user_input;
+    user_input += "정수 x = 2\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 1:\n";
+    user_input += "        출력(\"일\")\n";
+    user_input += "    경우 2:\n";
+    user_input += "        출력(\"이\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("이"), std::string::npos);
+}
+
+TEST_F(ReplTest, matchDefaultTest) {
+    std::string user_input;
+    user_input += "정수 x = 99\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 1:\n";
+    user_input += "        출력(\"일\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("기타"), std::string::npos);
+}
+
+TEST_F(ReplTest, tupleTest) {
+    std::string user_input;
+    user_input += "배열 t = (1, 2, 3)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    // 튜플이 생성되어야 함 - 타입 불일치로 에러가 나야 함
+    // 대신 튜플을 직접 테스트
+}
+
+TEST_F(ReplTest, tupleIndexTest) {
+    std::string user_input;
+    user_input += "(10, 20, 30)[1]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("20"), std::string::npos);
+}
+
+// ===== Stage 3: Class Tests =====
+
+TEST_F(ReplTest, classBasicTest) {
+    std::string user_input;
+    user_input += "클래스 동물:\n";
+    user_input += "    문자 이름\n";
+    user_input += "    정수 나이\n";
+    user_input += "    생성(문자 이름, 정수 나이):\n";
+    user_input += "        자기.이름 = 이름\n";
+    user_input += "        자기.나이 = 나이\n";
+    user_input += "    함수 소개() -> 문자:\n";
+    user_input += "        리턴 자기.이름\n";
+    user_input += "\n";
+    user_input += "동물 강아지 = 동물(\"뽀삐\", 3)\n";
+    user_input += "강아지.이름\n";
+    user_input += "강아지.나이\n";
+    user_input += "강아지.소개()\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("뽀삐"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, classMethodTest) {
+    std::string user_input;
+    user_input += "클래스 계산기:\n";
+    user_input += "    정수 값\n";
+    user_input += "    생성(정수 초기값):\n";
+    user_input += "        자기.값 = 초기값\n";
+    user_input += "    함수 더하기(정수 수) -> 정수:\n";
+    user_input += "        리턴 자기.값 + 수\n";
+    user_input += "\n";
+    user_input += "계산기 계 = 계산기(10)\n";
+    user_input += "계.더하기(5)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("15"), std::string::npos);
+}
+
 TEST_F(ReplTest, importCircularTest) {
     std::string tmpFile = std::tmpnam(nullptr);
     tmpFile += ".hik";

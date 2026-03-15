@@ -12,6 +12,10 @@ enum class ObjectType {
     ARRAY,
     HASH_MAP,
     BREAK_SIGNAL,
+    NULL_OBJ,
+    TUPLE,
+    CLASS_DEF,
+    INSTANCE,
 };
 
 #endif // OBJECT_TYPE_H
