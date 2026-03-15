@@ -51,6 +51,9 @@ enum class OpCode : uint8_t {
     // 함수 및 호출
     OP_CALL,            // [uint8 argCount]
     OP_RETURN,
+    OP_CLOSURE,         // [uint16 constIdx] [upvalue count * (uint8 isLocal, uint16 index)]
+    OP_GET_UPVALUE,     // [uint16 slot]
+    OP_SET_UPVALUE,     // [uint16 slot]
 
     // 내장 함수
     OP_GET_BUILTIN,     // [uint16 nameIdx]
@@ -116,6 +119,9 @@ inline std::string opcodeName(OpCode op) {
     case OpCode::OP_LOOP: return "OP_LOOP";
     case OpCode::OP_CALL: return "OP_CALL";
     case OpCode::OP_RETURN: return "OP_RETURN";
+    case OpCode::OP_CLOSURE: return "OP_CLOSURE";
+    case OpCode::OP_GET_UPVALUE: return "OP_GET_UPVALUE";
+    case OpCode::OP_SET_UPVALUE: return "OP_SET_UPVALUE";
     case OpCode::OP_GET_BUILTIN: return "OP_GET_BUILTIN";
     case OpCode::OP_BUILD_ARRAY: return "OP_BUILD_ARRAY";
     case OpCode::OP_BUILD_HASHMAP: return "OP_BUILD_HASHMAP";

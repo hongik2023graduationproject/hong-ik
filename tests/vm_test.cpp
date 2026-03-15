@@ -336,6 +336,21 @@ TEST_F(VMTest, ClassMethodCall) {
     EXPECT_NE(output.find("뽀삐"), string::npos);
 }
 
+// ===== 클로저 =====
+
+TEST_F(VMTest, ClosureCapture) {
+    auto result = runVM(
+        "정수 x = 10\n"
+        "함수 읽기() -> 정수:\n"
+        "    리턴 x\n"
+        "\n"
+        "읽기()\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 10);
+}
+
 TEST_F(VMTest, ClassMethod) {
     auto result = runVM(
         "클래스 계산기:\n"

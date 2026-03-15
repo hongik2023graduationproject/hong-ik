@@ -16,7 +16,8 @@ struct CallFrame {
     CompiledFunction* function;
     size_t ip;                      // 명령 포인터
     size_t slotOffset;              // 스택 내 로컬 시작 위치
-    bool hasCallee = true;          // OP_CALL은 true, OP_INVOKE는 false (callee가 instance로 대체됨)
+    bool hasCallee = true;          // OP_CALL은 true, OP_INVOKE는 false
+    Closure* closure = nullptr;     // 클로저인 경우 업밸류 접근용
 };
 
 // 예외 핸들러
@@ -40,6 +41,10 @@ public:
     VM();
 
     std::shared_ptr<Object> Execute(std::shared_ptr<CompiledFunction> topLevel);
+
+    // REPL 세션용: 전역 상태 접근
+    std::map<std::string, std::shared_ptr<Object>>& getGlobals() { return globals; }
+    void setGlobals(const std::map<std::string, std::shared_ptr<Object>>& g) { globals = g; }
 
 private:
     static constexpr size_t STACK_MAX = 65536;

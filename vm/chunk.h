@@ -69,6 +69,24 @@ struct CompiledFunction : public Object {
     }
 };
 
+// 업밸류: 클로저가 캡처한 변수
+struct Upvalue {
+    std::shared_ptr<Object> value;    // 캡처된 값
+};
+
+// 클로저: 함수 + 캡처된 업밸류
+struct Closure : public Object {
+    std::shared_ptr<CompiledFunction> function;
+    std::vector<std::shared_ptr<Upvalue>> upvalues;
+
+    Closure(std::shared_ptr<CompiledFunction> fn) : function(std::move(fn)) {
+        type = ObjectType::FUNCTION;
+    }
+    std::string ToString() override {
+        return function->name.empty() ? "<클로저>" : "함수: " + function->name;
+    }
+};
+
 // VM용 클래스 정의 - 컴파일된 생성자/메서드 포함
 struct CompiledClassDef : public ClassDef {
     std::shared_ptr<CompiledFunction> compiledConstructor;

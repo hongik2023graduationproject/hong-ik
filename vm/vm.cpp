@@ -292,6 +292,17 @@ shared_ptr<Object> VM::run() {
                     pop(); // callee
                     auto result = dynamic_cast<Builtin*>(callee.get())->function(args);
                     push(result ? result : make_shared<Null>());
+                } else if (auto* cls = dynamic_cast<Closure*>(callee.get())) {
+                    auto* fn = cls->function.get();
+                    if (fn->arity != argCount) {
+                        throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
+                    }
+                    CallFrame newFrame;
+                    newFrame.function = fn;
+                    newFrame.ip = 0;
+                    newFrame.slotOffset = stack.size() - argCount;
+                    newFrame.closure = cls;
+                    frames.push_back(newFrame);
                 } else if (auto* fn = dynamic_cast<CompiledFunction*>(callee.get())) {
                     if (fn->arity != argCount) {
                         throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
@@ -299,9 +310,6 @@ shared_ptr<Object> VM::run() {
                     CallFrame newFrame;
                     newFrame.function = fn;
                     newFrame.ip = 0;
-                    // callee가 스택에 있으므로 slot 0 = callee 위치 다음부터 인자
-                    // 여기서는 callee를 스택에 남기고 인자가 그 위에 있음
-                    // slotOffset을 인자 시작으로 설정
                     newFrame.slotOffset = stack.size() - argCount;
                     frames.push_back(newFrame);
                 } else if (auto* classDef = dynamic_cast<CompiledClassDef*>(callee.get())) {
@@ -529,6 +537,49 @@ shared_ptr<Object> VM::run() {
                     push(make_shared<String>(string(1, str->value[iter->index])));
                 }
                 iter->index++;
+                break;
+            }
+
+            case OpCode::OP_CLOSURE: {
+                uint16_t constIdx = readUint16();
+                auto fn = dynamic_pointer_cast<CompiledFunction>(frame.function->constants[constIdx]);
+                auto closure = make_shared<Closure>(fn);
+
+                uint8_t upvalueCount = readByte();
+                closure->upvalues.resize(upvalueCount);
+
+                for (uint8_t i = 0; i < upvalueCount; i++) {
+                    uint8_t isLocal = readByte();
+                    uint16_t index = readUint16();
+                    if (isLocal) {
+                        // enclosing 함수의 로컬 변수를 캡처
+                        auto uv = make_shared<Upvalue>();
+                        uv->value = stack[frame.slotOffset + index];
+                        closure->upvalues[i] = uv;
+                    } else {
+                        // enclosing 함수의 업밸류를 체이닝
+                        if (frame.closure) {
+                            closure->upvalues[i] = frame.closure->upvalues[index];
+                        }
+                    }
+                }
+                push(closure);
+                break;
+            }
+            case OpCode::OP_GET_UPVALUE: {
+                uint16_t slot = readUint16();
+                if (frame.closure && slot < frame.closure->upvalues.size()) {
+                    push(frame.closure->upvalues[slot]->value);
+                } else {
+                    push(make_shared<Null>());
+                }
+                break;
+            }
+            case OpCode::OP_SET_UPVALUE: {
+                uint16_t slot = readUint16();
+                if (frame.closure && slot < frame.closure->upvalues.size()) {
+                    frame.closure->upvalues[slot]->value = peek(0);
+                }
                 break;
             }
 

@@ -25,6 +25,8 @@ void Repl::Run() {
 
     vector<shared_ptr<Token>> tokens;
     int indent = 0;
+    // VM REPL 세션 전역 상태 유지
+    map<string, shared_ptr<Object>> vmGlobals;
 
     while (true) {
         try {
@@ -65,7 +67,9 @@ void Repl::Run() {
                 Compiler compiler;
                 auto bytecode = compiler.Compile(program);
                 VM vm;
+                vm.setGlobals(vmGlobals);
                 auto object = vm.Execute(bytecode);
+                vmGlobals = vm.getGlobals();
                 if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
                     cout << object->ToString() << endl;
                 }
@@ -128,38 +132,31 @@ void Repl::FileMode(const string& filename) {
         return;
     }
 
-    // 트리워킹 모드
+    // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행
     string code;
     while (getline(file, code)) {
-        try {
-            vector<string> utf8_strings        = Utf8Converter::Convert(code);
-            vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
-            tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
-
-            if (tokens.back()->type == TokenType::START_BLOCK) {
-                indent += 1;
-            }
-            if (tokens.back()->type == TokenType::END_BLOCK) {
-                indent -= 1;
-            }
-
-            if (indent != 0) {
-                continue;
-            }
-
-            auto program = parser->Parsing(tokens);
-            auto object  = evaluator->Evaluate(program);
-
-            if (object != nullptr) {
-                cout << object->ToString() << endl;
-            }
-
-            tokens.clear();
-        } catch (const exception& e) {
-            cout << "Error: " << e.what() << endl;
-            tokens.clear();
-            indent = 0;
+        code += "\n";
+        auto utf8 = Utf8Converter::Convert(code);
+        auto newTokens = lexer->Tokenize(utf8);
+        tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
+        for (auto& t : newTokens) {
+            if (t->type == TokenType::START_BLOCK) indent++;
+            if (t->type == TokenType::END_BLOCK) indent--;
         }
+    }
+    for (int i = 0; i < indent; i++) {
+        tokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
+    }
+    if (tokens.empty()) return;
+
+    try {
+        auto program = parser->Parsing(tokens);
+        auto object = evaluator->Evaluate(program);
+        if (object != nullptr) {
+            cout << object->ToString() << endl;
+        }
+    } catch (const exception& e) {
+        cout << "Error: " << e.what() << endl;
     }
 }
 

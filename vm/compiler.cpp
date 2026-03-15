@@ -30,16 +30,46 @@ void Compiler::endScope(long long line) {
 }
 
 uint16_t Compiler::declareLocal(const string& name) {
-    current->locals.push_back({name, current->scopeDepth});
+    current->locals.push_back({name, current->scopeDepth, false});
     return static_cast<uint16_t>(current->locals.size() - 1);
 }
 
-int Compiler::resolveLocal(const string& name) {
-    for (int i = static_cast<int>(current->locals.size()) - 1; i >= 0; i--) {
-        if (current->locals[i].name == name) {
+int Compiler::resolveLocal(CompilerState* state, const string& name) {
+    for (int i = static_cast<int>(state->locals.size()) - 1; i >= 0; i--) {
+        if (state->locals[i].name == name) {
             return i;
         }
     }
+    return -1;
+}
+
+uint16_t Compiler::addUpvalue(CompilerState* state, uint16_t index, bool isLocal) {
+    // 이미 동일한 업밸류가 있는지 확인
+    for (uint16_t i = 0; i < state->upvalues.size(); i++) {
+        if (state->upvalues[i].index == index && state->upvalues[i].isLocal == isLocal) {
+            return i;
+        }
+    }
+    state->upvalues.push_back({index, isLocal});
+    return static_cast<uint16_t>(state->upvalues.size() - 1);
+}
+
+int Compiler::resolveUpvalue(CompilerState* state, const string& name) {
+    if (state->enclosing == nullptr) return -1;
+
+    // enclosing의 로컬에서 찾기
+    int local = resolveLocal(state->enclosing, name);
+    if (local != -1) {
+        state->enclosing->locals[local].isCaptured = true;
+        return addUpvalue(state, static_cast<uint16_t>(local), true);
+    }
+
+    // enclosing의 업밸류에서 찾기 (재귀)
+    int upvalue = resolveUpvalue(state->enclosing, name);
+    if (upvalue != -1) {
+        return addUpvalue(state, static_cast<uint16_t>(upvalue), false);
+    }
+
     return -1;
 }
 
@@ -263,14 +293,18 @@ void Compiler::compileIdentifier(IdentifierExpression* expr) {
 }
 
 void Compiler::compileIdentifier(const string& name, long long line) {
-    int slot = resolveLocal(name);
+    int slot = resolveLocal(current, name);
     if (slot != -1) {
         chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, static_cast<uint16_t>(slot), line);
-    } else {
-        // 전역 변수 또는 내장 함수
-        uint16_t nameIdx = identifierConstant(name);
-        chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
+        return;
     }
+    int upvalue = resolveUpvalue(current, name);
+    if (upvalue != -1) {
+        chunk().emitOpAndUint16(OpCode::OP_GET_UPVALUE, static_cast<uint16_t>(upvalue), line);
+        return;
+    }
+    uint16_t nameIdx = identifierConstant(name);
+    chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
 }
 
 void Compiler::compileInfix(InfixExpression* expr) {
@@ -337,12 +371,17 @@ void Compiler::compileAssignment(AssignmentStatement* stmt) {
         return;
     }
 
-    int slot = resolveLocal(stmt->name);
+    int slot = resolveLocal(current, stmt->name);
     if (slot != -1) {
         chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, static_cast<uint16_t>(slot), 0);
     } else {
-        uint16_t nameIdx = identifierConstant(stmt->name);
-        chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, 0);
+        int uv = resolveUpvalue(current, stmt->name);
+        if (uv != -1) {
+            chunk().emitOpAndUint16(OpCode::OP_SET_UPVALUE, static_cast<uint16_t>(uv), 0);
+        } else {
+            uint16_t nameIdx = identifierConstant(stmt->name);
+            chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, 0);
+        }
     }
 }
 
@@ -350,13 +389,7 @@ void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
     long long line = stmt->op ? stmt->op->line : 0;
 
     // 현재 값 로드
-    int slot = resolveLocal(stmt->name);
-    if (slot != -1) {
-        chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, static_cast<uint16_t>(slot), line);
-    } else {
-        uint16_t nameIdx = identifierConstant(stmt->name);
-        chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
-    }
+    compileIdentifier(stmt->name, line);
 
     // 우항 컴파일
     compileExpression(stmt->value.get());
@@ -372,11 +405,17 @@ void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
     }
 
     // 결과 저장
+    int slot = resolveLocal(current, stmt->name);
     if (slot != -1) {
         chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, static_cast<uint16_t>(slot), line);
     } else {
-        uint16_t nameIdx = identifierConstant(stmt->name);
-        chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, line);
+        int uv = resolveUpvalue(current, stmt->name);
+        if (uv != -1) {
+            chunk().emitOpAndUint16(OpCode::OP_SET_UPVALUE, static_cast<uint16_t>(uv), line);
+        } else {
+            uint16_t nameIdx = identifierConstant(stmt->name);
+            chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, line);
+        }
     }
 }
 
@@ -474,36 +513,45 @@ void Compiler::compileReturn(ReturnStatement* stmt) {
 }
 
 void Compiler::compileFunction(FunctionStatement* stmt) {
-    // 새 컴파일러 상태 생성
     CompilerState funcState;
     funcState.function = make_shared<CompiledFunction>();
     funcState.function->name = stmt->name;
     funcState.function->arity = static_cast<int>(stmt->parameters.size());
-    funcState.scopeDepth = 1; // 함수 내부는 scope 1
+    funcState.scopeDepth = 1;
+    funcState.enclosing = current;
 
     CompilerState* enclosing = current;
     current = &funcState;
 
-    // 파라미터를 로컬로 선언
     for (auto& param : stmt->parameters) {
         declareLocal(param->name);
     }
 
-    // 본문 컴파일
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
 
-    // 암묵적 null 반환
     chunk().emitOp(OpCode::OP_NULL, 0);
     chunk().emitOp(OpCode::OP_RETURN, 0);
 
     current->function->localCount = static_cast<int>(current->locals.size());
+    auto upvalues = current->upvalues;
     current = enclosing;
 
-    // 함수를 상수로 추가하고 전역에 정의
+    // 업밸류가 있으면 OP_CLOSURE, 없으면 OP_CONSTANT
     uint16_t constIdx = chunk().addConstant(funcState.function);
-    chunk().emitOpAndUint16(OpCode::OP_CONSTANT, constIdx, 0);
+    if (!upvalues.empty()) {
+        chunk().emitOpAndUint16(OpCode::OP_CLOSURE, constIdx, 0);
+        // 업밸류 디스크립터
+        chunk().emitByte(static_cast<uint8_t>(upvalues.size()), 0);
+        for (auto& uv : upvalues) {
+            chunk().emitByte(uv.isLocal ? 1 : 0, 0);
+            chunk().emitByte(static_cast<uint8_t>((uv.index >> 8) & 0xff), 0);
+            chunk().emitByte(static_cast<uint8_t>(uv.index & 0xff), 0);
+        }
+    } else {
+        chunk().emitOpAndUint16(OpCode::OP_CONSTANT, constIdx, 0);
+    }
 
     uint16_t nameIdx = identifierConstant(stmt->name);
     chunk().emitOpAndUint16(OpCode::OP_DEFINE_GLOBAL, nameIdx, 0);

@@ -14,6 +14,12 @@
 struct Local {
     std::string name;
     int depth;
+    bool isCaptured = false; // 클로저에 캡처되었는지
+};
+
+struct UpvalueInfo {
+    uint16_t index;  // enclosing 함수의 로컬 슬롯 또는 업밸류 슬롯
+    bool isLocal;    // true: enclosing의 로컬, false: enclosing의 업밸류
 };
 
 struct LoopContext {
@@ -24,7 +30,9 @@ struct LoopContext {
 
 struct CompilerState {
     std::shared_ptr<CompiledFunction> function;
+    CompilerState* enclosing = nullptr;
     std::vector<Local> locals;
+    std::vector<UpvalueInfo> upvalues;
     int scopeDepth = 0;
     std::vector<LoopContext> loops;
 };
@@ -69,7 +77,9 @@ private:
     void beginScope();
     void endScope(long long line);
     uint16_t declareLocal(const std::string& name);
-    int resolveLocal(const std::string& name);
+    int resolveLocal(CompilerState* state, const std::string& name);
+    int resolveUpvalue(CompilerState* state, const std::string& name);
+    uint16_t addUpvalue(CompilerState* state, uint16_t index, bool isLocal);
     uint16_t identifierConstant(const std::string& name);
 
     // Helpers

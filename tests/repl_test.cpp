@@ -14,7 +14,7 @@ using namespace std;
 
 class ReplTest : public ::testing::Test {
 protected:
-    string runRepl(const string& user_input) {
+    string runRepl(const string& user_input, bool useVM = false) {
         std::istringstream fakeStdin(user_input);
         std::ostringstream fakeStdout;
 
@@ -24,7 +24,7 @@ protected:
         std::cin.rdbuf(fakeStdin.rdbuf());
         std::cout.rdbuf(fakeStdout.rdbuf());
 
-        Repl repl;
+        Repl repl(useVM);
         repl.Run();
 
         std::cin.rdbuf(cinbuf);
@@ -696,4 +696,29 @@ TEST_F(ReplTest, importCircularTest) {
     EXPECT_NE(output.find("99"), std::string::npos);
 
     std::remove(tmpFile.c_str());
+}
+
+
+// ===== VM REPL 세션 상태 유지 테스트 =====
+
+TEST_F(ReplTest, vmReplStateTest) {
+    std::string user_input;
+    user_input += "정수 x = 42\n";
+    user_input += "x + 8\n";
+    user_input += "종료하기\n";
+
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("50"), std::string::npos);
+}
+
+TEST_F(ReplTest, vmReplFunctionTest) {
+    std::string user_input;
+    user_input += "함수 두배(정수 n) -> 정수:\n";
+    user_input += "    리턴 n * 2\n";
+    user_input += "\n";
+    user_input += "두배(21)\n";
+    user_input += "종료하기\n";
+
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("42"), std::string::npos);
 }
