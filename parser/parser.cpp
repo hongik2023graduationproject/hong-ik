@@ -18,9 +18,14 @@ shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& t
         if (current_token->type == TokenType::END_OF_FILE) {
             break;
         }
-        auto statement = parseStatement();
-        if (statement != nullptr) {
-            program->statements.push_back(statement);
+        try {
+            auto statement = parseStatement();
+            if (statement != nullptr) {
+                program->statements.push_back(statement);
+            }
+        } catch (const std::exception& e) {
+            errors.push_back(e.what());
+            skipToNextLine();
         }
     }
 
@@ -31,7 +36,20 @@ shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& t
 void Parser::initialization() {
     program               = make_shared<Program>();
     current_read_position = 0;
+    errors.clear();
     setToken();
+}
+
+void Parser::skipToNextLine() {
+    while (current_read_position < static_cast<long long>(tokens.size())
+           && current_token != nullptr
+           && current_token->type != TokenType::NEW_LINE
+           && current_token->type != TokenType::END_OF_FILE) {
+        setNextToken();
+    }
+    if (current_token != nullptr && current_token->type == TokenType::NEW_LINE) {
+        setNextToken();
+    }
 }
 
 
@@ -132,6 +150,11 @@ shared_ptr<Statement> Parser::parseStatement() {
         return parseIfStatement();
     }
     if (current_token->type == TokenType::반복) {
+        // 반복 정수 i = 0 부터 10 까지: (for-range) vs 반복 조건 동안: (while)
+        // Detect: 반복 TYPE IDENT = ...
+        if (next_token != nullptr && isTypeKeyword(next_token->type)) {
+            return parseForRangeStatement();
+        }
         return parseWhileStatement();
     }
     if (current_token->type == TokenType::각각) {
@@ -357,6 +380,15 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
             ident->name = current_token->text;
             statement->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
+
+            // 기본값 (선택): = 표현식
+            if (current_token != nullptr && current_token->type == TokenType::ASSIGN) {
+                skipToken(TokenType::ASSIGN);
+                statement->defaultValues.push_back(parseExpression(Precedence::LOWEST));
+                setNextToken();
+            } else {
+                statement->defaultValues.push_back(nullptr);
+            }
         } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
     }
     skipToken(TokenType::RPAREN);
@@ -431,6 +463,15 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
     skipToken(TokenType::IDENTIFIER);
+
+    // 상속: 클래스 자식 < 부모:
+    if (current_token != nullptr && current_token->type == TokenType::LESS_THAN) {
+        skipToken(TokenType::LESS_THAN);
+        checkToken(TokenType::IDENTIFIER);
+        statement->parentName = current_token->text;
+        skipToken(TokenType::IDENTIFIER);
+    }
+
     skipToken(TokenType::COLON);
     skipToken(TokenType::NEW_LINE);
 
@@ -570,6 +611,12 @@ shared_ptr<Expression> Parser::parseSelfExpression() {
     return identifier_expression;
 }
 
+shared_ptr<Expression> Parser::parseParentExpression() {
+    auto identifier_expression  = make_shared<IdentifierExpression>();
+    identifier_expression->name = "부모";
+    return identifier_expression;
+}
+
 // object.member 또는 object.method(args)
 shared_ptr<Expression> Parser::parseMemberAccessExpression(shared_ptr<Expression> left) {
     skipToken(TokenType::DOT);
@@ -704,6 +751,37 @@ shared_ptr<Expression> Parser::parseNullLiteral() {
     auto nullLiteral = make_shared<NullLiteral>();
     nullLiteral->token = current_token;
     return nullLiteral;
+}
+
+// 반복 정수 i = 0 부터 10 까지:
+shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
+    auto statement = make_shared<ForRangeStatement>();
+    skipToken(TokenType::반복);
+
+    statement->varType = current_token;
+    setNextToken();
+
+    checkToken(TokenType::IDENTIFIER);
+    statement->varName = current_token->text;
+    skipToken(TokenType::IDENTIFIER);
+
+    skipToken(TokenType::ASSIGN);
+
+    statement->startExpr = parseExpression(Precedence::LOWEST);
+    setNextToken();
+
+    skipToken(TokenType::부터);
+
+    statement->endExpr = parseExpression(Precedence::LOWEST);
+    setNextToken();
+
+    skipToken(TokenType::까지);
+    skipToken(TokenType::COLON);
+    skipToken(TokenType::NEW_LINE);
+
+    statement->body = parseBlockStatement();
+
+    return statement;
 }
 
 // 가져오기 "파일명.hik"

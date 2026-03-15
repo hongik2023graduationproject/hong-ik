@@ -711,6 +711,157 @@ TEST_F(ReplTest, vmReplStateTest) {
     EXPECT_NE(output.find("50"), std::string::npos);
 }
 
+// ===== Feature Tests: Inheritance =====
+
+TEST_F(ReplTest, inheritanceBasicTest) {
+    std::string user_input;
+    user_input += "클래스 동물:\n";
+    user_input += "    문자 이름\n";
+    user_input += "    생성(문자 이름):\n";
+    user_input += "        자기.이름 = 이름\n";
+    user_input += "    함수 소리() -> 문자:\n";
+    user_input += "        리턴 \"...\"\n";
+    user_input += "\n";
+    user_input += "클래스 강아지 < 동물:\n";
+    user_input += "    함수 소리() -> 문자:\n";
+    user_input += "        리턴 \"멍멍\"\n";
+    user_input += "\n";
+    user_input += "강아지 뽀삐 = 강아지(\"뽀삐\")\n";
+    user_input += "뽀삐.이름\n";
+    user_input += "뽀삐.소리()\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("뽀삐"), std::string::npos);
+    EXPECT_NE(output.find("멍멍"), std::string::npos);
+}
+
+TEST_F(ReplTest, inheritanceParentMethodTest) {
+    std::string user_input;
+    user_input += "클래스 도형:\n";
+    user_input += "    문자 종류\n";
+    user_input += "    생성(문자 종류):\n";
+    user_input += "        자기.종류 = 종류\n";
+    user_input += "    함수 설명() -> 문자:\n";
+    user_input += "        리턴 자기.종류\n";
+    user_input += "\n";
+    user_input += "클래스 원 < 도형:\n";
+    user_input += "    정수 반지름\n";
+    user_input += "    생성(문자 종류, 정수 반지름):\n";
+    user_input += "        자기.종류 = 종류\n";
+    user_input += "        자기.반지름 = 반지름\n";
+    user_input += "\n";
+    user_input += "원 동그라미 = 원(\"원형\", 5)\n";
+    user_input += "동그라미.설명()\n";
+    user_input += "동그라미.반지름\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("원형"), std::string::npos);
+    EXPECT_NE(output.find("5"), std::string::npos);
+}
+
+// ===== Feature Tests: Higher-order functions =====
+
+TEST_F(ReplTest, mapTest) {
+    std::string user_input;
+    user_input += "함수 두배(정수 x) -> 정수:\n";
+    user_input += "    리턴 x * 2\n";
+    user_input += "\n";
+    user_input += "배열 결과 = 매핑([1, 2, 3], 두배)\n";
+    user_input += "출력(결과)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[2, 4, 6]"), std::string::npos);
+}
+
+TEST_F(ReplTest, filterTest) {
+    std::string user_input;
+    user_input += "함수 양수(정수 x) -> 논리:\n";
+    user_input += "    리턴 x > 0\n";
+    user_input += "\n";
+    user_input += "배열 결과 = 걸러내기([-1, 2, -3, 4], 양수)\n";
+    user_input += "출력(결과)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[2, 4]"), std::string::npos);
+}
+
+TEST_F(ReplTest, reduceTest) {
+    std::string user_input;
+    user_input += "함수 합(정수 누적, 정수 현재) -> 정수:\n";
+    user_input += "    리턴 누적 + 현재\n";
+    user_input += "\n";
+    user_input += "정수 결과 = 줄이기([1, 2, 3, 4, 5], 합, 0)\n";
+    user_input += "결과\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("15"), std::string::npos);
+}
+
+// ===== Feature Tests: Default parameters =====
+
+TEST_F(ReplTest, defaultParamTest) {
+    std::string user_input;
+    user_input += "함수 인사(문자 이름, 문자 접미사 = \"님\") -> 문자:\n";
+    user_input += "    리턴 이름 + 접미사\n";
+    user_input += "\n";
+    user_input += "인사(\"홍길동\")\n";
+    user_input += "인사(\"홍길동\", \"씨\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("홍길동님"), std::string::npos);
+    EXPECT_NE(output.find("홍길동씨"), std::string::npos);
+}
+
+// ===== Feature Tests: For range loop =====
+
+TEST_F(ReplTest, forRangeTest) {
+    std::string user_input;
+    user_input += "정수 합계 = 0\n";
+    user_input += "반복 정수 i = 0 부터 5 까지:\n";
+    user_input += "    합계 += i\n";
+    user_input += "\n";
+    user_input += "합계\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("10"), std::string::npos);
+}
+
+TEST_F(ReplTest, forRangeBreakTest) {
+    std::string user_input;
+    user_input += "정수 합계 = 0\n";
+    user_input += "반복 정수 i = 0 부터 100 까지:\n";
+    user_input += "    합계 += i\n";
+    user_input += "    만약 i == 4 라면:\n";
+    user_input += "        중단\n";
+    user_input += "\n";
+    user_input += "합계\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("10"), std::string::npos);
+}
+
+// ===== Feature Tests: Negative indexing =====
+
+TEST_F(ReplTest, negativeArrayIndexTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30]\n";
+    user_input += "목록[-1]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("30"), std::string::npos);
+}
+
+TEST_F(ReplTest, negativeStringIndexTest) {
+    std::string user_input;
+    user_input += "문자 s = \"hello\"\n";
+    user_input += "s[-1]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("o"), std::string::npos);
+}
+
+// ===== VM REPL Tests =====
+
 TEST_F(ReplTest, vmReplFunctionTest) {
     std::string user_input;
     user_input += "함수 두배(정수 n) -> 정수:\n";

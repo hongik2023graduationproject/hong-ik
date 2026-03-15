@@ -1,0 +1,35 @@
+{
+    "name": "hongik-language",
+    "displayName": "Hong-Ik Language",
+    "description": "Syntax highlighting for the Hong-Ik Korean programming language (.hik files)",
+    "version": "0.1.0",
+    "publisher": "hong-ik",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "hongik",
+                "aliases": [
+                    "Hong-Ik",
+                    "hongik"
+                ],
+                "extensions": [
+                    ".hik"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "hongik",
+                "scopeName": "source.hongik",
+                "path": "./syntaxes/hongik.tmLanguage.json"
+            }
+        ]
+    }
+}

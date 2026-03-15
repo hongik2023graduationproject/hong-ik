@@ -10,6 +10,7 @@
 class Parser {
 public:
     std::shared_ptr<Program> Parsing(const std::vector<std::shared_ptr<Token>>& tokens);
+    const std::vector<std::string>& getErrors() const { return errors; }
 
 private:
     std::vector<std::shared_ptr<Token>> tokens;
@@ -62,6 +63,11 @@ private:
 
     std::shared_ptr<ClassStatement> parseClassStatement();
 
+    std::shared_ptr<ForRangeStatement> parseForRangeStatement();
+
+    std::vector<std::string> errors;
+    void skipToNextLine();
+
 
     using PrefixParseFunction                                     = std::shared_ptr<Expression> (Parser::*) ();
     using InfixParseFunction                                      = std::shared_ptr<Expression> (Parser::*) (std::shared_ptr<Expression>);
@@ -71,6 +77,7 @@ private:
         {TokenType::BANG, &Parser::parsePrefixExpression},
         {TokenType::IDENTIFIER, &Parser::parseIdentifierExpression},
         {TokenType::자기, &Parser::parseSelfExpression},
+        {TokenType::부모, &Parser::parseParentExpression},
         {TokenType::INTEGER, &Parser::parseIntegerLiteral},
         {TokenType::FLOAT, &Parser::parseFloatLiteral},
         {TokenType::TRUE, &Parser::parseBooleanLiteral},
@@ -151,6 +158,8 @@ private:
     std::shared_ptr<Expression> parseIdentifierExpression();
 
     std::shared_ptr<Expression> parseSelfExpression();
+
+    std::shared_ptr<Expression> parseParentExpression();
 
 
     std::shared_ptr<Expression> parseIntegerLiteral();

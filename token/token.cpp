@@ -112,6 +112,12 @@ std::string TokenTypeToString(TokenType type) {
         return "생성";
     case TokenType::자기:
         return "자기";
+    case TokenType::부모:
+        return "부모";
+    case TokenType::부터:
+        return "부터";
+    case TokenType::까지:
+        return "까지";
     case TokenType::각각:
         return "각각";
     case TokenType::에서:

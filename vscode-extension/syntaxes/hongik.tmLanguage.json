@@ -1,0 +1,126 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Hong-Ik",
+    "scopeName": "source.hongik",
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#keywords" },
+        { "include": "#types" },
+        { "include": "#builtins" },
+        { "include": "#constants" },
+        { "include": "#operators" },
+        { "include": "#punctuation" }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.hongik",
+                    "match": "//.*$"
+                },
+                {
+                    "name": "comment.block.hongik",
+                    "begin": "/\\*",
+                    "end": "\\*/"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.hongik",
+                    "begin": "\"",
+                    "end": "\"",
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.hongik",
+                            "match": "\\\\."
+                        },
+                        {
+                            "name": "variable.other.interpolation.hongik",
+                            "match": "\\{[^}]+\\}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.float.hongik",
+                    "match": "\\b[0-9]+\\.[0-9]+\\b"
+                },
+                {
+                    "name": "constant.numeric.integer.hongik",
+                    "match": "\\b[0-9]+\\b"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.hongik",
+                    "match": "\\b(만약|라면|아니면|반복|동안|중단|각각|에서|시도|실패|리턴|가져오기|비교|경우|기본|부터|까지)\\b"
+                },
+                {
+                    "name": "keyword.declaration.hongik",
+                    "match": "\\b(함수|클래스|생성)\\b"
+                },
+                {
+                    "name": "variable.language.hongik",
+                    "match": "\\b(자기|부모)\\b"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.hongik",
+                    "match": "\\b(정수|실수|문자|논리|배열|사전)\\b"
+                }
+            ]
+        },
+        "builtins": {
+            "patterns": [
+                {
+                    "name": "support.function.hongik",
+                    "match": "\\b(출력|길이|추가|타입|정수변환|실수변환|문자변환|입력|키목록|포함|설정|삭제|파일읽기|파일쓰기|절대값|제곱근|최대|최소|난수|분리|대문자|소문자|치환|자르기|정렬|뒤집기|찾기|조각|매핑|걸러내기|줄이기)\\b"
+                }
+            ]
+        },
+        "constants": {
+            "patterns": [
+                {
+                    "name": "constant.language.boolean.hongik",
+                    "match": "\\b(true|false)\\b"
+                },
+                {
+                    "name": "constant.language.null.hongik",
+                    "match": "\\b없음\\b"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.hongik",
+                    "match": "(->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|[+\\-*/%=<>!&|])"
+                }
+            ]
+        },
+        "punctuation": {
+            "patterns": [
+                {
+                    "name": "punctuation.separator.hongik",
+                    "match": "[,;:.]"
+                },
+                {
+                    "name": "punctuation.bracket.hongik",
+                    "match": "[\\[\\](){}]"
+                }
+            ]
+        }
+    }
+}

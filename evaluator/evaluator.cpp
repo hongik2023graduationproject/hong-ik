@@ -275,6 +275,24 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         }
         return result;
     }
+    if (auto* for_range = dynamic_cast<ForRangeStatement*>(node)) {
+        auto startVal = eval(for_range->startExpr.get(), environment);
+        auto endVal = eval(for_range->endExpr.get(), environment);
+        auto* startInt = dynamic_cast<Integer*>(startVal.get());
+        auto* endInt = dynamic_cast<Integer*>(endVal.get());
+        if (!startInt || !endInt) {
+            throw RuntimeException("반복 범위의 시작과 끝은 정수이어야 합니다.", current_line);
+        }
+        shared_ptr<Object> result = nullptr;
+        for (long long i = startInt->value; i < endInt->value; i++) {
+            auto loopEnv = make_shared<Environment>(environment->shared_from_this());
+            loopEnv->Set(for_range->varName, make_shared<Integer>(i));
+            result = eval(for_range->body.get(), loopEnv.get());
+            if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
+            if (dynamic_cast<ReturnValue*>(result.get())) return result;
+        }
+        return result;
+    }
     if (auto* trycatch = dynamic_cast<TryCatchStatement*>(node)) {
         try {
             return eval(trycatch->tryBody.get(), environment);
@@ -298,6 +316,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         function->body = function_statement->body;
         function->parameterTypes = function_statement->parameterTypes;
         function->parameters     = function_statement->parameters;
+        function->defaultValues  = function_statement->defaultValues;
         function->env            = environment->shared_from_this();
         function->returnType     = function_statement->returnType;
         environment->Set(function_statement->name, function);
@@ -323,22 +342,79 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     if (auto* class_statement = dynamic_cast<ClassStatement*>(node)) {
         auto classDef = make_shared<ClassDef>();
         classDef->name = class_statement->name;
-        classDef->fieldTypes = class_statement->fieldTypes;
-        classDef->fieldNames = class_statement->fieldNames;
-        classDef->constructorParamTypes = class_statement->constructorParamTypes;
-        classDef->constructorParams = class_statement->constructorParams;
-        classDef->constructorBody = class_statement->constructorBody;
         classDef->env = environment->shared_from_this();
 
+        // 상속 처리
+        if (!class_statement->parentName.empty()) {
+            auto parentObj = environment->Get(class_statement->parentName);
+            if (!parentObj) {
+                throw RuntimeException("부모 클래스 '" + class_statement->parentName + "'을(를) 찾을 수 없습니다.", current_line);
+            }
+            auto parentDef = dynamic_pointer_cast<ClassDef>(parentObj);
+            if (!parentDef) {
+                throw RuntimeException("'" + class_statement->parentName + "'은(는) 클래스가 아닙니다.", current_line);
+            }
+            classDef->parent = parentDef;
+
+            // 부모 필드 복사
+            classDef->fieldTypes = parentDef->fieldTypes;
+            classDef->fieldNames = parentDef->fieldNames;
+            // 부모 메서드 복사
+            classDef->methods = parentDef->methods;
+            classDef->methodNames = parentDef->methodNames;
+            // 부모 생성자 기본값
+            if (!parentDef->constructorParams.empty() && class_statement->constructorParams.empty()) {
+                classDef->constructorParamTypes = parentDef->constructorParamTypes;
+                classDef->constructorParams = parentDef->constructorParams;
+                classDef->constructorBody = parentDef->constructorBody;
+            }
+        }
+
+        // 자식 필드 추가 (중복 없이)
+        for (size_t i = 0; i < class_statement->fieldNames.size(); i++) {
+            bool found = false;
+            for (size_t j = 0; j < classDef->fieldNames.size(); j++) {
+                if (classDef->fieldNames[j] == class_statement->fieldNames[i]) {
+                    classDef->fieldTypes[j] = class_statement->fieldTypes[i];
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                classDef->fieldTypes.push_back(class_statement->fieldTypes[i]);
+                classDef->fieldNames.push_back(class_statement->fieldNames[i]);
+            }
+        }
+
+        // 자식 생성자 오버라이드
+        if (class_statement->constructorBody) {
+            classDef->constructorParamTypes = class_statement->constructorParamTypes;
+            classDef->constructorParams = class_statement->constructorParams;
+            classDef->constructorBody = class_statement->constructorBody;
+        }
+
+        // 자식 메서드 추가/오버라이드
         for (auto& methodStmt : class_statement->methods) {
             auto fn = make_shared<Function>();
             fn->parameterTypes = methodStmt->parameterTypes;
             fn->parameters = methodStmt->parameters;
+            fn->defaultValues = methodStmt->defaultValues;
             fn->body = methodStmt->body;
             fn->returnType = methodStmt->returnType;
             fn->env = environment->shared_from_this();
-            classDef->methods.push_back(fn);
-            classDef->methodNames.push_back(methodStmt->name);
+
+            bool overridden = false;
+            for (size_t i = 0; i < classDef->methodNames.size(); i++) {
+                if (classDef->methodNames[i] == methodStmt->name) {
+                    classDef->methods[i] = fn;
+                    overridden = true;
+                    break;
+                }
+            }
+            if (!overridden) {
+                classDef->methods.push_back(fn);
+                classDef->methodNames.push_back(methodStmt->name);
+            }
         }
 
         environment->Set(class_statement->name, classDef);
@@ -368,6 +444,17 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         throw RuntimeException("'" + identifier_expression->name + "' 존재하지 않는 식별자입니다.", current_line);
     }
     if (auto* call_expression = dynamic_cast<CallExpression*>(node)) {
+        // 고차 함수 체크 (매핑, 걸러내기, 줄이기)
+        if (auto* ident = dynamic_cast<IdentifierExpression*>(call_expression->function.get())) {
+            if (ident->name == "매핑" || ident->name == "걸러내기" || ident->name == "줄이기") {
+                vector<shared_ptr<Object>> arguments;
+                for (auto& argument : call_expression->arguments) {
+                    arguments.push_back(eval(argument.get(), environment));
+                }
+                return evalHigherOrderCall(ident->name, arguments, environment);
+            }
+        }
+
         auto function = eval(call_expression->function.get(), environment);
 
         vector<shared_ptr<Object>> arguments;
@@ -605,8 +692,12 @@ shared_ptr<Object> Evaluator::evalIndexExpression(shared_ptr<Object> left, share
 shared_ptr<Object> Evaluator::evalArrayIndexExpression(shared_ptr<Object> array, shared_ptr<Object> index) {
     auto* arr = dynamic_cast<Array*>(array.get());
     auto* idx = dynamic_cast<Integer*>(index.get());
-    if (0 <= idx->value && idx->value < static_cast<long long>(arr->elements.size())) {
-        return arr->elements[idx->value];
+    long long actualIdx = idx->value;
+    if (actualIdx < 0) {
+        actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
+    }
+    if (0 <= actualIdx && actualIdx < static_cast<long long>(arr->elements.size())) {
+        return arr->elements[actualIdx];
     }
     throw RuntimeException("배열의 범위 밖 값이 인덱스로 입력되었습니다. (인덱스: "
                            + to_string(idx->value) + ", 길이: " + to_string(arr->elements.size()) + ")", current_line);
@@ -615,10 +706,14 @@ shared_ptr<Object> Evaluator::evalArrayIndexExpression(shared_ptr<Object> array,
 shared_ptr<Object> Evaluator::evalStringIndexExpression(shared_ptr<Object> str, shared_ptr<Object> index) {
     auto* s = dynamic_cast<String*>(str.get());
     auto* idx = dynamic_cast<Integer*>(index.get());
-    if (idx->value < 0 || idx->value >= static_cast<long long>(s->value.size())) {
+    long long actualIdx = idx->value;
+    if (actualIdx < 0) {
+        actualIdx = static_cast<long long>(s->value.size()) + actualIdx;
+    }
+    if (actualIdx < 0 || actualIdx >= static_cast<long long>(s->value.size())) {
         throw RuntimeException("문자열의 범위 밖 값이 인덱스로 입력되었습니다.", current_line);
     }
-    return make_shared<String>(string(1, s->value[idx->value]));
+    return make_shared<String>(string(1, s->value[actualIdx]));
 }
 
 shared_ptr<Object> Evaluator::evalHashMapIndexExpression(shared_ptr<Object> hashmap, shared_ptr<Object> key) {
@@ -650,6 +745,16 @@ shared_ptr<Object> Evaluator::evalBangPrefixExpression(shared_ptr<Object> right)
 
 shared_ptr<Object> Evaluator::applyFunction(shared_ptr<Object> function, std::vector<shared_ptr<Object>> arguments) {
     if (auto* fn = dynamic_cast<Function*>(function.get())) {
+        // 기본값으로 부족한 인자 채우기
+        if (arguments.size() < fn->parameterTypes.size() && !fn->defaultValues.empty()) {
+            for (size_t i = arguments.size(); i < fn->parameterTypes.size(); i++) {
+                if (i < fn->defaultValues.size() && fn->defaultValues[i] != nullptr) {
+                    auto defaultVal = eval(fn->defaultValues[i].get(), fn->env.get());
+                    arguments.push_back(defaultVal);
+                }
+            }
+        }
+
         if (fn->parameterTypes.size() != arguments.size()) {
             throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다. (필요: "
                                    + to_string(fn->parameterTypes.size()) + ", 입력: "
@@ -801,6 +906,16 @@ shared_ptr<Object> Evaluator::evalMemberAccess(shared_ptr<Object> obj, const str
     if (auto* instance = dynamic_cast<Instance*>(obj.get())) {
         auto value = instance->fields->Get(member);
         if (value != nullptr) return value;
+        // 부모 클래스 체인에서 필드 검색 (상속)
+        auto parentDef = instance->classDef->parent;
+        while (parentDef) {
+            for (size_t i = 0; i < parentDef->fieldNames.size(); i++) {
+                if (parentDef->fieldNames[i] == member) {
+                    return make_shared<Null>();
+                }
+            }
+            parentDef = parentDef->parent;
+        }
         throw RuntimeException("인스턴스에 '" + member + "' 필드가 존재하지 않습니다.", current_line);
     }
     throw RuntimeException("멤버 접근은 인스턴스에서만 사용할 수 있습니다.", current_line);
@@ -809,9 +924,20 @@ shared_ptr<Object> Evaluator::evalMemberAccess(shared_ptr<Object> obj, const str
 shared_ptr<Object> Evaluator::evalMethodCall(shared_ptr<Object> obj, const string& method,
                                               vector<shared_ptr<Object>> arguments, Environment* environment) {
     if (auto* instance = dynamic_cast<Instance*>(obj.get())) {
+        // 현재 클래스에서 메서드 검색 (상속된 메서드 포함 - 이미 classDef에 복사됨)
         for (size_t i = 0; i < instance->classDef->methodNames.size(); i++) {
             if (instance->classDef->methodNames[i] == method) {
                 auto* fn = instance->classDef->methods[i].get();
+
+                // 기본값으로 부족한 인자 채우기
+                if (arguments.size() < fn->parameterTypes.size() && !fn->defaultValues.empty()) {
+                    for (size_t j = arguments.size(); j < fn->parameterTypes.size(); j++) {
+                        if (j < fn->defaultValues.size() && fn->defaultValues[j] != nullptr) {
+                            auto defaultVal = eval(fn->defaultValues[j].get(), fn->env.get());
+                            arguments.push_back(defaultVal);
+                        }
+                    }
+                }
 
                 if (fn->parameterTypes.size() != arguments.size()) {
                     throw RuntimeException("메서드 '" + method + "'가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", current_line);
@@ -824,6 +950,16 @@ shared_ptr<Object> Evaluator::evalMethodCall(shared_ptr<Object> obj, const strin
 
                 auto methodEnv = make_shared<Environment>(fn->env);
                 methodEnv->Set("자기", obj);
+
+                // 부모 참조 설정 (상속 시)
+                if (instance->classDef->parent) {
+                    // 부모 인스턴스 역할: 같은 인스턴스지만 부모 클래스 정의를 사용
+                    auto parentInstance = make_shared<Instance>();
+                    parentInstance->classDef = instance->classDef->parent;
+                    parentInstance->fields = instance->fields;
+                    methodEnv->Set("부모", parentInstance);
+                }
+
                 for (size_t j = 0; j < fn->parameters.size(); j++) {
                     methodEnv->Set(fn->parameters[j]->name, arguments[j]);
                 }
@@ -837,4 +973,44 @@ shared_ptr<Object> Evaluator::evalMethodCall(shared_ptr<Object> obj, const strin
         throw RuntimeException("인스턴스에 '" + method + "' 메서드가 존재하지 않습니다.", current_line);
     }
     throw RuntimeException("메서드 호출은 인스턴스에서만 사용할 수 있습니다.", current_line);
+}
+
+// 고차 함수 구현
+shared_ptr<Object> Evaluator::evalHigherOrderCall(const string& name,
+                                                   vector<shared_ptr<Object>> arguments, Environment* environment) {
+    if (name == "매핑") {
+        if (arguments.size() != 2) throw RuntimeException("매핑 함수는 인자를 2개 받습니다 (배열, 함수).", current_line);
+        auto* arr = dynamic_cast<Array*>(arguments[0].get());
+        if (!arr) throw RuntimeException("매핑 함수의 첫 번째 인자는 배열이어야 합니다.", current_line);
+        auto result = make_shared<Array>();
+        for (auto& elem : arr->elements) {
+            result->elements.push_back(applyFunction(arguments[1], {elem}));
+        }
+        return result;
+    }
+    if (name == "걸러내기") {
+        if (arguments.size() != 2) throw RuntimeException("걸러내기 함수는 인자를 2개 받습니다 (배열, 함수).", current_line);
+        auto* arr = dynamic_cast<Array*>(arguments[0].get());
+        if (!arr) throw RuntimeException("걸러내기 함수의 첫 번째 인자는 배열이어야 합니다.", current_line);
+        auto result = make_shared<Array>();
+        for (auto& elem : arr->elements) {
+            auto cond = applyFunction(arguments[1], {elem});
+            auto* boolVal = dynamic_cast<Boolean*>(cond.get());
+            if (boolVal && boolVal->value) {
+                result->elements.push_back(elem);
+            }
+        }
+        return result;
+    }
+    if (name == "줄이기") {
+        if (arguments.size() != 3) throw RuntimeException("줄이기 함수는 인자를 3개 받습니다 (배열, 함수, 초기값).", current_line);
+        auto* arr = dynamic_cast<Array*>(arguments[0].get());
+        if (!arr) throw RuntimeException("줄이기 함수의 첫 번째 인자는 배열이어야 합니다.", current_line);
+        auto accumulator = arguments[2];
+        for (auto& elem : arr->elements) {
+            accumulator = applyFunction(arguments[1], {accumulator, elem});
+        }
+        return accumulator;
+    }
+    throw RuntimeException("알 수 없는 고차 함수: " + name, current_line);
 }

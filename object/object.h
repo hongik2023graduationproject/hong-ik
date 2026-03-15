@@ -99,6 +99,7 @@ class Function final : public Object {
 public:
     std::vector<std::shared_ptr<Token>> parameterTypes;
     std::vector<std::shared_ptr<IdentifierExpression>> parameters;
+    std::vector<std::shared_ptr<Expression>> defaultValues;
     std::shared_ptr<BlockStatement> body;
     std::shared_ptr<Environment> env;
     std::shared_ptr<Token> returnType;
@@ -220,6 +221,7 @@ public:
     std::vector<std::shared_ptr<Function>> methods;
     std::vector<std::string> methodNames;
     std::shared_ptr<Environment> env;
+    std::shared_ptr<ClassDef> parent;
 
     ClassDef() {
         type = ObjectType::CLASS_DEF;

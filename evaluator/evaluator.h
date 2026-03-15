@@ -85,6 +85,10 @@ private:
 
     std::shared_ptr<Object> evalMethodCall(std::shared_ptr<Object> obj, const std::string& method,
                                             std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
+
+    // 고차 함수
+    std::shared_ptr<Object> evalHigherOrderCall(const std::string& name,
+                                                 std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
 };
 
 

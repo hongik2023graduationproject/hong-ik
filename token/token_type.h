@@ -73,6 +73,9 @@ enum class TokenType {
     클래스, // class
     생성, // constructor
     자기, // self/this
+    부모, // parent/super
+    부터, // from (for range loop)
+    까지, // to (for range loop)
 
     BITWISE_AND, // &
     LOGICAL_AND, // &&

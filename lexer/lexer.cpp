@@ -34,6 +34,9 @@ Lexer::Lexer() {
         {"클래스", TokenType::클래스},
         {"생성", TokenType::생성},
         {"자기", TokenType::자기},
+        {"부모", TokenType::부모},
+        {"부터", TokenType::부터},
+        {"까지", TokenType::까지},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
     };

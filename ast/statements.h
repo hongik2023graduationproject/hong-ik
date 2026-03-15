@@ -149,6 +149,7 @@ class FunctionStatement : public Statement {
 public:
     std::vector<std::shared_ptr<Token>> parameterTypes;
     std::vector<std::shared_ptr<IdentifierExpression>> parameters;
+    std::vector<std::shared_ptr<Expression>> defaultValues;
     std::string name;
     std::shared_ptr<BlockStatement> body;
     std::shared_ptr<Token> returnType;
@@ -192,9 +193,26 @@ public:
     }
 };
 
+class ForRangeStatement : public Statement {
+public:
+    std::shared_ptr<Token> varType;
+    std::string varName;
+    std::shared_ptr<Expression> startExpr;
+    std::shared_ptr<Expression> endExpr;
+    std::shared_ptr<BlockStatement> body;
+
+    std::string String() override {
+        std::string s = "반복 " + varType->text + " " + varName + " = ";
+        s += startExpr->String() + " 부터 " + endExpr->String() + " 까지:\n";
+        s += body->String();
+        return s;
+    }
+};
+
 class ClassStatement : public Statement {
 public:
     std::string name;
+    std::string parentName;
     std::vector<std::shared_ptr<Token>> fieldTypes;
     std::vector<std::string> fieldNames;
     std::vector<std::shared_ptr<Token>> constructorParamTypes;

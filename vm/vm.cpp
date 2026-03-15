@@ -406,15 +406,19 @@ shared_ptr<Object> VM::run() {
                 if (auto* arr = dynamic_cast<Array*>(collection.get())) {
                     auto* idx = dynamic_cast<Integer*>(index.get());
                     if (!idx) throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
-                    if (idx->value < 0 || idx->value >= static_cast<long long>(arr->elements.size()))
+                    long long actualIdx = idx->value;
+                    if (actualIdx < 0) actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
+                    if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
                         throw RuntimeException("배열의 범위 밖 인덱스입니다.", currentLine());
-                    push(arr->elements[idx->value]);
+                    push(arr->elements[actualIdx]);
                 } else if (auto* str = dynamic_cast<String*>(collection.get())) {
                     auto* idx = dynamic_cast<Integer*>(index.get());
                     if (!idx) throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
-                    if (idx->value < 0 || idx->value >= static_cast<long long>(str->value.size()))
+                    long long actualIdx = idx->value;
+                    if (actualIdx < 0) actualIdx = static_cast<long long>(str->value.size()) + actualIdx;
+                    if (actualIdx < 0 || actualIdx >= static_cast<long long>(str->value.size()))
                         throw RuntimeException("문자열의 범위 밖 인덱스입니다.", currentLine());
-                    push(make_shared<String>(string(1, str->value[idx->value])));
+                    push(make_shared<String>(string(1, str->value[actualIdx])));
                 } else if (auto* hm = dynamic_cast<HashMap*>(collection.get())) {
                     auto* key = dynamic_cast<String*>(index.get());
                     if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
