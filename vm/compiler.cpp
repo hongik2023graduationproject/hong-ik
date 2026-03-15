@@ -136,11 +136,29 @@ void Compiler::compileStatement(Statement* stmt) {
         compileForEach(s);
         return;
     }
+    if (auto* s = dynamic_cast<ForRangeStatement*>(stmt)) {
+        compileForRange(s);
+        return;
+    }
     if (dynamic_cast<BreakStatement*>(stmt)) {
         if (!current->loops.empty()) {
             auto& loop = current->loops.back();
             size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
             loop.breakJumps.push_back(jumpOffset);
+        }
+        return;
+    }
+    if (dynamic_cast<ContinueStatement*>(stmt)) {
+        if (!current->loops.empty()) {
+            auto& loop = current->loops.back();
+            if (loop.continueTarget != 0) {
+                // For for-range loops, we need a forward jump to the increment section
+                size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
+                loop.continueJumps.push_back(jumpOffset);
+            } else {
+                // For while/foreach loops, jump back to loop start
+                chunk().emitLoop(loop.loopStart, 0);
+            }
         }
         return;
     }
@@ -284,6 +302,43 @@ void Compiler::compileExpression(Expression* expr) {
     }
     if (auto* e = dynamic_cast<IndexExpression*>(expr)) {
         compileIndex(e);
+        return;
+    }
+    if (auto* e = dynamic_cast<LambdaExpression*>(expr)) {
+        CompilerState funcState;
+        funcState.function = make_shared<CompiledFunction>();
+        funcState.function->name = "<람다>";
+        funcState.function->arity = static_cast<int>(e->parameters.size());
+        funcState.scopeDepth = 1;
+        funcState.enclosing = current;
+
+        CompilerState* enclosing = current;
+        current = &funcState;
+
+        for (auto& param : e->parameters) {
+            declareLocal(param->name);
+        }
+
+        // Compile the body expression and return it
+        compileExpression(e->body.get());
+        chunk().emitOp(OpCode::OP_RETURN, 0);
+
+        current->function->localCount = static_cast<int>(current->locals.size());
+        auto upvalues = current->upvalues;
+        current = enclosing;
+
+        uint16_t constIdx = chunk().addConstant(funcState.function);
+        if (!upvalues.empty()) {
+            chunk().emitOpAndUint16(OpCode::OP_CLOSURE, constIdx, 0);
+            chunk().emitByte(static_cast<uint8_t>(upvalues.size()), 0);
+            for (auto& uv : upvalues) {
+                chunk().emitByte(uv.isLocal ? 1 : 0, 0);
+                chunk().emitByte(static_cast<uint8_t>((uv.index >> 8) & 0xff), 0);
+                chunk().emitByte(static_cast<uint8_t>(uv.index & 0xff), 0);
+            }
+        } else {
+            chunk().emitOpAndUint16(OpCode::OP_CONSTANT, constIdx, 0);
+        }
         return;
     }
 }
@@ -446,7 +501,7 @@ void Compiler::compileIf(IfStatement* stmt) {
 
 void Compiler::compileWhile(WhileStatement* stmt) {
     size_t loopStart = chunk().code.size();
-    current->loops.push_back({loopStart, {}, current->scopeDepth});
+    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth});
 
     compileExpression(stmt->condition.get());
     size_t exitJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
@@ -479,7 +534,7 @@ void Compiler::compileForEach(ForEachStatement* stmt) {
     (void)iterSlot;
 
     size_t loopStart = chunk().code.size();
-    current->loops.push_back({loopStart, {}, current->scopeDepth});
+    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth});
 
     size_t exitJump = chunk().emitJump(OpCode::OP_ITER_NEXT, 0);
 
@@ -499,6 +554,60 @@ void Compiler::compileForEach(ForEachStatement* stmt) {
     chunk().patchJump(exitJump);
 
     auto& loop = current->loops.back();
+    for (auto offset : loop.breakJumps) {
+        chunk().patchJump(offset);
+    }
+    current->loops.pop_back();
+
+    endScope(0);
+}
+
+void Compiler::compileForRange(ForRangeStatement* stmt) {
+    // 반복 정수 i = start 부터 end 까지:
+    beginScope();
+
+    // 시작값을 로컬로 저장 (루프 변수)
+    compileExpression(stmt->startExpr.get());
+    uint16_t varSlot = declareLocal(stmt->varName);
+
+    // 종료값을 로컬로 저장
+    compileExpression(stmt->endExpr.get());
+    uint16_t endSlot = declareLocal("__end__");
+    (void)endSlot;
+
+    size_t loopStart = chunk().code.size();
+    // continueTarget = 1 is a sentinel meaning "use continueJumps for forward patching"
+    current->loops.push_back({loopStart, 1, {}, {}, current->scopeDepth});
+
+    // 조건: i < end
+    chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, varSlot, 0);
+    chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, static_cast<uint16_t>(varSlot + 1), 0);
+    chunk().emitOp(OpCode::OP_LESS, 0);
+    size_t exitJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+    // 본문
+    beginScope();
+    for (auto& s : stmt->body->statements) {
+        compileStatement(s.get());
+    }
+    endScope(0);
+
+    // continue 점프 패치: continue는 여기(증분 단계)로 점프해야 함
+    auto& loop = current->loops.back();
+    for (auto offset : loop.continueJumps) {
+        chunk().patchJump(offset);
+    }
+
+    // i += 1
+    chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, varSlot, 0);
+    emitConstant(make_shared<Integer>(1), 0);
+    chunk().emitOp(OpCode::OP_ADD, 0);
+    chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, varSlot, 0);
+
+    chunk().emitLoop(loopStart, 0);
+    chunk().patchJump(exitJump);
+
+    // break 점프 패치
     for (auto offset : loop.breakJumps) {
         chunk().patchJump(offset);
     }
@@ -622,6 +731,11 @@ void Compiler::compileClass(ClassStatement* stmt) {
     classDef->fieldTypes = stmt->fieldTypes;
     classDef->compiledConstructor = constructorFn;
     classDef->compiledMethods = compiledMethods;
+
+    // 상속 처리: 부모 클래스명 저장 (VM에서 런타임에 해결)
+    if (!stmt->parentName.empty()) {
+        classDef->parentName = stmt->parentName;
+    }
 
     uint16_t classConstIdx = chunk().addConstant(classDef);
     chunk().emitOpAndUint16(OpCode::OP_CONSTANT, classConstIdx, 0);

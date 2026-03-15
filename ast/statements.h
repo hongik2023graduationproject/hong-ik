@@ -107,6 +107,13 @@ public:
     }
 };
 
+class ContinueStatement : public Statement {
+public:
+    std::string String() override {
+        return "계속";
+    }
+};
+
 class CompoundAssignmentStatement : public Statement {
 public:
     std::string name;

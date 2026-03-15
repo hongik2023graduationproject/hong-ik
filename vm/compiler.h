@@ -24,7 +24,9 @@ struct UpvalueInfo {
 
 struct LoopContext {
     size_t loopStart;
+    size_t continueTarget; // for continue: where to jump (may differ from loopStart for for-range)
     std::vector<size_t> breakJumps;
+    std::vector<size_t> continueJumps;
     int scopeDepth;
 };
 
@@ -56,6 +58,7 @@ private:
     void compileIf(IfStatement* stmt);
     void compileWhile(WhileStatement* stmt);
     void compileForEach(ForEachStatement* stmt);
+    void compileForRange(ForRangeStatement* stmt);
     void compileReturn(ReturnStatement* stmt);
     void compileFunction(FunctionStatement* stmt);
     void compileClass(ClassStatement* stmt);

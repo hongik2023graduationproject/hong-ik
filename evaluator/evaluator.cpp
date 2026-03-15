@@ -238,6 +238,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             auto loopEnv = make_shared<Environment>(environment->shared_from_this());
             result = eval(while_statement->body.get(), loopEnv.get());
 
+            if (dynamic_cast<ContinueSignal*>(result.get())) continue;
             if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
             if (dynamic_cast<ReturnValue*>(result.get())) return result;
         }
@@ -255,6 +256,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
                 auto loopEnv = make_shared<Environment>(environment->shared_from_this());
                 loopEnv->Set(foreach_statement->elementName, element);
                 result = eval(foreach_statement->body.get(), loopEnv.get());
+                if (dynamic_cast<ContinueSignal*>(result.get())) continue;
                 if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
                 if (dynamic_cast<ReturnValue*>(result.get())) return result;
             }
@@ -267,6 +269,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
                 auto loopEnv = make_shared<Environment>(environment->shared_from_this());
                 loopEnv->Set(foreach_statement->elementName, ch);
                 result = eval(foreach_statement->body.get(), loopEnv.get());
+                if (dynamic_cast<ContinueSignal*>(result.get())) continue;
                 if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
                 if (dynamic_cast<ReturnValue*>(result.get())) return result;
             }
@@ -288,6 +291,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             auto loopEnv = make_shared<Environment>(environment->shared_from_this());
             loopEnv->Set(for_range->varName, make_shared<Integer>(i));
             result = eval(for_range->body.get(), loopEnv.get());
+            if (dynamic_cast<ContinueSignal*>(result.get())) continue;
             if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
             if (dynamic_cast<ReturnValue*>(result.get())) return result;
         }
@@ -304,6 +308,9 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     }
     if (dynamic_cast<BreakStatement*>(node)) {
         return make_shared<BreakSignal>();
+    }
+    if (dynamic_cast<ContinueStatement*>(node)) {
+        return make_shared<ContinueSignal>();
     }
     if (auto* return_statement = dynamic_cast<ReturnStatement*>(node)) {
         auto returnValue  = make_shared<ReturnValue>();
@@ -480,6 +487,20 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         }
         return evalMethodCall(obj, method_call->method, args, environment);
     }
+    if (auto* lambda_expression = dynamic_cast<LambdaExpression*>(node)) {
+        auto function = make_shared<Function>();
+        function->parameterTypes = lambda_expression->parameterTypes;
+        function->parameters = lambda_expression->parameters;
+        function->env = environment->shared_from_this();
+        function->returnType = lambda_expression->returnType;
+        // Wrap the body expression in a return statement inside a block
+        auto returnStmt = make_shared<ReturnStatement>();
+        returnStmt->expression = lambda_expression->body;
+        auto block = make_shared<BlockStatement>();
+        block->statements.push_back(returnStmt);
+        function->body = block;
+        return function;
+    }
     if (auto* index_expression = dynamic_cast<IndexExpression*>(node)) {
         auto left  = eval(index_expression->name.get(), environment);
         auto index = eval(index_expression->index.get(), environment);
@@ -552,7 +573,7 @@ shared_ptr<Object> Evaluator::evalBlockStatement(const std::vector<std::shared_p
     for (const auto& statement : statements) {
         result = eval(statement.get(), environment);
         if (result != nullptr) {
-            if (dynamic_cast<ReturnValue*>(result.get()) || dynamic_cast<BreakSignal*>(result.get())) {
+            if (dynamic_cast<ReturnValue*>(result.get()) || dynamic_cast<BreakSignal*>(result.get()) || dynamic_cast<ContinueSignal*>(result.get())) {
                 return result;
             }
         }
@@ -903,6 +924,19 @@ shared_ptr<Object> Evaluator::instantiateClass(ClassDef* classDef, vector<shared
 }
 
 shared_ptr<Object> Evaluator::evalMemberAccess(shared_ptr<Object> obj, const string& member) {
+    // 내장 타입의 길이 프로퍼티 지원
+    if (member == "길이") {
+        if (auto* str = dynamic_cast<String*>(obj.get())) {
+            return make_shared<Integer>(static_cast<long long>(str->value.size()));
+        }
+        if (auto* arr = dynamic_cast<Array*>(obj.get())) {
+            return make_shared<Integer>(static_cast<long long>(arr->elements.size()));
+        }
+        if (auto* hm = dynamic_cast<HashMap*>(obj.get())) {
+            return make_shared<Integer>(static_cast<long long>(hm->pairs.size()));
+        }
+    }
+
     if (auto* instance = dynamic_cast<Instance*>(obj.get())) {
         auto value = instance->fields->Get(member);
         if (value != nullptr) return value;
@@ -923,6 +957,41 @@ shared_ptr<Object> Evaluator::evalMemberAccess(shared_ptr<Object> obj, const str
 
 shared_ptr<Object> Evaluator::evalMethodCall(shared_ptr<Object> obj, const string& method,
                                               vector<shared_ptr<Object>> arguments, Environment* environment) {
+    // 내장 타입에 대한 메서드 호출 지원
+    // String 메서드
+    if (dynamic_cast<String*>(obj.get()) || dynamic_cast<Array*>(obj.get()) || dynamic_cast<HashMap*>(obj.get())) {
+        // 매핑 테이블: 메서드명 -> 내장함수명
+        static const map<string, string> methodMap = {
+            {"길이", "길이"},
+            {"대문자", "대문자"},
+            {"소문자", "소문자"},
+            {"자르기", "자르기"},
+            {"분리", "분리"},
+            {"치환", "치환"},
+            {"포함", "포함"},
+            {"찾기", "찾기"},
+            {"뒤집기", "뒤집기"},
+            {"정렬", "정렬"},
+            {"추가", "추가"},
+            {"삭제", "삭제"},
+            {"조각", "조각"},
+            {"키목록", "키목록"},
+            {"설정", "설정"},
+            {"타입", "타입"},
+        };
+        auto it = methodMap.find(method);
+        if (it != methodMap.end()) {
+            auto builtinIt = builtins.find(it->second);
+            if (builtinIt != builtins.end()) {
+                // obj를 첫 번째 인자로 삽입
+                vector<shared_ptr<Object>> allArgs;
+                allArgs.push_back(obj);
+                allArgs.insert(allArgs.end(), arguments.begin(), arguments.end());
+                return builtinIt->second->function(allArgs);
+            }
+        }
+    }
+
     if (auto* instance = dynamic_cast<Instance*>(obj.get())) {
         // 현재 클래스에서 메서드 검색 (상속된 메서드 포함 - 이미 classDef에 복사됨)
         for (size_t i = 0; i < instance->classDef->methodNames.size(); i++) {

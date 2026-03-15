@@ -58,6 +58,7 @@ enum class TokenType {
     반복, // while 루프
     동안, // while 조건 종료 키워드
     중단, // break
+    계속, // continue
     논리, // boolean type
     배열, // array type
     사전, // map type

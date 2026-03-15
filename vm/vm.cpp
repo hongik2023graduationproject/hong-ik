@@ -255,7 +255,49 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_DEFINE_GLOBAL: {
                 uint16_t nameIdx = readUint16();
                 auto* name = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
-                globals[name->value] = pop();
+                auto val = pop();
+                // 상속 해결: CompiledClassDef의 부모 참조 설정
+                if (auto* ccd = dynamic_cast<CompiledClassDef*>(val.get())) {
+                    if (!ccd->parentName.empty() && !ccd->parent) {
+                        auto parentIt = globals.find(ccd->parentName);
+                        if (parentIt != globals.end()) {
+                            auto parentCcd = dynamic_pointer_cast<CompiledClassDef>(parentIt->second);
+                            if (parentCcd) {
+                                ccd->parent = parentCcd;
+                                // 부모 필드 병합
+                                vector<string> mergedFieldNames = parentCcd->fieldNames;
+                                vector<shared_ptr<Token>> mergedFieldTypes = parentCcd->fieldTypes;
+                                for (size_t i = 0; i < ccd->fieldNames.size(); i++) {
+                                    bool found = false;
+                                    for (size_t j = 0; j < mergedFieldNames.size(); j++) {
+                                        if (mergedFieldNames[j] == ccd->fieldNames[i]) {
+                                            mergedFieldTypes[j] = ccd->fieldTypes[i];
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        mergedFieldNames.push_back(ccd->fieldNames[i]);
+                                        mergedFieldTypes.push_back(ccd->fieldTypes[i]);
+                                    }
+                                }
+                                ccd->fieldNames = mergedFieldNames;
+                                ccd->fieldTypes = mergedFieldTypes;
+                                // 부모 생성자 상속 (자식에 없으면)
+                                if (!ccd->compiledConstructor && parentCcd->compiledConstructor) {
+                                    ccd->compiledConstructor = parentCcd->compiledConstructor;
+                                }
+                                // 부모 메서드 병합
+                                for (auto& [mname, mfn] : parentCcd->compiledMethods) {
+                                    if (ccd->compiledMethods.find(mname) == ccd->compiledMethods.end()) {
+                                        ccd->compiledMethods[mname] = mfn;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                globals[name->value] = val;
                 break;
             }
 
@@ -464,6 +506,23 @@ shared_ptr<Object> VM::run() {
                 uint8_t argCount = readByte();
                 auto* methodName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
                 auto obj = peek(argCount);
+
+                // 내장 타입에 대한 메서드 호출 지원
+                if (dynamic_cast<String*>(obj.get()) || dynamic_cast<Array*>(obj.get()) || dynamic_cast<HashMap*>(obj.get())) {
+                    auto bit = builtins.find(methodName->value);
+                    if (bit != builtins.end()) {
+                        vector<shared_ptr<Object>> args;
+                        for (int i = argCount - 1; i >= 0; i--) {
+                            args.insert(args.begin(), peek(i));
+                        }
+                        for (int i = 0; i < argCount; i++) pop();
+                        auto target = pop(); // the object itself
+                        args.insert(args.begin(), target);
+                        auto result = bit->second->function(args);
+                        push(result ? result : make_shared<Null>());
+                        break;
+                    }
+                }
 
                 if (auto* inst = dynamic_cast<Instance*>(obj.get())) {
                     auto* ccd = dynamic_cast<CompiledClassDef*>(inst->classDef.get());

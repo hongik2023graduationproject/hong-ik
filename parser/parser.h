@@ -86,6 +86,7 @@ private:
         {TokenType::LBRACKET, &Parser::parseArrayLiteral},
         {TokenType::LBRACE, &Parser::parseHashMapLiteral},
         {TokenType::없음, &Parser::parseNullLiteral},
+        {TokenType::함수, &Parser::parseLambdaExpression},
     };
     std::map<TokenType, InfixParseFunction> infixParseFunctions = {
         {TokenType::PLUS, &Parser::parseInfixExpression},
@@ -175,6 +176,8 @@ private:
     std::shared_ptr<Expression> parseHashMapLiteral();
 
     std::shared_ptr<Expression> parseNullLiteral();
+
+    std::shared_ptr<Expression> parseLambdaExpression();
 
     bool isCompoundAssignToken(TokenType type);
 };

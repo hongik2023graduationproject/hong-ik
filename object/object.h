@@ -180,6 +180,17 @@ public:
     }
 };
 
+class ContinueSignal final : public Object {
+public:
+    ContinueSignal() {
+        type = ObjectType::CONTINUE_SIGNAL;
+    }
+
+    std::string ToString() override {
+        return "";
+    }
+};
+
 class Null final : public Object {
 public:
     Null() {

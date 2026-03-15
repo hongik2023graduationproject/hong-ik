@@ -168,7 +168,13 @@ shared_ptr<Statement> Parser::parseStatement() {
         skipToken(TokenType::NEW_LINE);
         return make_shared<BreakStatement>();
     }
-    if (current_token->type == TokenType::함수) {
+    if (current_token->type == TokenType::계속) {
+        skipToken(TokenType::계속);
+        skipToken(TokenType::NEW_LINE);
+        return make_shared<ContinueStatement>();
+    }
+    if (current_token->type == TokenType::함수 && next_token != nullptr
+        && next_token->type == TokenType::IDENTIFIER) {
         return parseFunctionStatement();
     }
     if (current_token->type == TokenType::가져오기) {
@@ -751,6 +757,41 @@ shared_ptr<Expression> Parser::parseNullLiteral() {
     auto nullLiteral = make_shared<NullLiteral>();
     nullLiteral->token = current_token;
     return nullLiteral;
+}
+
+// 람다: 함수(타입 이름, ...) 표현식
+shared_ptr<Expression> Parser::parseLambdaExpression() {
+    skipToken(TokenType::함수);
+    skipToken(TokenType::LPAREN);
+
+    auto lambda = make_shared<LambdaExpression>();
+
+    // 파라미터 파싱
+    if (current_token->type != TokenType::RPAREN) {
+        do {
+            lambda->parameterTypes.push_back(current_token);
+            setNextToken();
+
+            checkToken(TokenType::IDENTIFIER);
+            auto ident = make_shared<IdentifierExpression>();
+            ident->name = current_token->text;
+            lambda->parameters.push_back(ident);
+            skipToken(TokenType::IDENTIFIER);
+        } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
+    }
+    skipToken(TokenType::RPAREN);
+
+    // 리턴 타입 (선택)
+    if (current_token != nullptr && current_token->type == TokenType::RIGHT_ARROW) {
+        skipToken(TokenType::RIGHT_ARROW);
+        lambda->returnType = current_token;
+        setNextToken();
+    }
+
+    // 본문: 단일 표현식
+    lambda->body = parseExpression(Precedence::LOWEST);
+
+    return lambda;
 }
 
 // 반복 정수 i = 0 부터 10 까지:

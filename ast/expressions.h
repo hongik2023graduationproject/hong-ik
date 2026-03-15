@@ -97,4 +97,23 @@ public:
     }
 };
 
+class LambdaExpression : public Expression {
+public:
+    std::vector<std::shared_ptr<Token>> parameterTypes;
+    std::vector<std::shared_ptr<IdentifierExpression>> parameters;
+    std::shared_ptr<Expression> body;
+    std::shared_ptr<Token> returnType;
+
+    std::string String() override {
+        std::string s = "함수(";
+        for (size_t i = 0; i < parameterTypes.size(); i++) {
+            if (i > 0) s += ", ";
+            s += parameterTypes[i]->text + " " + parameters[i]->name;
+        }
+        s += ") ";
+        if (body) s += body->String();
+        return s;
+    }
+};
+
 #endif // EXPRESSIONS_H

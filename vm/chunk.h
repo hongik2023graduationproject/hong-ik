@@ -89,6 +89,7 @@ struct Closure : public Object {
 
 // VM용 클래스 정의 - 컴파일된 생성자/메서드 포함
 struct CompiledClassDef : public ClassDef {
+    std::string parentName;
     std::shared_ptr<CompiledFunction> compiledConstructor;
     std::map<std::string, std::shared_ptr<CompiledFunction>> compiledMethods;
 

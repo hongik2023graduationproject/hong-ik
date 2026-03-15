@@ -12,6 +12,7 @@ enum class ObjectType {
     ARRAY,
     HASH_MAP,
     BREAK_SIGNAL,
+    CONTINUE_SIGNAL,
     NULL_OBJ,
     TUPLE,
     CLASS_DEF,

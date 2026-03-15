@@ -19,6 +19,7 @@ Lexer::Lexer() {
         {"반복", TokenType::반복},
         {"동안", TokenType::동안},
         {"중단", TokenType::중단},
+        {"계속", TokenType::계속},
         {"논리", TokenType::논리},
         {"배열", TokenType::배열},
         {"사전", TokenType::사전},

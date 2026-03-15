@@ -90,6 +90,8 @@ std::string TokenTypeToString(TokenType type) {
         return "동안";
     case TokenType::중단:
         return "중단";
+    case TokenType::계속:
+        return "계속";
     case TokenType::논리:
         return "논리";
     case TokenType::배열:
