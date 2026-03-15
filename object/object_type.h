@@ -17,6 +17,7 @@ enum class ObjectType {
     TUPLE,
     CLASS_DEF,
     INSTANCE,
+    ITERATOR,
 };
 
 #endif // OBJECT_TYPE_H

@@ -264,7 +264,7 @@ shared_ptr<BlockStatement> Parser::parseBlockStatement() {
     auto statement = make_shared<BlockStatement>();
     skipToken(TokenType::START_BLOCK);
 
-    while (current_token->type != TokenType::END_BLOCK) {
+    while (current_token != nullptr && current_token->type != TokenType::END_BLOCK) {
         auto stmt = parseStatement();
         if (stmt != nullptr) {
             statement->statements.push_back(stmt);
@@ -544,7 +544,10 @@ shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
     shared_ptr<Expression> expression       = (this->*prefixParseFunction)();
 
-    while (next_token != nullptr && precedence < getPrecedence[next_token->type]) {
+    while (next_token != nullptr) {
+        auto precIt = getPrecedence.find(next_token->type);
+        Precedence nextPrec = (precIt != getPrecedence.end()) ? precIt->second : Precedence::LOWEST;
+        if (precedence >= nextPrec) break;
         if (!infixParseFunctions.contains(next_token->type)) {
             throw UnknownInfixParseFunctionException(next_token->type, next_token->line);
         }
@@ -730,6 +733,7 @@ shared_ptr<Expression> Parser::parseArrayLiteral() {
         } while (current_token != nullptr && current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
     }
 
+    checkToken(TokenType::RBRACKET);
     return arrayLiteral;
 }
 

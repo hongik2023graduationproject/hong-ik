@@ -7,6 +7,7 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -48,6 +49,8 @@ Evaluator::Evaluator() {
     };
 }
 
+// 소멸자에서 환경을 명시적으로 정리하여 순환 참조(Environment ↔ Function)로 인한
+// shared_ptr 메모리 누수를 줄임. 근본적 해결은 weak_ptr 또는 GC가 필요함.
 Evaluator::~Evaluator() {
     environment->store.clear();
 }
@@ -114,12 +117,23 @@ string Evaluator::interpolateString(const string& str, Environment* environment)
 }
 
 shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
+    // 재귀 깊이 제한 확인
+    if (++recursionDepth > MAX_RECURSION_DEPTH) {
+        recursionDepth--;
+        throw RuntimeException("최대 재귀 깊이(" + to_string(MAX_RECURSION_DEPTH) + ")를 초과했습니다.", current_line);
+    }
+    struct RecursionGuard {
+        int& depth;
+        ~RecursionGuard() { depth--; }
+    } guard{recursionDepth};
+
     // 노드에서 줄 번호 추출 (0이 아닌 경우에만 갱신)
     long long nodeLine = getLineFromNode(node);
     if (nodeLine > 0) current_line = nodeLine;
 
     // program
     if (auto* program = dynamic_cast<Program*>(node)) {
+        // 비소유 shared_ptr: Program은 호출자가 소유하며 eval 호출 동안 유효함
         return evalProgram(shared_ptr<Program>(shared_ptr<Program>{}, program), environment);
     }
 
@@ -436,6 +450,29 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     }
     if (auto* infix_expression = dynamic_cast<InfixExpression*>(node)) {
         current_line = infix_expression->token->line;
+
+        // 단축 평가: && 와 || 연산자는 좌항 결과에 따라 우항을 평가하지 않을 수 있음
+        if (infix_expression->token->type == TokenType::LOGICAL_AND) {
+            auto left = eval(infix_expression->left.get(), environment);
+            auto* lb = dynamic_cast<Boolean*>(left.get());
+            if (!lb) throw RuntimeException("논리곱(&&)의 좌항은 논리 값이어야 합니다.", current_line);
+            if (!lb->value) return make_shared<Boolean>(false);
+            auto right = eval(infix_expression->right.get(), environment);
+            auto* rb = dynamic_cast<Boolean*>(right.get());
+            if (!rb) throw RuntimeException("논리곱(&&)의 우항은 논리 값이어야 합니다.", current_line);
+            return make_shared<Boolean>(rb->value);
+        }
+        if (infix_expression->token->type == TokenType::LOGICAL_OR) {
+            auto left = eval(infix_expression->left.get(), environment);
+            auto* lb = dynamic_cast<Boolean*>(left.get());
+            if (!lb) throw RuntimeException("논리합(||)의 좌항은 논리 값이어야 합니다.", current_line);
+            if (lb->value) return make_shared<Boolean>(true);
+            auto right = eval(infix_expression->right.get(), environment);
+            auto* rb = dynamic_cast<Boolean*>(right.get());
+            if (!rb) throw RuntimeException("논리합(||)의 우항은 논리 값이어야 합니다.", current_line);
+            return make_shared<Boolean>(rb->value);
+        }
+
         auto left  = eval(infix_expression->left.get(), environment);
         auto right = eval(infix_expression->right.get(), environment);
         return evalInfixExpression(infix_expression->token.get(), left, right);
@@ -469,8 +506,8 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             arguments.push_back(eval(argument.get(), environment));
         }
 
-        if (auto* classDef = dynamic_cast<ClassDef*>(function.get())) {
-            return instantiateClass(classDef, arguments, environment);
+        if (dynamic_cast<ClassDef*>(function.get())) {
+            return instantiateClass(function, arguments, environment);
         }
 
         return applyFunction(function, arguments);
@@ -840,6 +877,15 @@ bool Evaluator::typeCheck(Token* type, const shared_ptr<Object>& value) {
     if (type->type == TokenType::배열) return dynamic_cast<Array*>(target) != nullptr;
     if (type->type == TokenType::사전) return dynamic_cast<HashMap*>(target) != nullptr;
 
+    // 클래스 타입 확인: IDENTIFIER인 경우 인스턴스의 클래스 이름과 비교
+    if (type->type == TokenType::IDENTIFIER) {
+        auto* inst = dynamic_cast<Instance*>(target);
+        if (inst && inst->classDef) {
+            return inst->classDef->name == type->text;
+        }
+        return false;
+    }
+
     return true;
 }
 
@@ -849,8 +895,17 @@ bool Evaluator::typeCheck(ObjectType type, const shared_ptr<Object>& value) {
 }
 
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {
-    if (importedFiles.contains(filename)) return nullptr;
-    importedFiles.insert(filename);
+    // 경로 정규화: 동일 파일의 중복 임포트를 방지하기 위해 canonical 경로를 사용
+    string canonicalPath = filename;
+    try {
+        auto p = std::filesystem::weakly_canonical(filename);
+        canonicalPath = p.string();
+    } catch (...) {
+        // 경로 정규화 실패 시 원본 경로 사용
+    }
+
+    if (importedFiles.contains(canonicalPath)) return nullptr;
+    importedFiles.insert(canonicalPath);
 
     ifstream file(filename);
     if (!file.is_open()) {
@@ -891,9 +946,11 @@ shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* en
 
 // ===== 클래스 관련 =====
 
-shared_ptr<Object> Evaluator::instantiateClass(ClassDef* classDef, vector<shared_ptr<Object>> arguments, Environment* environment) {
+shared_ptr<Object> Evaluator::instantiateClass(shared_ptr<Object> classDefObj, vector<shared_ptr<Object>> arguments, Environment* environment) {
+    auto classDefPtr = dynamic_pointer_cast<ClassDef>(classDefObj);
+    auto* classDef = classDefPtr.get();
     auto instance = make_shared<Instance>();
-    instance->classDef = shared_ptr<ClassDef>(shared_ptr<ClassDef>{}, classDef);
+    instance->classDef = classDefPtr;
     instance->fields = make_shared<Environment>();
 
     for (size_t i = 0; i < classDef->fieldNames.size(); i++) {

@@ -19,7 +19,10 @@ public:
         : token(std::move(token)), left(std::move(left)), right(std::move(right)) {}
 
     std::string String() override {
-        return "(" + left->String() + " " + token->text + " " + right->String() + ")";
+        std::string l = left ? left->String() : "<null>";
+        std::string r = right ? right->String() : "<null>";
+        std::string op = token ? token->text : "?";
+        return "(" + l + " " + op + " " + r + ")";
     }
 };
 
@@ -29,7 +32,9 @@ public:
     std::shared_ptr<Expression> right;
 
     std::string String() override {
-        return "(" + token->text + right->String() + ")";
+        std::string op = token ? token->text : "?";
+        std::string r = right ? right->String() : "<null>";
+        return "(" + op + r + ")";
     }
 };
 
@@ -49,7 +54,7 @@ public:
     std::vector<std::shared_ptr<Expression>> arguments;
 
     std::string String() override {
-        std::string s = ":" + function->String();
+        std::string s = ":" + (function ? function->String() : "<null>");
         s += " (";
         for (auto& arg : arguments) {
             s += arg->String();
@@ -66,7 +71,7 @@ public:
     std::string member;
 
     std::string String() override {
-        return object->String() + "." + member;
+        return (object ? object->String() : "<null>") + "." + member;
     }
 };
 
@@ -77,7 +82,7 @@ public:
     std::vector<std::shared_ptr<Expression>> arguments;
 
     std::string String() override {
-        std::string s = object->String() + "." + method + "(";
+        std::string s = (object ? object->String() : "<null>") + "." + method + "(";
         for (size_t i = 0; i < arguments.size(); i++) {
             if (i > 0) s += ", ";
             s += arguments[i]->String();

@@ -68,6 +68,10 @@ private:
     // 현재 실행 중인 줄 번호 (에러 메시지용)
     long long current_line = 0;
 
+    // 재귀 깊이 제한 (무한 재귀 방지)
+    int recursionDepth = 0;
+    static constexpr int MAX_RECURSION_DEPTH = 1000;
+
     // 노드에서 줄 번호를 추출
     long long getLineFromNode(Node* node);
 
@@ -79,7 +83,7 @@ private:
     std::string interpolateString(const std::string& str, Environment* environment);
 
     // 클래스 관련
-    std::shared_ptr<Object> instantiateClass(ClassDef* classDef, std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
+    std::shared_ptr<Object> instantiateClass(std::shared_ptr<Object> classDefObj, std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
 
     std::shared_ptr<Object> evalMemberAccess(std::shared_ptr<Object> obj, const std::string& member);
 

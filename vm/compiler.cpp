@@ -381,6 +381,8 @@ void Compiler::compileInfix(InfixExpression* expr) {
     case TokenType::GREATER_THAN: chunk().emitOp(OpCode::OP_GREATER, line); break;
     case TokenType::LESS_EQUAL: chunk().emitOp(OpCode::OP_LESS_EQUAL, line); break;
     case TokenType::GREATER_EQUAL: chunk().emitOp(OpCode::OP_GREATER_EQUAL, line); break;
+    // TODO: VM의 논리 연산은 양쪽을 모두 평가(eager)함. 단축 평가(short-circuit)를
+    // 구현하려면 점프 명령을 사용해야 하며, 현재는 트리워킹 인터프리터와 동작이 다름.
     case TokenType::LOGICAL_AND: chunk().emitOp(OpCode::OP_AND, line); break;
     case TokenType::LOGICAL_OR: chunk().emitOp(OpCode::OP_OR, line); break;
     default:
@@ -423,6 +425,7 @@ void Compiler::compileAssignment(AssignmentStatement* stmt) {
         compileIdentifier("자기", 0);
         uint16_t nameIdx = identifierConstant(fieldName);
         chunk().emitOpAndUint16(OpCode::OP_SET_MEMBER, nameIdx, 0);
+        chunk().emitOp(OpCode::OP_POP, 0); // SET_MEMBER이 남긴 값 정리
         return;
     }
 
@@ -438,6 +441,8 @@ void Compiler::compileAssignment(AssignmentStatement* stmt) {
             chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, 0);
         }
     }
+    // SET_LOCAL/SET_GLOBAL/SET_UPVALUE는 값을 스택에 유지하므로, 문(statement)으로서 pop 필요
+    chunk().emitOp(OpCode::OP_POP, 0);
 }
 
 void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
@@ -472,6 +477,8 @@ void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
             chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, line);
         }
     }
+    // SET_LOCAL/SET_GLOBAL/SET_UPVALUE는 값을 스택에 유지하므로, 문(statement)으로서 pop 필요
+    chunk().emitOp(OpCode::OP_POP, line);
 }
 
 void Compiler::compileBlock(BlockStatement* stmt) {
@@ -603,6 +610,7 @@ void Compiler::compileForRange(ForRangeStatement* stmt) {
     emitConstant(make_shared<Integer>(1), 0);
     chunk().emitOp(OpCode::OP_ADD, 0);
     chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, varSlot, 0);
+    chunk().emitOp(OpCode::OP_POP, 0); // SET_LOCAL이 남긴 값 정리
 
     chunk().emitLoop(loopStart, 0);
     chunk().patchJump(exitJump);
@@ -805,16 +813,16 @@ void Compiler::compileTryCatch(TryCatchStatement* stmt) {
 }
 
 void Compiler::compileImport(ImportStatement* stmt) {
-    // 파일명을 상수로 추가하고 VM에서 처리
-    emitConstant(make_shared<String>(stmt->filename), 0);
-    // VM에서 특별 처리 (현재 미구현 - 트리워킹 방식과 동일하게 처리해야 함)
-    chunk().emitOp(OpCode::OP_POP, 0);
+    throw RuntimeException("VM 모드에서는 가져오기(import)를 지원하지 않습니다: " + stmt->filename, 0);
 }
 
 void Compiler::compileCall(CallExpression* expr) {
     compileExpression(expr->function.get());
     for (auto& arg : expr->arguments) {
         compileExpression(arg.get());
+    }
+    if (expr->arguments.size() > 255) {
+        throw RuntimeException("함수 호출의 인자 개수가 255개를 초과했습니다.", 0);
     }
     chunk().emitByte(static_cast<uint8_t>(OpCode::OP_CALL), 0);
     chunk().emitByte(static_cast<uint8_t>(expr->arguments.size()), 0);

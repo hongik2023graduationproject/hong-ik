@@ -165,7 +165,7 @@ public:
         std::string str = "함수: ";
 
         for (size_t i = 0; i < parameterTypes.size(); i++) {
-            str += "[" + parameterTypes[i]->text += "]" + parameters[i]->String() + ", ";
+            str += "[" + parameterTypes[i]->text + "]" + parameters[i]->String() + ", ";
         }
         str += name;
 

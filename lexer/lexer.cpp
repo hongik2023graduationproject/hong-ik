@@ -141,6 +141,13 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
             continue;
         }
 
+        // \r 문자 무시 (Windows 줄바꿈 호환)
+        if (current_character == "\r") {
+            current_read_position++;
+            next_read_position++;
+            continue;
+        }
+
         if (current_character == "\n") {
             addToken(TokenType::NEW_LINE, "\n");
             line++;
@@ -225,6 +232,11 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
         throw UnknownCharacterException(current_character, line);
     }
 
+    // NOTE: 파일 모드에서 입력이 끝나도 남아있는 들여쓰기에 대해 END_BLOCK을 자동으로
+    // 발행하지 않음. 이는 REPL 모드에서 여러 줄에 걸친 입력을 지원하기 위한 의도적 설계이며,
+    // 파일 모드에서는 외부 호출자(evalImport 등)가 END_BLOCK을 보충해야 함.
+    // M6: REPL의 들여쓰기 추적은 공백 개수 기반 휴리스틱으로, 혼합 들여쓰기 시 부정확할 수 있음.
+    // M7: Lexer는 호출 간에 indent 상태를 유지하여 여러 줄 입력을 지원함.
     return tokens;
 }
 
@@ -261,6 +273,7 @@ string Lexer::readNumber(bool& isFloat) {
     return number_string;
 }
 
+// TODO: 한글 범위 비교가 문자열 비교 기반이라 일부 멀티바이트 문자가 잘못 매칭될 수 있음
 bool Lexer::isLetter(const std::string& s) {
     return (("a" <= s && s <= "z") || ("A" <= s && s <= "Z") || s == "_" || ("가" <= s && s <= "힣"));
 }

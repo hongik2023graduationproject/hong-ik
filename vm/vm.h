@@ -32,7 +32,7 @@ struct IteratorState : public Object {
     std::shared_ptr<Object> iterable;
     size_t index = 0;
 
-    IteratorState() { type = ObjectType::NULL_OBJ; }
+    IteratorState() { type = ObjectType::ITERATOR; }
     std::string ToString() override { return "<이터레이터>"; }
 };
 

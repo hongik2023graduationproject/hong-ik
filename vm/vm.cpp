@@ -45,12 +45,18 @@ void VM::push(shared_ptr<Object> value) {
 }
 
 shared_ptr<Object> VM::pop() {
+    if (stack.empty()) {
+        throw RuntimeException("VM 스택이 비어있습니다.", 0);
+    }
     auto val = std::move(stack.back());
     stack.pop_back();
     return val;
 }
 
 shared_ptr<Object>& VM::peek(int distance) {
+    if (distance < 0 || static_cast<size_t>(distance) >= stack.size()) {
+        throw RuntimeException("VM 스택 범위 밖 접근입니다.", 0);
+    }
     return stack[stack.size() - 1 - distance];
 }
 
@@ -60,6 +66,9 @@ CallFrame& VM::currentFrame() {
 
 uint8_t VM::readByte() {
     auto& frame = currentFrame();
+    if (frame.ip >= frame.function->code.size()) {
+        throw RuntimeException("VM 바이트코드 범위 밖 읽기입니다.", currentLine());
+    }
     return frame.function->code[frame.ip++];
 }
 
@@ -310,7 +319,10 @@ shared_ptr<Object> VM::run() {
                 uint16_t offset = readUint16();
                 auto condition = pop();
                 auto* b = dynamic_cast<Boolean*>(condition.get());
-                if (!b || !b->value) {
+                if (!b) {
+                    throw RuntimeException("조건식의 결과는 논리(참/거짓) 값이어야 합니다.", currentLine());
+                }
+                if (!b->value) {
                     currentFrame().ip += offset;
                 }
                 break;
@@ -339,6 +351,9 @@ shared_ptr<Object> VM::run() {
                     if (fn->arity != argCount) {
                         throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
                     }
+                    if (frames.size() >= FRAMES_MAX) {
+                        throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
+                    }
                     CallFrame newFrame;
                     newFrame.function = fn;
                     newFrame.ip = 0;
@@ -349,6 +364,9 @@ shared_ptr<Object> VM::run() {
                     if (fn->arity != argCount) {
                         throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
                     }
+                    if (frames.size() >= FRAMES_MAX) {
+                        throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
+                    }
                     CallFrame newFrame;
                     newFrame.function = fn;
                     newFrame.ip = 0;
@@ -356,7 +374,7 @@ shared_ptr<Object> VM::run() {
                     frames.push_back(newFrame);
                 } else if (auto* classDef = dynamic_cast<CompiledClassDef*>(callee.get())) {
                     auto instance = make_shared<Instance>();
-                    instance->classDef = shared_ptr<ClassDef>(shared_ptr<ClassDef>{}, static_cast<ClassDef*>(classDef));
+                    instance->classDef = dynamic_pointer_cast<ClassDef>(callee);
                     instance->fields = make_shared<Environment>();
                     for (auto& fieldName : classDef->fieldNames) {
                         instance->fields->Set(fieldName, make_shared<Null>());
@@ -422,12 +440,18 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_BUILD_HASHMAP: {
                 uint16_t count = readUint16();
                 auto hashmap = make_shared<HashMap>();
+                // 스택에서 역순으로 pop하므로, 먼저 벡터에 모은 뒤
+                // 역순으로 삽입하여 소스 코드 순서대로 마지막 키가 우선하도록 함
+                vector<pair<shared_ptr<Object>, shared_ptr<Object>>> pairs;
                 for (uint16_t i = 0; i < count; i++) {
                     auto value = pop();
                     auto key = pop();
-                    auto* strKey = dynamic_cast<String*>(key.get());
+                    pairs.emplace_back(std::move(key), std::move(value));
+                }
+                for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
+                    auto* strKey = dynamic_cast<String*>(it->first.get());
                     if (!strKey) throw RuntimeException("사전의 키는 문자열이어야 합니다.", currentLine());
-                    hashmap->pairs[strKey->value] = value;
+                    hashmap->pairs[strKey->value] = it->second;
                 }
                 push(hashmap);
                 break;
@@ -604,6 +628,9 @@ shared_ptr<Object> VM::run() {
             }
 
             case OpCode::OP_CLOSURE: {
+                // TODO: 현재 업밸류는 값 캡처(by-value) 방식으로, 캡처 시점의 스냅샷을 저장함.
+                // 외부 변수가 이후 변경되어도 클로저 내부에는 반영되지 않음.
+                // 참조 캡처(by-reference)를 구현하려면 open/closed upvalue 메커니즘이 필요함.
                 uint16_t constIdx = readUint16();
                 auto fn = dynamic_pointer_cast<CompiledFunction>(frame.function->constants[constIdx]);
                 auto closure = make_shared<Closure>(fn);

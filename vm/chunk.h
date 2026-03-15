@@ -5,6 +5,7 @@
 #include "opcode.h"
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,9 @@ struct CompiledFunction : public Object {
     }
 
     uint16_t addConstant(std::shared_ptr<Object> value) {
+        if (constants.size() >= 65535) {
+            throw std::runtime_error("상수 개수가 최대치(65535)를 초과했습니다.");
+        }
         constants.push_back(std::move(value));
         return static_cast<uint16_t>(constants.size() - 1);
     }
@@ -75,6 +79,8 @@ struct Upvalue {
 };
 
 // 클로저: 함수 + 캡처된 업밸류
+// NOTE: Closure와 CompiledFunction이 동일한 ObjectType::FUNCTION 타입을 사용함.
+// 이는 트리워킹 인터프리터의 Function과의 호환성을 위한 의도적 설계임.
 struct Closure : public Object {
     std::shared_ptr<CompiledFunction> function;
     std::vector<std::shared_ptr<Upvalue>> upvalues;

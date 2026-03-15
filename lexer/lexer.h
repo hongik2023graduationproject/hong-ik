@@ -14,13 +14,13 @@ public:
     std::vector<std::shared_ptr<Token>> Tokenize(const std::vector<std::string>& characters);
 
 private:
-    bool at_line_start;
+    bool at_line_start = true;
     int indent = 0;
     std::vector<std::string> characters;
     std::vector<std::shared_ptr<Token>> tokens;
-    long long current_read_position;
-    long long next_read_position;
-    long long line;
+    long long current_read_position = 0;
+    long long next_read_position = 0;
+    long long line = 1;
     std::unordered_map<std::string, TokenType> keywords;
     std::unordered_map<std::string, TokenType> singleCharacterTokens;
     std::unordered_map<std::string, TokenType> multiCharacterTokens;

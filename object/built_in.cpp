@@ -11,6 +11,8 @@
 using namespace std;
 
 
+// TODO: 문자열 길이/인덱싱이 바이트 단위이므로 한글 등 멀티바이트 문자에서
+// 부정확한 결과를 반환함. UTF-8 코드포인트 기반 처리가 필요함.
 std::shared_ptr<Object> Length::function(std::vector<std::shared_ptr<Object>> parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("길이 함수는 인자를 1개만 받습니다.");
@@ -265,6 +267,11 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
         throw runtime_error("파일읽기 함수의 인자는 문자열(파일 경로)이어야 합니다.");
     }
 
+    // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
+    if (filename->value.find("..") != string::npos) {
+        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
+    }
+
     ifstream file(filename->value);
     if (!file.is_open()) {
         throw runtime_error("파일을 열 수 없습니다: " + filename->value);
@@ -287,6 +294,11 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
     auto* content = dynamic_cast<String*>(parameters[1].get());
     if (!content) {
         throw runtime_error("파일쓰기 함수의 두 번째 인자는 문자열(내용)이어야 합니다.");
+    }
+
+    // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
+    if (filename->value.find("..") != string::npos) {
+        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
     }
 
     ofstream file(filename->value);

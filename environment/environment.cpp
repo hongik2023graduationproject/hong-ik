@@ -25,7 +25,6 @@ std::shared_ptr<Object> Environment::Update(const std::string& name, std::shared
     if (outer != nullptr) {
         return outer->Update(name, object);
     }
-    // 찾지 못한 경우 현재 스코프에 설정
-    store[name] = object;
-    return object;
+    // 찾지 못한 경우: 선언되지 않은 변수의 업데이트이므로 아무것도 하지 않고 nullptr 반환
+    return nullptr;
 }
