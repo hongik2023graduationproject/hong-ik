@@ -15,23 +15,24 @@
 
 using namespace std;
 
-Evaluator::Evaluator() {
+Evaluator::Evaluator(IOContext* ioCtx, ExecutionLimiter* limiter)
+    : ioCtx(ioCtx), limiter(limiter) {
     environment = make_shared<Environment>();
     builtins = {
         {"길이", make_shared<Length>()},
-        {"출력", make_shared<Print>()},
+        {"출력", make_shared<Print>(ioCtx)},
         {"추가", make_shared<Push>()},
         {"타입", make_shared<TypeOf>()},
         {"정수변환", make_shared<ToInteger>()},
         {"실수변환", make_shared<ToFloat>()},
         {"문자변환", make_shared<ToString_>()},
-        {"입력", make_shared<Input>()},
+        {"입력", make_shared<Input>(ioCtx)},
         {"키목록", make_shared<Keys>()},
         {"포함", make_shared<Contains>()},
         {"설정", make_shared<MapSet>()},
         {"삭제", make_shared<Remove>()},
-        {"파일읽기", make_shared<FileRead>()},
-        {"파일쓰기", make_shared<FileWrite>()},
+        {"파일읽기", make_shared<FileRead>(ioCtx)},
+        {"파일쓰기", make_shared<FileWrite>(ioCtx)},
         {"절대값", make_shared<Abs>()},
         {"제곱근", make_shared<Sqrt>()},
         {"최대", make_shared<Max>()},
@@ -53,6 +54,12 @@ Evaluator::Evaluator() {
 // shared_ptr 메모리 누수를 줄임. 근본적 해결은 weak_ptr 또는 GC가 필요함.
 Evaluator::~Evaluator() {
     environment->store.clear();
+}
+
+void Evaluator::checkLimits() {
+    if (limiter && limiter->isTimeoutExceeded()) {
+        throw RuntimeException("실행 시간 제한을 초과했습니다.", current_line);
+    }
 }
 
 shared_ptr<Object> Evaluator::Evaluate(shared_ptr<Program> program) {
@@ -117,6 +124,9 @@ string Evaluator::interpolateString(const string& str, Environment* environment)
 }
 
 shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
+    // 샌드박스 제한 체크 (시간 초과)
+    checkLimits();
+
     // 재귀 깊이 제한 확인
     if (++recursionDepth > MAX_RECURSION_DEPTH) {
         recursionDepth--;
@@ -242,6 +252,8 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     if (auto* while_statement = dynamic_cast<WhileStatement*>(node)) {
         shared_ptr<Object> result = nullptr;
         while (true) {
+            if (limiter) limiter->incrementLoopCounter();
+
             auto condition = eval(while_statement->condition.get(), environment);
             auto* boolean = dynamic_cast<Boolean*>(condition.get());
             if (!boolean) {
@@ -264,6 +276,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
 
         if (auto* array = dynamic_cast<Array*>(iterable.get())) {
             for (auto& element : array->elements) {
+                if (limiter) limiter->incrementLoopCounter();
                 if (!typeCheck(foreach_statement->elementType.get(), element)) {
                     throw RuntimeException("각각 반복문에서 원소의 타입이 일치하지 않습니다.", current_line);
                 }
@@ -276,6 +289,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             }
         } else if (auto* str = dynamic_cast<String*>(iterable.get())) {
             for (size_t i = 0; i < str->value.size(); i++) {
+                if (limiter) limiter->incrementLoopCounter();
                 auto ch = make_shared<String>(string(1, str->value[i]));
                 if (!typeCheck(foreach_statement->elementType.get(), ch)) {
                     throw RuntimeException("각각 반복문에서 원소의 타입이 일치하지 않습니다.", current_line);
@@ -302,6 +316,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         }
         shared_ptr<Object> result = nullptr;
         for (long long i = startInt->value; i < endInt->value; i++) {
+            if (limiter) limiter->incrementLoopCounter();
             auto loopEnv = make_shared<Environment>(environment->shared_from_this());
             loopEnv->Set(for_range->varName, make_shared<Integer>(i));
             result = eval(for_range->body.get(), loopEnv.get());
@@ -895,29 +910,52 @@ bool Evaluator::typeCheck(ObjectType type, const shared_ptr<Object>& value) {
 }
 
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {
-    // 경로 정규화: 동일 파일의 중복 임포트를 방지하기 위해 canonical 경로를 사용
-    string canonicalPath = filename;
-    try {
-        auto p = std::filesystem::weakly_canonical(filename);
-        canonicalPath = p.string();
-    } catch (...) {
-        // 경로 정규화 실패 시 원본 경로 사용
+    if (importedFiles.contains(filename)) return nullptr;
+    importedFiles.insert(filename);
+
+    string fileContent;
+
+    // IOContext가 있으면 콜백을 사용 (WASM 환경에서 MemoryFileSystem 연동)
+    if (ioCtx && ioCtx->fileRead) {
+        try {
+            fileContent = ioCtx->fileRead(filename);
+        } catch (...) {
+            throw RuntimeException("파일을 열 수 없습니다: " + filename, current_line);
+        }
+    } else {
+        // 기본 파일시스템 I/O
+        // 경로 정규화: 동일 파일의 중복 임포트를 방지
+        string canonicalPath = filename;
+        try {
+            auto p = std::filesystem::weakly_canonical(filename);
+            canonicalPath = p.string();
+        } catch (...) {
+            // 경로 정규화 실패 시 원본 경로 사용
+        }
+
+        // 정규화된 경로로 중복 체크
+        if (canonicalPath != filename && importedFiles.contains(canonicalPath)) return nullptr;
+        importedFiles.insert(canonicalPath);
+
+        ifstream file(filename);
+        if (!file.is_open()) {
+            throw RuntimeException("파일을 열 수 없습니다: " + filename, current_line);
+        }
+
+        ostringstream oss;
+        oss << file.rdbuf();
+        fileContent = oss.str();
     }
 
-    if (importedFiles.contains(canonicalPath)) return nullptr;
-    importedFiles.insert(canonicalPath);
-
-    ifstream file(filename);
-    if (!file.is_open()) {
-        throw RuntimeException("파일을 열 수 없습니다: " + filename, current_line);
-    }
-
+    // 파일 내용을 토큰화
     Lexer importLexer;
     vector<shared_ptr<Token>> allTokens;
-    string line_str;
     int indent = 0;
 
-    while (getline(file, line_str)) {
+    // 줄 단위로 토큰화 (Lexer가 줄 단위 indent 추적을 하므로)
+    istringstream stream(fileContent);
+    string line_str;
+    while (getline(stream, line_str)) {
         line_str += "\n";
         auto utf8 = Utf8Converter::Convert(line_str);
         auto newTokens = importLexer.Tokenize(utf8);

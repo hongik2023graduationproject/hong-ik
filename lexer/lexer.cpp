@@ -88,6 +88,7 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
     if (indent == 0) {
         line = 1;
     }
+    line_start_pos = 0;
     tokens.clear();
 
     // 빈 문자열 예외 처리
@@ -100,6 +101,7 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
 
 
     while (current_read_position < static_cast<long long>(characters.size())) {
+        token_start = current_read_position;
         string current_character = characters[current_read_position];
         string next_character    = (next_read_position < static_cast<long long>(characters.size())) ? characters[next_read_position] : "";
 
@@ -149,10 +151,11 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
         }
 
         if (current_character == "\n") {
-            addToken(TokenType::NEW_LINE, "\n");
-            line++;
             current_read_position++;
             next_read_position++;
+            addToken(TokenType::NEW_LINE, "\n");
+            line++;
+            line_start_pos = current_read_position;
             at_line_start = true;
             continue;
         }
@@ -172,17 +175,17 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
         // 2글자 연산자 처리
         if (auto iterator = multiCharacterTokens.find(current_character + next_character);
             iterator != multiCharacterTokens.end()) {
-            addToken(iterator->second, current_character + next_character);
             current_read_position += 2;
             next_read_position += 2;
+            addToken(iterator->second, current_character + next_character);
             continue;
         }
 
         // 1글자 연산자 처리
         if (auto iterator = singleCharacterTokens.find(current_character); iterator != singleCharacterTokens.end()) {
-            addToken(iterator->second);
             current_read_position++;
             next_read_position++;
+            addToken(iterator->second, current_character);
             continue;
         }
 
@@ -218,14 +221,14 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
             if (next_character == "."
                 && next_read_position + 1 < static_cast<long long>(characters.size())
                 && characters[next_read_position + 1] == ".") {
-                addToken(TokenType::ELLIPSIS, "...");
                 current_read_position += 3;
                 next_read_position += 3;
+                addToken(TokenType::ELLIPSIS, "...");
                 continue;
             }
-            addToken(TokenType::DOT, ".");
             current_read_position++;
             next_read_position++;
+            addToken(TokenType::DOT, ".");
             continue;
         }
 
@@ -365,6 +368,7 @@ void Lexer::skipBlockComment() {
 
         if (current_character == "\n") {
             line++;
+            line_start_pos = current_read_position + 1;
         }
 
         if (current_character == "*" && next_character == "/") {
@@ -386,7 +390,11 @@ void Lexer::addToken(TokenType type) {
 }
 
 void Lexer::addToken(TokenType type, string literal) {
-    tokens.push_back(make_shared<Token>(Token{type, std::move(literal), line}));
+    long long col = token_start - line_start_pos;
+    long long endCol = current_read_position - line_start_pos;
+    if (col < 0) col = 0;
+    if (endCol < col) endCol = col;
+    tokens.push_back(make_shared<Token>(Token{type, std::move(literal), line, col, endCol}));
 }
 
 void Lexer::handleIdentifierAndKeywords(std::string& identifier) {

@@ -1,14 +1,18 @@
 #ifndef BUILT_IN_H
 #define BUILT_IN_H
 
+#include "../io/io_interface.h"
 #include "object.h"
-
 
 class Length : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
 class Print : public Builtin {
+    IOContext* ioCtx = nullptr;
+
+public:
+    Print(IOContext* ctx = nullptr) : ioCtx(ctx) {}
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
@@ -33,6 +37,10 @@ class ToString_ : public Builtin {
 };
 
 class Input : public Builtin {
+    IOContext* ioCtx = nullptr;
+
+public:
+    Input(IOContext* ctx = nullptr) : ioCtx(ctx) {}
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
@@ -53,10 +61,18 @@ class Remove : public Builtin {
 };
 
 class FileRead : public Builtin {
+    IOContext* ioCtx = nullptr;
+
+public:
+    FileRead(IOContext* ctx = nullptr) : ioCtx(ctx) {}
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
 class FileWrite : public Builtin {
+    IOContext* ioCtx = nullptr;
+
+public:
+    FileWrite(IOContext* ctx = nullptr) : ioCtx(ctx) {}
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 

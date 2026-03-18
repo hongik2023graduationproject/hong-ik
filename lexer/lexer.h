@@ -21,6 +21,8 @@ private:
     long long current_read_position = 0;
     long long next_read_position = 0;
     long long line = 1;
+    long long line_start_pos = 0;  // 현재 줄 시작의 character 인덱스
+    long long token_start = 0;    // 현재 토큰 시작 위치 (addToken에서 column 계산용)
     std::unordered_map<std::string, TokenType> keywords;
     std::unordered_map<std::string, TokenType> singleCharacterTokens;
     std::unordered_map<std::string, TokenType> multiCharacterTokens;

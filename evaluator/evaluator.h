@@ -5,6 +5,8 @@
 #include "../environment/environment.h"
 #include "../object/built_in.h"
 #include "../object/object.h"
+#include "../io/io_interface.h"
+#include "../sandbox/execution_limiter.h"
 #include <memory>
 #include <set>
 #include <string>
@@ -12,14 +14,15 @@
 
 class Evaluator {
 public:
-    Evaluator();
+    Evaluator(IOContext* ioCtx = nullptr, ExecutionLimiter* limiter = nullptr);
     ~Evaluator();
 
     std::shared_ptr<Object> Evaluate(std::shared_ptr<Program> program);
 
 private:
     std::shared_ptr<Environment> environment;
-
+    IOContext* ioCtx = nullptr;
+    ExecutionLimiter* limiter = nullptr;
 
     std::map<std::string, std::shared_ptr<Builtin>> builtins;
 
@@ -93,6 +96,9 @@ private:
     // 고차 함수
     std::shared_ptr<Object> evalHigherOrderCall(const std::string& name,
                                                  std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
+
+    // 샌드박스 제한 체크 (시간 초과)
+    void checkLimits();
 };
 
 

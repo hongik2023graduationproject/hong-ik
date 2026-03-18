@@ -9,7 +9,8 @@ public:
     TokenType type;
     std::string text;
     long long line;
-
+    long long column = 0;       // 추가: 열 번호
+    long long endColumn = 0;    // 추가: 끝 열 번호
 
     // 연산자 오버로딩
     bool operator==(const Token& other) const {

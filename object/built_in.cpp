@@ -32,36 +32,44 @@ std::shared_ptr<Object> Length::function(std::vector<std::shared_ptr<Object>> pa
 }
 
 std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> parameters) {
+    string output;
     for (size_t i = 0; i < parameters.size(); i++) {
         if (auto str = dynamic_cast<String*>(parameters[i].get())) {
-            cout << str->value;
+            output += str->value;
         } else if (auto integer = dynamic_cast<Integer*>(parameters[i].get())) {
-            cout << integer->value;
+            output += to_string(integer->value);
         } else if (auto float_obj = dynamic_cast<Float*>(parameters[i].get())) {
-            cout << float_obj->ToString();
+            output += float_obj->ToString();
         } else if (auto boolean = dynamic_cast<Boolean*>(parameters[i].get())) {
-            cout << (boolean->value ? "true" : "false");
+            output += (boolean->value ? "true" : "false");
         } else if (auto array = dynamic_cast<Array*>(parameters[i].get())) {
-            cout << array->ToString();
+            output += array->ToString();
         } else if (auto hashmap = dynamic_cast<HashMap*>(parameters[i].get())) {
-            cout << hashmap->ToString();
+            output += hashmap->ToString();
         } else if (auto func = dynamic_cast<Function*>(parameters[i].get())) {
-            cout << func->ToString();
+            output += func->ToString();
         } else if (dynamic_cast<Null*>(parameters[i].get())) {
-            cout << "없음";
+            output += "없음";
         } else if (auto tuple = dynamic_cast<Tuple*>(parameters[i].get())) {
-            cout << tuple->ToString();
+            output += tuple->ToString();
         } else if (auto inst = dynamic_cast<Instance*>(parameters[i].get())) {
-            cout << inst->ToString();
+            output += inst->ToString();
         } else {
             throw runtime_error("출력 함수에서 지원하지 않는 타입입니다.");
         }
 
         if (i < parameters.size() - 1) {
-            cout << " ";
+            output += " ";
         }
     }
-    cout << endl;
+    output += "\n";
+
+    // IOContext가 있으면 사용, 없으면 기본 cout 사용
+    if (ioCtx && ioCtx->print) {
+        ioCtx->print(output);
+    } else {
+        cout << output;
+    }
 
     return nullptr;
 }
@@ -160,15 +168,23 @@ std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> par
         throw runtime_error("입력 함수는 인자를 0개 또는 1개 받습니다.");
     }
 
-    // 프롬프트 출력 (선택)
+    string prompt;
     if (parameters.size() == 1) {
         if (auto str = dynamic_cast<String*>(parameters[0].get())) {
-            cout << str->value;
+            prompt = str->value;
         }
     }
 
+    // IOContext가 있으면 사용, 없으면 기본 getline 사용
     string input;
-    getline(cin, input);
+    if (ioCtx && ioCtx->input) {
+        input = ioCtx->input(prompt);
+    } else {
+        if (!prompt.empty()) {
+            cout << prompt;
+        }
+        getline(cin, input);
+    }
     return make_shared<String>(input);
 }
 
@@ -267,6 +283,13 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
         throw runtime_error("파일읽기 함수의 인자는 문자열(파일 경로)이어야 합니다.");
     }
 
+    // IOContext가 있으면 사용, 없으면 기본 파일 I/O 사용
+    if (ioCtx && ioCtx->fileRead) {
+        string content = ioCtx->fileRead(filename->value);
+        return make_shared<String>(content);
+    }
+
+    // 기본 파일 I/O
     // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
     if (filename->value.find("..") != string::npos) {
         throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
@@ -296,6 +319,13 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
         throw runtime_error("파일쓰기 함수의 두 번째 인자는 문자열(내용)이어야 합니다.");
     }
 
+    // IOContext가 있으면 사용, 없으면 기본 파일 I/O 사용
+    if (ioCtx && ioCtx->fileWrite) {
+        ioCtx->fileWrite(filename->value, content->value);
+        return nullptr;
+    }
+
+    // 기본 파일 I/O
     // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
     if (filename->value.find("..") != string::npos) {
         throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
