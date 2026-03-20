@@ -188,7 +188,7 @@ void Repl::TestLexer() {
             vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
 
             for (auto& token : new_tokens) {
-                if (token == new_tokens.back() && token->type == TokenType::COLON) {
+                if (!new_tokens.empty() && token == new_tokens.back() && token->type == TokenType::COLON) {
                     indent += 1;
                 }
                 if (token->type == TokenType::END_BLOCK) {
@@ -243,7 +243,7 @@ void Repl::TestParser() {
             vector<shared_ptr<Token>> new_tokens = lexer->Tokenize(utf8_strings);
             tokens.insert(tokens.end(), new_tokens.begin(), new_tokens.end());
 
-            if (tokens.back()->type == TokenType::COLON) {
+            if (!tokens.empty() && tokens.back()->type == TokenType::COLON) {
                 indent += 1;
             }
             for (auto& token : new_tokens) {

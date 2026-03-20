@@ -652,17 +652,17 @@ shared_ptr<Object> Evaluator::evalInfixExpression(Token* token, shared_ptr<Objec
     if (left->type == ObjectType::FLOAT && right->type == ObjectType::FLOAT) {
         auto* lf = dynamic_cast<Float*>(left.get());
         auto* rf = dynamic_cast<Float*>(right.get());
-        return evalFloatInfixExpression(token, lf->value, rf->value);
+        if (lf && rf) return evalFloatInfixExpression(token, lf->value, rf->value);
     }
     if (left->type == ObjectType::INTEGER && right->type == ObjectType::FLOAT) {
         auto* li = dynamic_cast<Integer*>(left.get());
         auto* rf = dynamic_cast<Float*>(right.get());
-        return evalFloatInfixExpression(token, static_cast<double>(li->value), rf->value);
+        if (li && rf) return evalFloatInfixExpression(token, static_cast<double>(li->value), rf->value);
     }
     if (left->type == ObjectType::FLOAT && right->type == ObjectType::INTEGER) {
         auto* lf = dynamic_cast<Float*>(left.get());
         auto* ri = dynamic_cast<Integer*>(right.get());
-        return evalFloatInfixExpression(token, lf->value, static_cast<double>(ri->value));
+        if (lf && ri) return evalFloatInfixExpression(token, lf->value, static_cast<double>(ri->value));
     }
     if (left->type == ObjectType::BOOLEAN && right->type == ObjectType::BOOLEAN) {
         return evalBooleanInfixExpression(token, left, right);
@@ -677,6 +677,7 @@ shared_ptr<Object> Evaluator::evalInfixExpression(Token* token, shared_ptr<Objec
 shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_ptr<Object> left, shared_ptr<Object> right) {
     auto* left_integer  = dynamic_cast<Integer*>(left.get());
     auto* right_integer = dynamic_cast<Integer*>(right.get());
+    if (!left_integer || !right_integer) throw RuntimeException("정수 연산의 피연산자가 올바르지 않습니다.", token->line);
     long long lv = left_integer->value;
     long long rv = right_integer->value;
 
@@ -724,6 +725,7 @@ shared_ptr<Object> Evaluator::evalFloatInfixExpression(Token* token, double lv, 
 shared_ptr<Object> Evaluator::evalBooleanInfixExpression(Token* token, shared_ptr<Object> left, shared_ptr<Object> right) {
     auto* lb = dynamic_cast<Boolean*>(left.get());
     auto* rb = dynamic_cast<Boolean*>(right.get());
+    if (!lb || !rb) throw RuntimeException("논리 연산의 피연산자가 올바르지 않습니다.", token->line);
 
     if (token->type == TokenType::LOGICAL_AND) return make_shared<Boolean>(lb->value && rb->value);
     if (token->type == TokenType::LOGICAL_OR) return make_shared<Boolean>(lb->value || rb->value);
@@ -736,6 +738,7 @@ shared_ptr<Object> Evaluator::evalBooleanInfixExpression(Token* token, shared_pt
 shared_ptr<Object> Evaluator::evalStringInfixExpression(Token* token, shared_ptr<Object> left, shared_ptr<Object> right) {
     auto* ls = dynamic_cast<String*>(left.get());
     auto* rs = dynamic_cast<String*>(right.get());
+    if (!ls || !rs) throw RuntimeException("문자열 연산의 피연산자가 올바르지 않습니다.", token->line);
 
     if (token->type == TokenType::PLUS) return make_shared<String>(ls->value + rs->value);
     if (token->type == TokenType::EQUAL) return make_shared<Boolean>(ls->value == rs->value);
@@ -991,6 +994,14 @@ shared_ptr<Object> Evaluator::instantiateClass(shared_ptr<Object> classDefObj, v
     instance->classDef = classDefPtr;
     instance->fields = make_shared<Environment>();
 
+    // 부모 클래스 체인의 필드도 초기화
+    auto parentDef = classDef->parent;
+    while (parentDef) {
+        for (size_t i = 0; i < parentDef->fieldNames.size(); i++) {
+            instance->fields->Set(parentDef->fieldNames[i], make_shared<Null>());
+        }
+        parentDef = parentDef->parent;
+    }
     for (size_t i = 0; i < classDef->fieldNames.size(); i++) {
         instance->fields->Set(classDef->fieldNames[i], make_shared<Null>());
     }
@@ -1009,7 +1020,8 @@ shared_ptr<Object> Evaluator::instantiateClass(shared_ptr<Object> classDefObj, v
 
         auto constructorEnv = make_shared<Environment>(environment->shared_from_this());
         constructorEnv->Set("자기", instance);
-        for (size_t i = 0; i < classDef->constructorParams.size(); i++) {
+        size_t paramCount = min(classDef->constructorParams.size(), arguments.size());
+        for (size_t i = 0; i < paramCount; i++) {
             constructorEnv->Set(classDef->constructorParams[i]->name, arguments[i]);
         }
         eval(classDef->constructorBody.get(), constructorEnv.get());
@@ -1035,12 +1047,14 @@ shared_ptr<Object> Evaluator::evalMemberAccess(shared_ptr<Object> obj, const str
     if (auto* instance = dynamic_cast<Instance*>(obj.get())) {
         auto value = instance->fields->Get(member);
         if (value != nullptr) return value;
-        // 부모 클래스 체인에서 필드 검색 (상속)
+        // 부모 클래스 체인에서 필드 존재 여부 확인 (상속)
+        // 부모 필드는 instantiateClass에서 이미 instance->fields에 초기화됨
         auto parentDef = instance->classDef->parent;
         while (parentDef) {
             for (size_t i = 0; i < parentDef->fieldNames.size(); i++) {
                 if (parentDef->fieldNames[i] == member) {
-                    return make_shared<Null>();
+                    auto val = instance->fields->Get(member);
+                    return val ? val : make_shared<Null>();
                 }
             }
             parentDef = parentDef->parent;

@@ -290,9 +290,15 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
     }
 
     // 기본 파일 I/O
-    // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
+    // 경로 탐색 방지 (완전한 샌드박스는 아님)
     if (filename->value.find("..") != string::npos) {
         throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
+    }
+    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
+        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    }
+    if (filename->value.size() >= 2 && filename->value[1] == ':') {
+        throw runtime_error("절대 경로는 사용할 수 없습니다.");
     }
 
     ifstream file(filename->value);
@@ -326,9 +332,15 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
     }
 
     // 기본 파일 I/O
-    // 기본적인 경로 탐색 방지 (완전한 샌드박스는 아님)
+    // 경로 탐색 방지 (완전한 샌드박스는 아님)
     if (filename->value.find("..") != string::npos) {
         throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
+    }
+    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
+        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    }
+    if (filename->value.size() >= 2 && filename->value[1] == ':') {
+        throw runtime_error("절대 경로는 사용할 수 없습니다.");
     }
 
     ofstream file(filename->value);
