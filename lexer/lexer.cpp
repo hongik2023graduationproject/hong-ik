@@ -76,6 +76,8 @@ Lexer::Lexer() {
         {"*=", TokenType::ASTERISK_ASSIGN},
         {"/=", TokenType::SLASH_ASSIGN},
         {"%=", TokenType::PERCENT_ASSIGN},
+        {"++", TokenType::INCREMENT},
+        {"--", TokenType::DECREMENT},
     };
 }
 

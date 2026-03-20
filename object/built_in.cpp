@@ -1,5 +1,6 @@
 #include "built_in.h"
 
+#include "../util/utf8_utils.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -11,15 +12,14 @@
 using namespace std;
 
 
-// TODO: 문자열 길이/인덱싱이 바이트 단위이므로 한글 등 멀티바이트 문자에서
-// 부정확한 결과를 반환함. UTF-8 코드포인트 기반 처리가 필요함.
+// UTF-8 코드포인트 기반 문자열 길이 반환
 std::shared_ptr<Object> Length::function(std::vector<std::shared_ptr<Object>> parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("길이 함수는 인자를 1개만 받습니다.");
     }
 
     if (auto str = dynamic_cast<String*>(parameters[0].get())) {
-        return make_shared<Integer>(str->value.size());
+        return make_shared<Integer>(utf8::codePointCount(str->value));
     }
     if (auto array = dynamic_cast<Array*>(parameters[0].get())) {
         return make_shared<Integer>(array->elements.size());
@@ -455,8 +455,10 @@ std::shared_ptr<Object> Split::function(std::vector<std::shared_ptr<Object>> par
     string d = delim->value;
 
     if (d.empty()) {
-        for (char c : s) {
-            result->elements.push_back(make_shared<String>(string(1, c)));
+        // UTF-8 코드포인트 단위로 분리
+        auto codePoints = utf8::toCodePoints(s);
+        for (auto& cp : codePoints) {
+            result->elements.push_back(make_shared<String>(cp));
         }
         return result;
     }
@@ -563,9 +565,8 @@ std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> p
         return result;
     }
     if (auto* str = dynamic_cast<String*>(parameters[0].get())) {
-        string result = str->value;
-        std::reverse(result.begin(), result.end());
-        return make_shared<String>(result);
+        // UTF-8 코드포인트 단위로 뒤집기
+        return make_shared<String>(utf8::reverseCodePoints(str->value));
     }
     throw runtime_error("뒤집기 함수는 배열 또는 문자열만 지원합니다.");
 }

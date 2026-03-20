@@ -304,6 +304,41 @@ void Compiler::compileExpression(Expression* expr) {
         compileIndex(e);
         return;
     }
+    if (auto* e = dynamic_cast<PostfixExpression*>(expr)) {
+        auto* ident = dynamic_cast<IdentifierExpression*>(e->left.get());
+        if (!ident) {
+            throw RuntimeException("증감 연산자는 변수에만 사용할 수 있습니다.", 0);
+        }
+        long long line = e->token ? e->token->line : 0;
+
+        // 현재 값 로드 (반환용)
+        compileIdentifier(ident->name, line);
+
+        // 현재 값을 다시 로드하고 1을 더하거나 빼서 저장
+        compileIdentifier(ident->name, line);
+        emitConstant(make_shared<Integer>(1), line);
+        if (e->token->type == TokenType::INCREMENT) {
+            chunk().emitOp(OpCode::OP_ADD, line);
+        } else {
+            chunk().emitOp(OpCode::OP_SUB, line);
+        }
+
+        // 결과 저장
+        int slot = resolveLocal(current, ident->name);
+        if (slot != -1) {
+            chunk().emitOpAndUint16(OpCode::OP_SET_LOCAL, static_cast<uint16_t>(slot), line);
+        } else {
+            int uv = resolveUpvalue(current, ident->name);
+            if (uv != -1) {
+                chunk().emitOpAndUint16(OpCode::OP_SET_UPVALUE, static_cast<uint16_t>(uv), line);
+            } else {
+                uint16_t nameIdx = identifierConstant(ident->name);
+                chunk().emitOpAndUint16(OpCode::OP_SET_GLOBAL, nameIdx, line);
+            }
+        }
+        chunk().emitOp(OpCode::OP_POP, line); // SET이 남긴 새 값 제거 (이전 값이 스택에 남음)
+        return;
+    }
     if (auto* e = dynamic_cast<LambdaExpression*>(expr)) {
         CompilerState funcState;
         funcState.function = make_shared<CompiledFunction>();
@@ -364,6 +399,37 @@ void Compiler::compileIdentifier(const string& name, long long line) {
 
 void Compiler::compileInfix(InfixExpression* expr) {
     long long line = expr->token ? expr->token->line : 0;
+
+    // 단축 평가(short-circuit): && 는 좌항이 false면 우항을 평가하지 않음
+    if (expr->token->type == TokenType::LOGICAL_AND) {
+        compileExpression(expr->left.get());
+        // 좌항이 false이면 우항을 건너뛰고 false를 결과로 사용
+        size_t jumpToEnd = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, line);
+        // 좌항이 true인 경우: 우항을 평가하여 결과로 사용
+        compileExpression(expr->right.get());
+        size_t skipFalse = chunk().emitJump(OpCode::OP_JUMP, line);
+        // 좌항이 false인 경우: false를 push
+        chunk().patchJump(jumpToEnd);
+        chunk().emitOp(OpCode::OP_FALSE, line);
+        chunk().patchJump(skipFalse);
+        return;
+    }
+
+    // 단축 평가(short-circuit): || 는 좌항이 true면 우항을 평가하지 않음
+    if (expr->token->type == TokenType::LOGICAL_OR) {
+        compileExpression(expr->left.get());
+        // 좌항이 false이면 우항 평가로 진행
+        size_t jumpToRight = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, line);
+        // 좌항이 true인 경우: true를 결과로 사용
+        chunk().emitOp(OpCode::OP_TRUE, line);
+        size_t jumpToEnd = chunk().emitJump(OpCode::OP_JUMP, line);
+        // 좌항이 false인 경우: 우항을 평가하여 결과로 사용
+        chunk().patchJump(jumpToRight);
+        compileExpression(expr->right.get());
+        chunk().patchJump(jumpToEnd);
+        return;
+    }
+
     compileExpression(expr->left.get());
     compileExpression(expr->right.get());
 
@@ -381,10 +447,6 @@ void Compiler::compileInfix(InfixExpression* expr) {
     case TokenType::GREATER_THAN: chunk().emitOp(OpCode::OP_GREATER, line); break;
     case TokenType::LESS_EQUAL: chunk().emitOp(OpCode::OP_LESS_EQUAL, line); break;
     case TokenType::GREATER_EQUAL: chunk().emitOp(OpCode::OP_GREATER_EQUAL, line); break;
-    // TODO: VM의 논리 연산은 양쪽을 모두 평가(eager)함. 단축 평가(short-circuit)를
-    // 구현하려면 점프 명령을 사용해야 하며, 현재는 트리워킹 인터프리터와 동작이 다름.
-    case TokenType::LOGICAL_AND: chunk().emitOp(OpCode::OP_AND, line); break;
-    case TokenType::LOGICAL_OR: chunk().emitOp(OpCode::OP_OR, line); break;
     default:
         throw RuntimeException("알 수 없는 중위 연산자입니다.", line);
     }

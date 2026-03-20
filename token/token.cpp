@@ -158,6 +158,10 @@ std::string TokenTypeToString(TokenType type) {
         return "DOT";
     case TokenType::ELLIPSIS:
         return "ELLIPSIS";
+    case TokenType::INCREMENT:
+        return "INCREMENT";
+    case TokenType::DECREMENT:
+        return "DECREMENT";
 
     default:
         break;

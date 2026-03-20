@@ -7,6 +7,7 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/utf8_utils.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -81,6 +82,7 @@ long long Evaluator::getLineFromNode(Node* node) {
     // 토큰을 가진 Expression들에서 줄 번호 추출
     if (auto* e = dynamic_cast<InfixExpression*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<PrefixExpression*>(node)) return e->token ? e->token->line : 0;
+    if (auto* e = dynamic_cast<PostfixExpression*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<IntegerLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<FloatLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<BooleanLiteral*>(node)) return e->token ? e->token->line : 0;
@@ -288,9 +290,10 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
                 if (dynamic_cast<ReturnValue*>(result.get())) return result;
             }
         } else if (auto* str = dynamic_cast<String*>(iterable.get())) {
-            for (size_t i = 0; i < str->value.size(); i++) {
+            auto codePoints = utf8::toCodePoints(str->value);
+            for (size_t i = 0; i < codePoints.size(); i++) {
                 if (limiter) limiter->incrementLoopCounter();
-                auto ch = make_shared<String>(string(1, str->value[i]));
+                auto ch = make_shared<String>(codePoints[i]);
                 if (!typeCheck(foreach_statement->elementType.get(), ch)) {
                     throw RuntimeException("각각 반복문에서 원소의 타입이 일치하지 않습니다.", current_line);
                 }
@@ -553,6 +556,24 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         function->body = block;
         return function;
     }
+    if (auto* postfix_expression = dynamic_cast<PostfixExpression*>(node)) {
+        auto* ident = dynamic_cast<IdentifierExpression*>(postfix_expression->left.get());
+        if (!ident) {
+            throw RuntimeException("증감 연산자는 변수에만 사용할 수 있습니다.", current_line);
+        }
+        auto before = environment->Get(ident->name);
+        if (!before) {
+            throw RuntimeException("선언되지 않은 변수명입니다: " + ident->name, current_line);
+        }
+        auto* intVal = dynamic_cast<Integer*>(before.get());
+        if (!intVal) {
+            throw RuntimeException("증감 연산자는 정수 변수에만 사용할 수 있습니다.", current_line);
+        }
+        long long delta = (postfix_expression->token->type == TokenType::INCREMENT) ? 1 : -1;
+        auto newVal = make_shared<Integer>(intVal->value + delta);
+        environment->Update(ident->name, newVal);
+        return before; // 후위 연산: 변경 전 값 반환
+    }
     if (auto* index_expression = dynamic_cast<IndexExpression*>(node)) {
         auto left  = eval(index_expression->name.get(), environment);
         auto index = eval(index_expression->index.get(), environment);
@@ -782,14 +803,15 @@ shared_ptr<Object> Evaluator::evalArrayIndexExpression(shared_ptr<Object> array,
 shared_ptr<Object> Evaluator::evalStringIndexExpression(shared_ptr<Object> str, shared_ptr<Object> index) {
     auto* s = dynamic_cast<String*>(str.get());
     auto* idx = dynamic_cast<Integer*>(index.get());
+    long long len = static_cast<long long>(utf8::codePointCount(s->value));
     long long actualIdx = idx->value;
     if (actualIdx < 0) {
-        actualIdx = static_cast<long long>(s->value.size()) + actualIdx;
+        actualIdx = len + actualIdx;
     }
-    if (actualIdx < 0 || actualIdx >= static_cast<long long>(s->value.size())) {
+    if (actualIdx < 0 || actualIdx >= len) {
         throw RuntimeException("문자열의 범위 밖 값이 인덱스로 입력되었습니다.", current_line);
     }
-    return make_shared<String>(string(1, s->value[actualIdx]));
+    return make_shared<String>(utf8::nthCodePoint(s->value, static_cast<size_t>(actualIdx)));
 }
 
 shared_ptr<Object> Evaluator::evalHashMapIndexExpression(shared_ptr<Object> hashmap, shared_ptr<Object> key) {

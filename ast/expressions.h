@@ -102,6 +102,19 @@ public:
     }
 };
 
+// 후위 표현식 (변수++ 또는 변수--)
+class PostfixExpression : public Expression {
+public:
+    std::shared_ptr<Token> token; // ++ 또는 --
+    std::shared_ptr<Expression> left; // 피연산자 (식별자)
+
+    std::string String() override {
+        std::string l = left ? left->String() : "<null>";
+        std::string op = token ? token->text : "?";
+        return "(" + l + op + ")";
+    }
+};
+
 class LambdaExpression : public Expression {
 public:
     std::vector<std::shared_ptr<Token>> parameterTypes;

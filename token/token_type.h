@@ -99,6 +99,9 @@ enum class TokenType {
 
     DOT, // .
     ELLIPSIS, // ...
+
+    INCREMENT, // ++
+    DECREMENT, // --
 };
 
 #endif // TOKEN_TYPE_H

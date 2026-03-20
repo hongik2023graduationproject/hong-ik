@@ -829,6 +829,14 @@ shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
     return statement;
 }
 
+// 후위 표현식: 변수++ 또는 변수--
+shared_ptr<Expression> Parser::parsePostfixExpression(shared_ptr<Expression> left) {
+    auto postfix = make_shared<PostfixExpression>();
+    postfix->token = current_token;
+    postfix->left = std::move(left);
+    return postfix;
+}
+
 // 가져오기 "파일명.hik"
 shared_ptr<ImportStatement> Parser::parseImportStatement() {
     auto statement = make_shared<ImportStatement>();
