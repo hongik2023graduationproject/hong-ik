@@ -439,6 +439,7 @@ void Compiler::compileInfix(InfixExpression* expr) {
     case TokenType::ASTERISK: chunk().emitOp(OpCode::OP_MUL, line); break;
     case TokenType::SLASH: chunk().emitOp(OpCode::OP_DIV, line); break;
     case TokenType::PERCENT: chunk().emitOp(OpCode::OP_MOD, line); break;
+    case TokenType::POWER: chunk().emitOp(OpCode::OP_POW, line); break;
     case TokenType::BITWISE_AND: chunk().emitOp(OpCode::OP_BITWISE_AND, line); break;
     case TokenType::BITWISE_OR: chunk().emitOp(OpCode::OP_BITWISE_OR, line); break;
     case TokenType::EQUAL: chunk().emitOp(OpCode::OP_EQUAL, line); break;

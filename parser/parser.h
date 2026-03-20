@@ -104,6 +104,7 @@ private:
         {TokenType::LOGICAL_OR, &Parser::parseInfixExpression},
         {TokenType::BITWISE_AND, &Parser::parseInfixExpression},
         {TokenType::BITWISE_OR, &Parser::parseInfixExpression},
+        {TokenType::POWER, &Parser::parseInfixExpression},
         {TokenType::LBRACKET, &Parser::parseIndexExpression},
         {TokenType::LPAREN, &Parser::parseCallInfixExpression},
         {TokenType::DOT, &Parser::parseMemberAccessExpression},
@@ -121,6 +122,7 @@ private:
         LESS_GREATER, // <, >
         SUM, // +, -
         PRODUCT, // *, /, %
+        POWER_P, // **
         PREFIX, // -X, !X
         POSTFIX, // X++, X--
         CALL, // function(x)
@@ -135,6 +137,7 @@ private:
         {TokenType::PLUS, Precedence::SUM}, {TokenType::MINUS, Precedence::SUM},
         {TokenType::ASTERISK, Precedence::PRODUCT}, {TokenType::SLASH, Precedence::PRODUCT},
         {TokenType::PERCENT, Precedence::PRODUCT},
+        {TokenType::POWER, Precedence::POWER_P},
         {TokenType::INCREMENT, Precedence::POSTFIX},
         {TokenType::DECREMENT, Precedence::POSTFIX},
         {TokenType::LPAREN, Precedence::CALL},

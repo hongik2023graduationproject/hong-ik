@@ -102,6 +102,8 @@ enum class TokenType {
 
     INCREMENT, // ++
     DECREMENT, // --
+
+    POWER, // **
 };
 
 #endif // TOKEN_TYPE_H

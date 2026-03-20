@@ -1243,3 +1243,95 @@ TEST_F(ReplTest, vmInheritanceTest) {
     EXPECT_NE(output.find("나비"), std::string::npos);
     EXPECT_NE(output.find("야옹"), std::string::npos);
 }
+
+// Task 1: 문자열 보간 테스트
+TEST_F(ReplTest, stringInterpolationPrintTest) {
+    std::string user_input;
+    user_input += "정수 x = 42\n";
+    user_input += "출력(\"값은 {x}입니다\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("값은 42입니다"), std::string::npos);
+}
+
+TEST_F(ReplTest, stringInterpolationMultipleVarsTest) {
+    std::string user_input;
+    user_input += "문자 이름 = \"홍길동\"\n";
+    user_input += "정수 나이 = 25\n";
+    user_input += "출력(\"{이름}님은 {나이}살입니다\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("홍길동님은 25살입니다"), std::string::npos);
+}
+
+// Task 2: 거듭제곱 연산자 테스트
+TEST_F(ReplTest, powerOperatorIntegerTest) {
+    std::string user_input;
+    user_input += "2 ** 10\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("1024"), std::string::npos);
+}
+
+TEST_F(ReplTest, powerOperatorFloatTest) {
+    std::string user_input;
+    user_input += "2.0 ** 3.0\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("8"), std::string::npos);
+}
+
+TEST_F(ReplTest, powerOperatorPrecedenceTest) {
+    std::string user_input;
+    user_input += "2 * 3 ** 2\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    // 3 ** 2 = 9, 2 * 9 = 18 (** has higher precedence than *)
+    EXPECT_NE(output.find("18"), std::string::npos);
+}
+
+// Task 3: 이스케이프 시퀀스 테스트
+TEST_F(ReplTest, escapeSequenceBackslashTest) {
+    std::string user_input;
+    user_input += "출력(\"경로: C:\\\\폴더\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("경로: C:\\폴더"), std::string::npos);
+}
+
+TEST_F(ReplTest, escapeSequenceNewlineTest) {
+    std::string user_input;
+    user_input += "출력(\"첫줄\\n둘째줄\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("첫줄"), std::string::npos);
+    EXPECT_NE(output.find("둘째줄"), std::string::npos);
+}
+
+TEST_F(ReplTest, escapeSequenceTabTest) {
+    std::string user_input;
+    user_input += "출력(\"이름\\t나이\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("이름\t나이"), std::string::npos);
+}
+
+// VM 모드에서도 거듭제곱 테스트
+TEST_F(ReplTest, vmPowerOperatorTest) {
+    std::string user_input;
+    user_input += "정수 결과 = 2 ** 8\n";
+    user_input += "결과\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("256"), std::string::npos);
+}
+
+// VM 모드에서 문자열 보간 테스트
+TEST_F(ReplTest, vmStringInterpolationTest) {
+    std::string user_input;
+    user_input += "정수 x = 100\n";
+    user_input += "출력(\"값: {x}\")\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("값: 100"), std::string::npos);
+}

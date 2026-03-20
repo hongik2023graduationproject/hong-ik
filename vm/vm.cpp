@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "../environment/environment.h"
 #include "../exception/exception.h"
+#include <cmath>
 #include <iostream>
 #include <sstream>
 
@@ -120,6 +121,12 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
         case OpCode::OP_MOD:
             if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", line);
             return make_shared<Integer>(lv % rv);
+        case OpCode::OP_POW: {
+            if (rv < 0) return make_shared<Float>(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
+            long long result = 1;
+            for (long long i = 0; i < rv; i++) result *= lv;
+            return make_shared<Integer>(result);
+        }
         case OpCode::OP_BITWISE_AND: return make_shared<Integer>(lv & rv);
         case OpCode::OP_BITWISE_OR: return make_shared<Integer>(lv | rv);
         case OpCode::OP_EQUAL: return make_shared<Boolean>(lv == rv);
@@ -147,6 +154,7 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
         case OpCode::OP_DIV:
             if (rv == 0.0) throw RuntimeException("0으로 나눌 수 없습니다.", line);
             return make_shared<Float>(lv / rv);
+        case OpCode::OP_POW: return make_shared<Float>(std::pow(lv, rv));
         case OpCode::OP_EQUAL: return make_shared<Boolean>(lv == rv);
         case OpCode::OP_NOT_EQUAL: return make_shared<Boolean>(lv != rv);
         case OpCode::OP_LESS: return make_shared<Boolean>(lv < rv);
@@ -204,7 +212,7 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_FALSE: push(make_shared<Boolean>(false)); break;
 
             case OpCode::OP_ADD: case OpCode::OP_SUB: case OpCode::OP_MUL:
-            case OpCode::OP_DIV: case OpCode::OP_MOD:
+            case OpCode::OP_DIV: case OpCode::OP_MOD: case OpCode::OP_POW:
             case OpCode::OP_BITWISE_AND: case OpCode::OP_BITWISE_OR:
             case OpCode::OP_EQUAL: case OpCode::OP_NOT_EQUAL:
             case OpCode::OP_LESS: case OpCode::OP_GREATER:

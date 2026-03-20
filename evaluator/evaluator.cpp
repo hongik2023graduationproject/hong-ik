@@ -8,6 +8,7 @@
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/utf8_utils.h"
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -713,6 +714,14 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
         return make_shared<Integer>(lv % rv);
     }
+    if (token->type == TokenType::POWER) {
+        long long result = 1;
+        long long base = lv;
+        long long exp = rv;
+        if (exp < 0) return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
+        for (long long i = 0; i < exp; i++) result *= base;
+        return make_shared<Integer>(result);
+    }
     if (token->type == TokenType::BITWISE_AND) return make_shared<Integer>(lv & rv);
     if (token->type == TokenType::BITWISE_OR) return make_shared<Integer>(lv | rv);
     if (token->type == TokenType::EQUAL) return make_shared<Boolean>(lv == rv);
@@ -733,6 +742,7 @@ shared_ptr<Object> Evaluator::evalFloatInfixExpression(Token* token, double lv, 
         if (rv == 0.0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
         return make_shared<Float>(lv / rv);
     }
+    if (token->type == TokenType::POWER) return make_shared<Float>(std::pow(lv, rv));
     if (token->type == TokenType::EQUAL) return make_shared<Boolean>(lv == rv);
     if (token->type == TokenType::NOT_EQUAL) return make_shared<Boolean>(lv != rv);
     if (token->type == TokenType::LESS_THAN) return make_shared<Boolean>(lv < rv);

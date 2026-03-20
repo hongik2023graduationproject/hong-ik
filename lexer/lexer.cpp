@@ -78,6 +78,7 @@ Lexer::Lexer() {
         {"%=", TokenType::PERCENT_ASSIGN},
         {"++", TokenType::INCREMENT},
         {"--", TokenType::DECREMENT},
+        {"**", TokenType::POWER},
     };
 }
 
@@ -312,6 +313,8 @@ string Lexer::readString() {
                 string_value += "\n";
             } else if (current_character == "t") {
                 string_value += "\t";
+            } else if (current_character == "\\") {
+                string_value += "\\";
             } else if (current_character == "\"") {
                 string_value += "\"";
             } else {

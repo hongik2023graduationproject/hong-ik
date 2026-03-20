@@ -565,6 +565,10 @@ shared_ptr<Expression> Parser::parseInfixExpression(shared_ptr<Expression> left)
     infixExpression->left  = std::move(left);
 
     Precedence precedence = getPrecedence[current_token->type];
+    // ** (거듭제곱)은 우결합성: 2 ** 3 ** 2 → 2 ** (3 ** 2)
+    if (current_token->type == TokenType::POWER) {
+        precedence = static_cast<Precedence>(static_cast<int>(precedence) - 1);
+    }
     setNextToken();
 
     infixExpression->right = parseExpression(precedence);

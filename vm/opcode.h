@@ -17,6 +17,7 @@ enum class OpCode : uint8_t {
     OP_MUL,
     OP_DIV,
     OP_MOD,
+    OP_POW,
     OP_BITWISE_AND,
     OP_BITWISE_OR,
 
@@ -97,6 +98,7 @@ inline std::string opcodeName(OpCode op) {
     case OpCode::OP_MUL: return "OP_MUL";
     case OpCode::OP_DIV: return "OP_DIV";
     case OpCode::OP_MOD: return "OP_MOD";
+    case OpCode::OP_POW: return "OP_POW";
     case OpCode::OP_BITWISE_AND: return "OP_BITWISE_AND";
     case OpCode::OP_BITWISE_OR: return "OP_BITWISE_OR";
     case OpCode::OP_EQUAL: return "OP_EQUAL";

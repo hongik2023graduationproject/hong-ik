@@ -162,6 +162,8 @@ std::string TokenTypeToString(TokenType type) {
         return "INCREMENT";
     case TokenType::DECREMENT:
         return "DECREMENT";
+    case TokenType::POWER:
+        return "POWER";
 
     default:
         break;
