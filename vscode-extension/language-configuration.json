@@ -12,7 +12,7 @@
         { "open": "{", "close": "}" },
         { "open": "[", "close": "]" },
         { "open": "(", "close": ")" },
-        { "open": "\"", "close": "\"" }
+        { "open": "\"", "close": "\"", "notIn": ["string"] }
     ],
     "surroundingPairs": [
         { "open": "{", "close": "}" },
@@ -20,8 +20,30 @@
         { "open": "(", "close": ")" },
         { "open": "\"", "close": "\"" }
     ],
+    "colorizedBracketPairs": [
+        ["(", ")"],
+        ["[", "]"],
+        ["{", "}"]
+    ],
     "indentationRules": {
         "increaseIndentPattern": ".*:\\s*$",
-        "decreaseIndentPattern": "^\\s*(아니면|실패|경우|기본).*"
-    }
+        "decreaseIndentPattern": "^\\s*(아니면|실패|마침내|경우|기본).*"
+    },
+    "folding": {
+        "markers": {
+            "start": "^\\s*(만약|반복|각각|함수|클래스|시도|비교)\\b.*:\\s*$",
+            "end": "^\\s*$"
+        }
+    },
+    "wordPattern": "[가-힣a-zA-Z_][가-힣a-zA-Z0-9_]*",
+    "onEnterRules": [
+        {
+            "beforeText": ".*:\\s*$",
+            "action": { "indent": "indent" }
+        },
+        {
+            "beforeText": "^\\s*(아니면|실패|마침내|경우|기본).*:\\s*$",
+            "action": { "indent": "indent" }
+        }
+    ]
 }

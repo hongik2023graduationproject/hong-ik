@@ -6,6 +6,8 @@
         { "include": "#comments" },
         { "include": "#strings" },
         { "include": "#numbers" },
+        { "include": "#function-call" },
+        { "include": "#function-def" },
         { "include": "#keywords" },
         { "include": "#types" },
         { "include": "#builtins" },
@@ -23,7 +25,10 @@
                 {
                     "name": "comment.block.hongik",
                     "begin": "/\\*",
-                    "end": "\\*/"
+                    "end": "\\*/",
+                    "captures": {
+                        "0": { "name": "punctuation.definition.comment.hongik" }
+                    }
                 }
             ]
         },
@@ -33,14 +38,22 @@
                     "name": "string.quoted.double.hongik",
                     "begin": "\"",
                     "end": "\"",
+                    "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.hongik" } },
+                    "endCaptures": { "0": { "name": "punctuation.definition.string.end.hongik" } },
                     "patterns": [
                         {
                             "name": "constant.character.escape.hongik",
-                            "match": "\\\\."
+                            "match": "\\\\[\"\\\\nrt0]"
                         },
                         {
                             "name": "variable.other.interpolation.hongik",
-                            "match": "\\{[^}]+\\}"
+                            "begin": "\\{",
+                            "end": "\\}",
+                            "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.hongik" } },
+                            "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.hongik" } },
+                            "patterns": [
+                                { "include": "$self" }
+                            ]
                         }
                     ]
                 }
@@ -58,11 +71,40 @@
                 }
             ]
         },
+        "function-call": {
+            "patterns": [
+                {
+                    "comment": "hong-ik function call syntax :(...) name",
+                    "match": "(:)\\s*\\(",
+                    "captures": {
+                        "1": { "name": "keyword.operator.call.hongik" }
+                    }
+                },
+                {
+                    "comment": "function name after call parens",
+                    "match": "\\)\\s*([가-힣a-zA-Z_][가-힣a-zA-Z0-9_]*)",
+                    "captures": {
+                        "1": { "name": "entity.name.function.call.hongik" }
+                    }
+                }
+            ]
+        },
+        "function-def": {
+            "patterns": [
+                {
+                    "comment": "function definition name before ->",
+                    "match": "\\b(함수)\\s*:",
+                    "captures": {
+                        "1": { "name": "keyword.declaration.hongik" }
+                    }
+                }
+            ]
+        },
         "keywords": {
             "patterns": [
                 {
                     "name": "keyword.control.hongik",
-                    "match": "\\b(만약|라면|아니면|반복|동안|중단|각각|에서|시도|실패|리턴|가져오기|비교|경우|기본|부터|까지)\\b"
+                    "match": "\\b(만약|라면|아니면|반복|동안|중단|계속|각각|에서|시도|실패|마침내|리턴|가져오기|비교|경우|기본|부터|까지|생산)\\b"
                 },
                 {
                     "name": "keyword.declaration.hongik",
@@ -79,14 +121,60 @@
                 {
                     "name": "storage.type.hongik",
                     "match": "\\b(정수|실수|문자|논리|배열|사전)\\b"
+                },
+                {
+                    "comment": "optional type annotation",
+                    "name": "storage.modifier.optional.hongik",
+                    "match": "\\b(정수|실수|문자|논리|배열|사전)\\?"
                 }
             ]
         },
         "builtins": {
             "patterns": [
                 {
+                    "comment": "I/O functions",
+                    "name": "support.function.io.hongik",
+                    "match": "\\b(출력|입력|길이)(?=\\s*\\()"
+                },
+                {
+                    "comment": "Type conversion functions",
+                    "name": "support.function.conversion.hongik",
+                    "match": "\\b(정수변환|실수변환|문자변환|타입)(?=\\s*\\()"
+                },
+                {
+                    "comment": "Collection functions",
+                    "name": "support.function.collection.hongik",
+                    "match": "\\b(추가|삭제|포함|키목록|설정|정렬|뒤집기|찾기|조각)(?=\\s*\\()"
+                },
+                {
+                    "comment": "String functions",
+                    "name": "support.function.string.hongik",
+                    "match": "\\b(분리|대문자|소문자|치환|자르기|시작확인|끝확인|반복|채우기|부분문자)(?=\\s*\\()"
+                },
+                {
+                    "comment": "Math functions",
+                    "name": "support.function.math.hongik",
+                    "match": "\\b(절대값|제곱근|최대|최소|난수|사인|코사인|탄젠트|로그|자연로그|거듭제곱|파이|자연수e|반올림|올림|내림)(?=\\s*\\()"
+                },
+                {
+                    "comment": "File I/O functions",
+                    "name": "support.function.file.hongik",
+                    "match": "\\b(파일읽기|파일쓰기)(?=\\s*\\()"
+                },
+                {
+                    "comment": "Higher-order functions",
+                    "name": "support.function.higher-order.hongik",
+                    "match": "\\b(매핑|걸러내기|줄이기)(?=\\s*\\()"
+                },
+                {
+                    "comment": "JSON functions",
+                    "name": "support.function.json.hongik",
+                    "match": "\\b(JSON_파싱|JSON_직렬화)(?=\\s*\\()"
+                },
+                {
+                    "comment": "Fallback: builtin without lookahead for call-style usage",
                     "name": "support.function.hongik",
-                    "match": "\\b(출력|길이|추가|타입|정수변환|실수변환|문자변환|입력|키목록|포함|설정|삭제|파일읽기|파일쓰기|절대값|제곱근|최대|최소|난수|분리|대문자|소문자|치환|자르기|정렬|뒤집기|찾기|조각|매핑|걸러내기|줄이기)\\b"
+                    "match": "\\b(출력|길이|추가|타입|정수변환|실수변환|문자변환|입력|키목록|포함|설정|삭제|파일읽기|파일쓰기|절대값|제곱근|최대|최소|난수|분리|대문자|소문자|치환|자르기|정렬|뒤집기|찾기|조각|매핑|걸러내기|줄이기|사인|코사인|탄젠트|로그|자연로그|거듭제곱|파이|자연수e|반올림|올림|내림|시작확인|끝확인|반복|채우기|부분문자|JSON_파싱|JSON_직렬화)\\b"
                 }
             ]
         },
@@ -94,7 +182,7 @@
             "patterns": [
                 {
                     "name": "constant.language.boolean.hongik",
-                    "match": "\\b(true|false)\\b"
+                    "match": "\\b(true|false|참|거짓)\\b"
                 },
                 {
                     "name": "constant.language.null.hongik",
@@ -105,8 +193,36 @@
         "operators": {
             "patterns": [
                 {
-                    "name": "keyword.operator.hongik",
-                    "match": "(->|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|[+\\-*/%=<>!&|])"
+                    "name": "keyword.operator.arrow.hongik",
+                    "match": "->"
+                },
+                {
+                    "name": "keyword.operator.comparison.hongik",
+                    "match": "(==|!=|<=|>=|<|>)"
+                },
+                {
+                    "name": "keyword.operator.logical.hongik",
+                    "match": "(&&|\\|\\||!)"
+                },
+                {
+                    "name": "keyword.operator.assignment.hongik",
+                    "match": "(\\+=|-=|\\*=|/=|%=|=)"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.hongik",
+                    "match": "(\\*\\*|[+\\-*/%])"
+                },
+                {
+                    "name": "keyword.operator.bitwise.hongik",
+                    "match": "([&|~^])"
+                },
+                {
+                    "name": "keyword.operator.increment.hongik",
+                    "match": "(\\+\\+|--)"
+                },
+                {
+                    "name": "keyword.operator.ternary.hongik",
+                    "match": "\\?"
                 }
             ]
         },
@@ -114,11 +230,23 @@
             "patterns": [
                 {
                     "name": "punctuation.separator.hongik",
-                    "match": "[,;:.]"
+                    "match": "[,;:]"
                 },
                 {
-                    "name": "punctuation.bracket.hongik",
-                    "match": "[\\[\\](){}]"
+                    "name": "punctuation.accessor.hongik",
+                    "match": "\\."
+                },
+                {
+                    "name": "punctuation.bracket.round.hongik",
+                    "match": "[()]"
+                },
+                {
+                    "name": "punctuation.bracket.square.hongik",
+                    "match": "[\\[\\]]"
+                },
+                {
+                    "name": "punctuation.bracket.curly.hongik",
+                    "match": "[{}]"
                 }
             ]
         }
