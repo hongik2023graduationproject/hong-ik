@@ -2,6 +2,7 @@
 #define ENVIRONMENT_H
 
 #include "../object/object.h"
+#include "../object/object_type.h"
 #include <map>
 #include <memory>
 #include <set>
@@ -13,6 +14,7 @@ class Environment : public std::enable_shared_from_this<Environment> {
 public:
     std::map<std::string, std::shared_ptr<Object>> store;
     std::set<std::string> optionalVars;
+    std::map<std::string, ObjectType> typeMap;
     std::shared_ptr<Environment> outer;
 
     Environment() = default;
@@ -28,6 +30,11 @@ public:
 
     // 외부 스코프까지 탐색하여 변수를 업데이트
     std::shared_ptr<Object> Update(const std::string& name, std::shared_ptr<Object> object);
+
+    // 타입 추적
+    void SetType(const std::string& name, ObjectType type);
+    ObjectType GetType(const std::string& name);
+    bool HasType(const std::string& name);
 };
 
 #endif // ENVIRONMENT_H

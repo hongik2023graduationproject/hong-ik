@@ -3,6 +3,7 @@
 #include "vm/compiler.h"
 #include "vm/vm.h"
 #include "utf8_converter/utf8_converter.h"
+#include "exception/exception.h"
 #include <gtest/gtest.h>
 #include <fstream>
 #include <memory>
@@ -790,4 +791,52 @@ TEST_F(VMTest, OptimizationVerification) {
     auto* i = dynamic_cast<Integer*>(result.get());
     ASSERT_NE(i, nullptr);
     EXPECT_EQ(i->value, 4950);
+}
+
+// ===== 런타임 타입 체크 =====
+
+TEST_F(VMTest, FunctionParamTypeError) {
+    EXPECT_THROW({
+        runVM(
+            "함수 더하기(정수 x) -> 정수:\n"
+            "    리턴 x + 1\n"
+            "\n"
+            "더하기(\"문자열\")\n"
+        );
+    }, RuntimeException);
+}
+
+TEST_F(VMTest, FunctionReturnTypeError) {
+    EXPECT_THROW({
+        runVM(
+            "함수 변환(정수 x) -> 문자:\n"
+            "    리턴 x + 1\n"
+            "\n"
+            "변환(10)\n"
+        );
+    }, RuntimeException);
+}
+
+TEST_F(VMTest, FunctionCorrectTypes) {
+    auto result = runVM(
+        "함수 합계(정수 x, 정수 y) -> 정수:\n"
+        "    리턴 x + y\n"
+        "\n"
+        "합계(3, 4)\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 7);
+}
+
+TEST_F(VMTest, BinaryOpBetterErrorMessage) {
+    try {
+        runVM("1 + \"문자\"\n");
+        FAIL() << "Expected RuntimeException";
+    } catch (const RuntimeException& e) {
+        string msg = e.what();
+        EXPECT_TRUE(msg.find("+") != string::npos) << "Error message should contain operator: " << msg;
+        EXPECT_TRUE(msg.find("정수") != string::npos) << "Error message should contain left type: " << msg;
+        EXPECT_TRUE(msg.find("문자") != string::npos) << "Error message should contain right type: " << msg;
+    }
 }

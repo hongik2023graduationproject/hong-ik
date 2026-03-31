@@ -7,6 +7,7 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
 #include <filesystem>
@@ -190,6 +191,11 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             if (initialization_statement->isOptional) {
                 environment->SetOptional(initialization_statement->name);
             }
+            // 선언된 타입 저장
+            ObjectType declType = tokenTypeToObjectType(initialization_statement->type->type);
+            if (declType != ObjectType::NULL_OBJ) {
+                environment->SetType(initialization_statement->name, declType);
+            }
             return value;
         }
 
@@ -214,6 +220,11 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         environment->Set(initialization_statement->name, value);
         if (initialization_statement->isOptional) {
             environment->SetOptional(initialization_statement->name);
+        }
+        // 선언된 타입 저장
+        ObjectType declType = tokenTypeToObjectType(initialization_statement->type->type);
+        if (declType != ObjectType::NULL_OBJ) {
+            environment->SetType(initialization_statement->name, declType);
         }
         return value;
     }
@@ -244,8 +255,14 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             if (!environment->IsOptional(assignment_statement->name)) {
                 throw RuntimeException("선택적 타입이 아닌 변수에 '없음'을 대입할 수 없습니다.", current_line);
             }
+        } else if (environment->HasType(assignment_statement->name)) {
+            // 선언된 타입이 있으면 그 타입으로 체크 (없음→값 대입 시에도 정확한 타입 체크)
+            ObjectType declaredType = environment->GetType(assignment_statement->name);
+            if (value->type != declaredType) {
+                throw RuntimeException("값의 형식이 변수의 형식과 일치하지 않습니다.", current_line);
+            }
         } else if (dynamic_cast<Null*>(before.get())) {
-            // Optional 변수가 현재 '없음'인 경우, 새 값 대입 허용 (타입 체크 스킵)
+            // Optional 변수가 현재 '없음'인 경우, 선언 타입 없으면 새 값 대입 허용
         } else if (!typeCheck(before->type, value)) {
             throw RuntimeException("값의 형식이 변수의 형식과 일치하지 않습니다.", current_line);
         }

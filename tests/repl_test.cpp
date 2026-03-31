@@ -1878,3 +1878,23 @@ TEST_F(ReplTest, indexAssignmentHashMap) {
     auto output = runRepl(user_input);
     EXPECT_TRUE(output.find("25") != string::npos);
 }
+
+// ===== 런타임 타입 체크 =====
+
+TEST_F(ReplTest, VariableInitTypeCheck) {
+    string user_input = "정수 x = \"hello\"\n종료하기\n";
+    auto output = runRepl(user_input);
+    EXPECT_TRUE(output.find("자료형") != string::npos || output.find("일치") != string::npos) << "Expected type error, got: " << output;
+}
+
+TEST_F(ReplTest, VariableReassignTypeCheck) {
+    string user_input = "정수 x = 10\nx = \"hello\"\n종료하기\n";
+    auto output = runRepl(user_input);
+    EXPECT_TRUE(output.find("형식") != string::npos || output.find("일치") != string::npos) << "Expected type error, got: " << output;
+}
+
+TEST_F(ReplTest, OptionalAllowsNull) {
+    string user_input = "정수? x = 없음\n출력(x)\n종료하기\n";
+    auto output = runRepl(user_input);
+    EXPECT_TRUE(output.find("없음") != string::npos) << "Expected '없음', got: " << output;
+}

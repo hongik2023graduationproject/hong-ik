@@ -21,6 +21,12 @@ struct CompiledFunction : public Object {
     std::vector<std::shared_ptr<Object>> defaultValues; // pre-evaluated constant defaults, nullptr for required params
     bool hasYield = false;
 
+    // 런타임 타입 체크용
+    std::vector<ObjectType> paramTypeChecks;    // 매개변수 타입 (NULL_OBJ = 체크 안 함)
+    std::vector<bool> paramOptionals;           // 매개변수 옵션 여부
+    ObjectType returnTypeCheck = ObjectType::NULL_OBJ;  // 반환 타입 (NULL_OBJ = 체크 안 함)
+    bool returnTypeOptional = false;
+
     CompiledFunction() { type = ObjectType::FUNCTION; }
 
     std::string ToString() override {

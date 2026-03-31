@@ -5,6 +5,7 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <algorithm>
 #include <cmath>
@@ -123,6 +124,19 @@ shared_ptr<Object> VM::Execute(shared_ptr<CompiledFunction> topLevel) {
     return run();
 }
 
+static ObjectType vmValueToObjectType(const VMValue& val) {
+    switch (val.tag) {
+    case ValueTag::INT: return ObjectType::INTEGER;
+    case ValueTag::FLOAT: return ObjectType::FLOAT;
+    case ValueTag::BOOL: return ObjectType::BOOLEAN;
+    case ValueTag::NULL_V: return ObjectType::NULL_OBJ;
+    case ValueTag::OBJECT:
+        if (val.objVal) return val.objVal->type;
+        return ObjectType::NULL_OBJ;
+    }
+    return ObjectType::NULL_OBJ;
+}
+
 VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long long line) {
     // Null checks
     if (left.tag == ValueTag::NULL_V || right.tag == ValueTag::NULL_V) {
@@ -214,7 +228,9 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
         }
     }
 
-    throw RuntimeException("좌항과 우항의 타입을 연산할 수 없습니다.", line);
+    throw RuntimeException(
+        typeToKorean(vmValueToObjectType(left)) + " " + opToSymbol(op) + " " +
+        typeToKorean(vmValueToObjectType(right)) + ": 좌항과 우항의 타입을 연산할 수 없습니다.", line);
 }
 
 shared_ptr<Object> VM::run() {
@@ -386,6 +402,23 @@ shared_ptr<Object> VM::run() {
                     auto* cls = dynamic_cast<Closure*>(callee.objVal.get());
                     auto* fn = cls->function.get();
                     fillDefaults(fn, argCount);
+                    // 매개변수 타입 체크
+                    if (!fn->paramTypeChecks.empty()) {
+                        for (size_t i = 0; i < fn->paramTypeChecks.size() && i < static_cast<size_t>(fn->arity); i++) {
+                            if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) continue;
+                            auto& arg = stack[stack.size() - fn->arity + i];
+                            ObjectType argType = vmValueToObjectType(arg);
+                            if (argType == ObjectType::NULL_OBJ) {
+                                if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) continue;
+                                throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)", currentLine());
+                            }
+                            if (argType != fn->paramTypeChecks[i]) {
+                                throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 ("
+                                    + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
+                                    + typeToKorean(argType) + " 전달)", currentLine());
+                            }
+                        }
+                    }
                     if (frames.size() >= FRAMES_MAX) {
                         throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
                     }
@@ -399,6 +432,23 @@ shared_ptr<Object> VM::run() {
                 } else if (callee.tag == ValueTag::OBJECT && dynamic_cast<CompiledFunction*>(callee.objVal.get())) {
                     auto* fn = dynamic_cast<CompiledFunction*>(callee.objVal.get());
                     fillDefaults(fn, argCount);
+                    // 매개변수 타입 체크
+                    if (!fn->paramTypeChecks.empty()) {
+                        for (size_t i = 0; i < fn->paramTypeChecks.size() && i < static_cast<size_t>(fn->arity); i++) {
+                            if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) continue;
+                            auto& arg = stack[stack.size() - fn->arity + i];
+                            ObjectType argType = vmValueToObjectType(arg);
+                            if (argType == ObjectType::NULL_OBJ) {
+                                if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) continue;
+                                throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)", currentLine());
+                            }
+                            if (argType != fn->paramTypeChecks[i]) {
+                                throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 ("
+                                    + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
+                                    + typeToKorean(argType) + " 전달)", currentLine());
+                            }
+                        }
+                    }
                     if (frames.size() >= FRAMES_MAX) {
                         throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
                     }
@@ -442,6 +492,21 @@ shared_ptr<Object> VM::run() {
 
             case OpCode::OP_RETURN: {
                 auto result = pop();
+                // 반환 타입 체크 (제너레이터 함수는 제외)
+                auto& retFrame = currentFrame();
+                if (retFrame.function->returnTypeCheck != ObjectType::NULL_OBJ && !retFrame.isGenerator) {
+                    ObjectType resultType = vmValueToObjectType(result);
+                    if (resultType == ObjectType::NULL_OBJ) {
+                        if (!retFrame.function->returnTypeOptional) {
+                            throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다. ("
+                                + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, 없음 반환)", currentLine());
+                        }
+                    } else if (resultType != retFrame.function->returnTypeCheck) {
+                        throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다. ("
+                            + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, "
+                            + typeToKorean(resultType) + " 반환)", currentLine());
+                    }
+                }
                 size_t slotOffset = currentFrame().slotOffset;
                 bool hasCallee = currentFrame().hasCallee;
                 bool wasGenerator = currentFrame().isGenerator;

@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "../exception/exception.h"
+#include "../util/type_utils.h"
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -956,6 +957,23 @@ void Compiler::compileFunction(FunctionStatement* stmt) {
 
     funcState.function->hasYield = containsYield(stmt->body.get());
 
+    // 매개변수 타입 정보 복사
+    funcState.function->paramTypeChecks.resize(stmt->parameters.size(), ObjectType::NULL_OBJ);
+    funcState.function->paramOptionals.resize(stmt->parameters.size(), false);
+    for (size_t i = 0; i < stmt->parameterTypes.size(); i++) {
+        if (stmt->parameterTypes[i]) {
+            funcState.function->paramTypeChecks[i] = tokenTypeToObjectType(stmt->parameterTypes[i]->type);
+        }
+        if (i < stmt->parameterOptionals.size()) {
+            funcState.function->paramOptionals[i] = stmt->parameterOptionals[i];
+        }
+    }
+    // 반환 타입 정보 복사
+    if (stmt->returnType) {
+        funcState.function->returnTypeCheck = tokenTypeToObjectType(stmt->returnType->type);
+    }
+    funcState.function->returnTypeOptional = stmt->returnTypeOptional;
+
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
@@ -1056,6 +1074,22 @@ void Compiler::compileClass(ClassStatement* stmt) {
             }
         }
         methodState.function->defaultCount = methodDefaultCount;
+
+        // 메서드 매개변수 타입 정보 복사
+        methodState.function->paramTypeChecks.resize(method->parameters.size(), ObjectType::NULL_OBJ);
+        methodState.function->paramOptionals.resize(method->parameters.size(), false);
+        for (size_t i = 0; i < method->parameterTypes.size(); i++) {
+            if (method->parameterTypes[i]) {
+                methodState.function->paramTypeChecks[i] = tokenTypeToObjectType(method->parameterTypes[i]->type);
+            }
+            if (i < method->parameterOptionals.size()) {
+                methodState.function->paramOptionals[i] = method->parameterOptionals[i];
+            }
+        }
+        if (method->returnType) {
+            methodState.function->returnTypeCheck = tokenTypeToObjectType(method->returnType->type);
+        }
+        methodState.function->returnTypeOptional = method->returnTypeOptional;
 
         for (auto& s : method->body->statements) {
             compileStatement(s.get());
