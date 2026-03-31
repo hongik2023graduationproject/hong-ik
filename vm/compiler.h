@@ -37,6 +37,7 @@ struct CompilerState {
     std::vector<UpvalueInfo> upvalues;
     int scopeDepth = 0;
     std::vector<LoopContext> loops;
+    bool isUnreachable = false;
 };
 
 class Compiler {

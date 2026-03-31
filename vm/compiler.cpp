@@ -105,6 +105,8 @@ shared_ptr<CompiledFunction> Compiler::Compile(shared_ptr<Program> program) {
 }
 
 void Compiler::compileStatement(Statement* stmt) {
+    if (current->isUnreachable) return;
+
     if (auto* s = dynamic_cast<ExpressionStatement*>(stmt)) {
         compileExpression(s->expression.get());
         chunk().emitOp(OpCode::OP_POP, 0);
@@ -147,6 +149,7 @@ void Compiler::compileStatement(Statement* stmt) {
             auto& loop = current->loops.back();
             size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
             loop.breakJumps.push_back(jumpOffset);
+            current->isUnreachable = true;
         }
         return;
     }
@@ -161,6 +164,7 @@ void Compiler::compileStatement(Statement* stmt) {
                 // For while/foreach loops, jump back to loop start
                 chunk().emitLoop(loop.loopStart, 0);
             }
+            current->isUnreachable = true;
         }
         return;
     }
@@ -752,6 +756,7 @@ void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
 
 void Compiler::compileBlock(BlockStatement* stmt) {
     beginScope();
+    current->isUnreachable = false;
     for (auto& s : stmt->statements) {
         compileStatement(s.get());
     }
@@ -773,6 +778,7 @@ void Compiler::compileIf(IfStatement* stmt) {
     } else {
         chunk().patchJump(elseJump);
     }
+    current->isUnreachable = false;
 }
 
 void Compiler::compileWhile(WhileStatement* stmt) {
@@ -783,10 +789,12 @@ void Compiler::compileWhile(WhileStatement* stmt) {
     size_t exitJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
 
     beginScope();
+    current->isUnreachable = false;
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
     endScope(0);
+    current->isUnreachable = false;
 
     chunk().emitLoop(loopStart, 0);
     chunk().patchJump(exitJump);
@@ -818,9 +826,11 @@ void Compiler::compileForEach(ForEachStatement* stmt) {
     uint16_t elemSlot = declareLocal(stmt->elementName);
     (void)elemSlot;
 
+    current->isUnreachable = false;
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
+    current->isUnreachable = false;
 
     // 원소 로컬 제거
     chunk().emitOp(OpCode::OP_POP, 0);
@@ -863,10 +873,12 @@ void Compiler::compileForRange(ForRangeStatement* stmt) {
 
     // 본문
     beginScope();
+    current->isUnreachable = false;
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
     endScope(0);
+    current->isUnreachable = false;
 
     // continue 점프 패치: continue는 여기(증분 단계)로 점프해야 함
     auto& loop = current->loops.back();
@@ -896,6 +908,7 @@ void Compiler::compileForRange(ForRangeStatement* stmt) {
 void Compiler::compileReturn(ReturnStatement* stmt) {
     compileExpression(stmt->expression.get());
     chunk().emitOp(OpCode::OP_RETURN, 0);
+    current->isUnreachable = true;
 }
 
 void Compiler::compileFunction(FunctionStatement* stmt) {
