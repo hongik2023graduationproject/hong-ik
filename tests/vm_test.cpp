@@ -747,6 +747,39 @@ TEST_F(VMTest, IntegrationGeneratorWithDefaults) {
     EXPECT_EQ(output, "0\n2\n4\n");
 }
 
+TEST_F(VMTest, ConstantFoldingComparison) {
+    auto result = runVM("2 > 1\n");
+    auto* b = dynamic_cast<Boolean*>(result.get());
+    ASSERT_NE(b, nullptr);
+    EXPECT_TRUE(b->value);
+}
+
+TEST_F(VMTest, ConstantFoldingModulo) {
+    auto result = runVM("10 % 3\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 1);
+}
+
+TEST_F(VMTest, UnaryConstantFolding) {
+    auto result = runVM("-42\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, -42);
+}
+
+TEST_F(VMTest, DeadCodeAfterReturn) {
+    auto result = runVM(
+        "함수 테스트() -> 정수:\n"
+        "    리턴 42\n"
+        "    리턴 99\n"
+        "테스트()\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 42);
+}
+
 TEST_F(VMTest, OptimizationVerification) {
     auto result = runVM(
         "정수 합 = 0\n"
