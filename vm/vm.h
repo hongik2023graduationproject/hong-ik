@@ -88,6 +88,18 @@ private:
 
     // 에러
     long long currentLine();
+
+    // 캐시된 싱글턴
+    std::shared_ptr<Object> CACHED_TRUE;
+    std::shared_ptr<Object> CACHED_FALSE;
+    std::shared_ptr<Object> CACHED_NULL;
+
+    // 정수 풀링
+    static constexpr int INT_POOL_MIN = -128;
+    static constexpr int INT_POOL_MAX = 127;
+    static constexpr int INT_POOL_SIZE = INT_POOL_MAX - INT_POOL_MIN + 1;
+    std::shared_ptr<Integer> intPool[INT_POOL_SIZE];
+    std::shared_ptr<Object> makeInt(long long val);
 };
 
 #endif // VM_H

@@ -3,6 +3,7 @@
 
 #include "../ast/expressions.h"
 #include "../ast/statements.h"
+#include "../util/utf8_utils.h"
 #include "object_type.h"
 #include <map>
 #include <memory>
@@ -77,9 +78,21 @@ public:
 
     std::string value;
 
+    const std::vector<std::string>& codePoints() const {
+        if (!codePointCacheValid_) {
+            codePointCache_ = utf8::toCodePoints(value);
+            codePointCacheValid_ = true;
+        }
+        return codePointCache_;
+    }
+
     std::string ToString() override {
         return value;
     }
+
+private:
+    mutable std::vector<std::string> codePointCache_;
+    mutable bool codePointCacheValid_ = false;
 };
 
 class ReturnValue final : public Object {

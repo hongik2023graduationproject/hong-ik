@@ -746,3 +746,15 @@ TEST_F(VMTest, IntegrationGeneratorWithDefaults) {
     );
     EXPECT_EQ(output, "0\n2\n4\n");
 }
+
+TEST_F(VMTest, OptimizationVerification) {
+    auto result = runVM(
+        "정수 합 = 0\n"
+        "반복 정수 i = 0 부터 100 까지:\n"
+        "    합 = 합 + i\n"
+        "합\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 4950);
+}

@@ -17,6 +17,12 @@ using namespace std;
 
 VM::VM() {
     stack.reserve(STACK_MAX);
+    CACHED_TRUE = make_shared<Boolean>(true);
+    CACHED_FALSE = make_shared<Boolean>(false);
+    CACHED_NULL = make_shared<Null>();
+    for (int i = 0; i < INT_POOL_SIZE; i++) {
+        intPool[i] = make_shared<Integer>(INT_POOL_MIN + i);
+    }
     builtins = {
         {"길이", make_shared<Length>()},
         {"출력", make_shared<Print>()},
@@ -65,6 +71,13 @@ VM::VM() {
         {"JSON_파싱", make_shared<JsonParse>()},
         {"JSON_직렬화", make_shared<JsonSerialize>()},
     };
+}
+
+shared_ptr<Object> VM::makeInt(long long val) {
+    if (val >= INT_POOL_MIN && val <= INT_POOL_MAX) {
+        return intPool[val - INT_POOL_MIN];
+    }
+    return make_shared<Integer>(val);
 }
 
 void VM::push(shared_ptr<Object> value) {
@@ -128,8 +141,8 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
     bool ln = dynamic_cast<Null*>(left.get()) != nullptr;
     bool rn = dynamic_cast<Null*>(right.get()) != nullptr;
     if (ln || rn) {
-        if (op == OpCode::OP_EQUAL) return make_shared<Boolean>(ln && rn);
-        if (op == OpCode::OP_NOT_EQUAL) return make_shared<Boolean>(!(ln && rn));
+        if (op == OpCode::OP_EQUAL) return (ln && rn) ? CACHED_TRUE : CACHED_FALSE;
+        if (op == OpCode::OP_NOT_EQUAL) return !(ln && rn) ? CACHED_TRUE : CACHED_FALSE;
         throw RuntimeException("없음(null) 값에 대해서는 == 와 != 비교만 지원합니다.", line);
     }
 
@@ -138,29 +151,29 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
     if (li && ri) {
         long long lv = li->value, rv = ri->value;
         switch (op) {
-        case OpCode::OP_ADD: return make_shared<Integer>(lv + rv);
-        case OpCode::OP_SUB: return make_shared<Integer>(lv - rv);
-        case OpCode::OP_MUL: return make_shared<Integer>(lv * rv);
+        case OpCode::OP_ADD: return makeInt(lv + rv);
+        case OpCode::OP_SUB: return makeInt(lv - rv);
+        case OpCode::OP_MUL: return makeInt(lv * rv);
         case OpCode::OP_DIV:
             if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", line);
-            return make_shared<Integer>(lv / rv);
+            return makeInt(lv / rv);
         case OpCode::OP_MOD:
             if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", line);
-            return make_shared<Integer>(lv % rv);
+            return makeInt(lv % rv);
         case OpCode::OP_POW: {
             if (rv < 0) return make_shared<Float>(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
             long long result = 1;
             for (long long i = 0; i < rv; i++) result *= lv;
-            return make_shared<Integer>(result);
+            return makeInt(result);
         }
-        case OpCode::OP_BITWISE_AND: return make_shared<Integer>(lv & rv);
-        case OpCode::OP_BITWISE_OR: return make_shared<Integer>(lv | rv);
-        case OpCode::OP_EQUAL: return make_shared<Boolean>(lv == rv);
-        case OpCode::OP_NOT_EQUAL: return make_shared<Boolean>(lv != rv);
-        case OpCode::OP_LESS: return make_shared<Boolean>(lv < rv);
-        case OpCode::OP_GREATER: return make_shared<Boolean>(lv > rv);
-        case OpCode::OP_LESS_EQUAL: return make_shared<Boolean>(lv <= rv);
-        case OpCode::OP_GREATER_EQUAL: return make_shared<Boolean>(lv >= rv);
+        case OpCode::OP_BITWISE_AND: return makeInt(lv & rv);
+        case OpCode::OP_BITWISE_OR: return makeInt(lv | rv);
+        case OpCode::OP_EQUAL: return (lv == rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_NOT_EQUAL: return (lv != rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_LESS: return (lv < rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_GREATER: return (lv > rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_LESS_EQUAL: return (lv <= rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_GREATER_EQUAL: return (lv >= rv) ? CACHED_TRUE : CACHED_FALSE;
         default: break;
         }
     }
@@ -181,12 +194,12 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
             if (rv == 0.0) throw RuntimeException("0으로 나눌 수 없습니다.", line);
             return make_shared<Float>(lv / rv);
         case OpCode::OP_POW: return make_shared<Float>(std::pow(lv, rv));
-        case OpCode::OP_EQUAL: return make_shared<Boolean>(lv == rv);
-        case OpCode::OP_NOT_EQUAL: return make_shared<Boolean>(lv != rv);
-        case OpCode::OP_LESS: return make_shared<Boolean>(lv < rv);
-        case OpCode::OP_GREATER: return make_shared<Boolean>(lv > rv);
-        case OpCode::OP_LESS_EQUAL: return make_shared<Boolean>(lv <= rv);
-        case OpCode::OP_GREATER_EQUAL: return make_shared<Boolean>(lv >= rv);
+        case OpCode::OP_EQUAL: return (lv == rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_NOT_EQUAL: return (lv != rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_LESS: return (lv < rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_GREATER: return (lv > rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_LESS_EQUAL: return (lv <= rv) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_GREATER_EQUAL: return (lv >= rv) ? CACHED_TRUE : CACHED_FALSE;
         default: break;
         }
     }
@@ -195,10 +208,10 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
     auto* rb = dynamic_cast<Boolean*>(right.get());
     if (lb && rb) {
         switch (op) {
-        case OpCode::OP_AND: return make_shared<Boolean>(lb->value && rb->value);
-        case OpCode::OP_OR: return make_shared<Boolean>(lb->value || rb->value);
-        case OpCode::OP_EQUAL: return make_shared<Boolean>(lb->value == rb->value);
-        case OpCode::OP_NOT_EQUAL: return make_shared<Boolean>(lb->value != rb->value);
+        case OpCode::OP_AND: return (lb->value && rb->value) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_OR: return (lb->value || rb->value) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_EQUAL: return (lb->value == rb->value) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_NOT_EQUAL: return (lb->value != rb->value) ? CACHED_TRUE : CACHED_FALSE;
         default: break;
         }
     }
@@ -208,8 +221,8 @@ shared_ptr<Object> VM::binaryOp(OpCode op, shared_ptr<Object> left, shared_ptr<O
     if (ls && rs) {
         switch (op) {
         case OpCode::OP_ADD: return make_shared<String>(ls->value + rs->value);
-        case OpCode::OP_EQUAL: return make_shared<Boolean>(ls->value == rs->value);
-        case OpCode::OP_NOT_EQUAL: return make_shared<Boolean>(ls->value != rs->value);
+        case OpCode::OP_EQUAL: return (ls->value == rs->value) ? CACHED_TRUE : CACHED_FALSE;
+        case OpCode::OP_NOT_EQUAL: return (ls->value != rs->value) ? CACHED_TRUE : CACHED_FALSE;
         default: break;
         }
     }
@@ -233,9 +246,9 @@ shared_ptr<Object> VM::run() {
                 push(frame.function->constants[idx]);
                 break;
             }
-            case OpCode::OP_NULL: push(make_shared<Null>()); break;
-            case OpCode::OP_TRUE: push(make_shared<Boolean>(true)); break;
-            case OpCode::OP_FALSE: push(make_shared<Boolean>(false)); break;
+            case OpCode::OP_NULL: push(CACHED_NULL); break;
+            case OpCode::OP_TRUE: push(CACHED_TRUE); break;
+            case OpCode::OP_FALSE: push(CACHED_FALSE); break;
 
             case OpCode::OP_ADD: case OpCode::OP_SUB: case OpCode::OP_MUL:
             case OpCode::OP_DIV: case OpCode::OP_MOD: case OpCode::OP_POW:
@@ -253,7 +266,7 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_NEGATE: {
                 auto operand = pop();
                 if (auto* i = dynamic_cast<Integer*>(operand.get()))
-                    push(make_shared<Integer>(-i->value));
+                    push(makeInt(-i->value));
                 else if (auto* f = dynamic_cast<Float*>(operand.get()))
                     push(make_shared<Float>(-f->value));
                 else
@@ -263,7 +276,7 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_NOT: {
                 auto operand = pop();
                 if (auto* b = dynamic_cast<Boolean*>(operand.get()))
-                    push(make_shared<Boolean>(!b->value));
+                    push(b->value ? CACHED_FALSE : CACHED_TRUE);
                 else
                     throw RuntimeException("'!' 전위 연산자가 지원되지 않는 타입입니다.", currentLine());
                 break;
@@ -372,14 +385,14 @@ shared_ptr<Object> VM::run() {
                 auto callee = peek(argCount);
 
                 if (dynamic_cast<Builtin*>(callee.get())) {
-                    vector<shared_ptr<Object>> args;
-                    for (int i = argCount - 1; i >= 0; i--) {
-                        args.insert(args.begin(), peek(i));
+                    vector<shared_ptr<Object>> args(argCount);
+                    for (int i = 0; i < argCount; i++) {
+                        args[i] = peek(argCount - 1 - i);
                     }
                     for (int i = 0; i < argCount; i++) pop();
                     pop(); // callee
                     auto result = dynamic_cast<Builtin*>(callee.get())->function(args);
-                    push(result ? result : make_shared<Null>());
+                    push(result ? result : CACHED_NULL);
                 } else if (auto* cls = dynamic_cast<Closure*>(callee.get())) {
                     auto* fn = cls->function.get();
                     fillDefaults(fn, argCount);
@@ -527,7 +540,7 @@ shared_ptr<Object> VM::run() {
                 } else if (auto* str = dynamic_cast<String*>(collection.get())) {
                     auto* idx = dynamic_cast<Integer*>(index.get());
                     if (!idx) throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
-                    auto cps = utf8::toCodePoints(str->value);
+                    const auto& cps = str->codePoints();
                     long long len = static_cast<long long>(cps.size());
                     long long actualIdx = idx->value;
                     if (actualIdx < 0) actualIdx = len + actualIdx;
@@ -668,15 +681,15 @@ shared_ptr<Object> VM::run() {
                 if (dynamic_cast<String*>(obj.get()) || dynamic_cast<Array*>(obj.get()) || dynamic_cast<HashMap*>(obj.get())) {
                     auto bit = builtins.find(methodName->value);
                     if (bit != builtins.end()) {
-                        vector<shared_ptr<Object>> args;
-                        for (int i = argCount - 1; i >= 0; i--) {
-                            args.insert(args.begin(), peek(i));
+                        vector<shared_ptr<Object>> args(argCount + 1);
+                        for (int i = 0; i < argCount; i++) {
+                            args[i + 1] = peek(argCount - 1 - i);
                         }
                         for (int i = 0; i < argCount; i++) pop();
                         auto target = pop(); // the object itself
-                        args.insert(args.begin(), target);
+                        args[0] = target;
                         auto result = bit->second->function(args);
-                        push(result ? result : make_shared<Null>());
+                        push(result ? result : CACHED_NULL);
                         break;
                     }
                 }
@@ -727,7 +740,7 @@ shared_ptr<Object> VM::run() {
                 iter->iterable = iterable;
                 iter->index = 0;
                 if (auto* str = dynamic_cast<String*>(iterable.get())) {
-                    iter->codePoints = utf8::toCodePoints(str->value);
+                    iter->codePoints = str->codePoints();
                 }
                 push(iter);
                 break;
