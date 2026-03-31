@@ -92,6 +92,7 @@ private:
 
     // Optimization
     bool tryConstantFold(InfixExpression* expr);
+    void optimize(CompiledFunction& fn);
 
     // Helpers
     CompiledFunction& chunk();

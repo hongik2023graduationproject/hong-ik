@@ -101,6 +101,7 @@ shared_ptr<CompiledFunction> Compiler::Compile(shared_ptr<Program> program) {
     }
 
     current->function->localCount = static_cast<int>(current->locals.size());
+    optimize(*state.function);
     return state.function;
 }
 
@@ -574,6 +575,10 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
     }
 
     return false;
+}
+
+void Compiler::optimize(CompiledFunction& fn) {
+    // Peephole optimization pass (placeholder for future patterns)
 }
 
 void Compiler::compileInfix(InfixExpression* expr) {
