@@ -56,6 +56,8 @@ private:
 
     std::shared_ptr<Object> evalHashMapIndexExpression(std::shared_ptr<Object> hashmap, std::shared_ptr<Object> key);
 
+    std::shared_ptr<Object> evalSliceExpression(std::shared_ptr<Object> object, std::shared_ptr<Object> start, std::shared_ptr<Object> end);
+
     std::shared_ptr<Object> applyFunction(std::shared_ptr<Object> function, std::vector<std::shared_ptr<Object>> arguments);
 
     std::shared_ptr<Environment> extendFunctionEnvironment(Function* function, std::vector<std::shared_ptr<Object>> arguments);
@@ -96,6 +98,11 @@ private:
     // 고차 함수
     std::shared_ptr<Object> evalHigherOrderCall(const std::string& name,
                                                  std::vector<std::shared_ptr<Object>> arguments, Environment* environment);
+
+    // 제너레이터 관련
+    bool containsYield(BlockStatement* block);
+    std::shared_ptr<Object> evalGeneratorBody(Node* node, Environment* environment, std::vector<std::shared_ptr<Object>>& yieldValues);
+    std::shared_ptr<Object> evalGeneratorBlockStatement(const std::vector<std::shared_ptr<Statement>>& statements, Environment* environment, std::vector<std::shared_ptr<Object>>& yieldValues);
 
     // 샌드박스 제한 체크 (시간 초과)
     void checkLimits();

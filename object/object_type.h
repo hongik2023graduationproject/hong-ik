@@ -18,6 +18,7 @@ enum class ObjectType {
     CLASS_DEF,
     INSTANCE,
     ITERATOR,
+    GENERATOR,
 };
 
 #endif // OBJECT_TYPE_H

@@ -97,6 +97,54 @@ class Random : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
+// 삼각함수
+class Sin : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Cos : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Tan : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+// 로그/지수
+class Log : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Ln : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Power : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+// 상수
+class Pi : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class EulerE : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+// 반올림 계열
+class Round : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Ceil : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Floor : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
 // 문자열 내장함수
 class Split : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
@@ -118,6 +166,26 @@ class Trim : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 
+class StartsWith : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class EndsWith : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Repeat : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Pad : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class Substring : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
 // 배열 내장함수
 class Sort : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
@@ -132,6 +200,15 @@ class Find : public Builtin {
 };
 
 class Slice : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+// JSON 내장함수
+class JsonParse : public Builtin {
+    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+};
+
+class JsonSerialize : public Builtin {
     std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
 };
 

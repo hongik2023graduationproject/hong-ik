@@ -480,7 +480,7 @@ TEST_F(ReplTest, bitwiseOrTest) {
 
 TEST_F(ReplTest, nullTest) {
     std::string user_input;
-    user_input += "정수 x = 없음\n";
+    user_input += "정수? x = 없음\n";
     user_input += "x == 없음\n";
     user_input += "종료하기\n";
     string output = runRepl(user_input);
@@ -858,6 +858,71 @@ TEST_F(ReplTest, negativeStringIndexTest) {
     user_input += "종료하기\n";
     string output = runRepl(user_input);
     EXPECT_NE(output.find("o"), std::string::npos);
+}
+
+// ===== Feature Tests: Slicing =====
+
+TEST_F(ReplTest, arraySliceTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30, 40, 50]\n";
+    user_input += "목록[1:3]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[20, 30]"), std::string::npos);
+}
+
+TEST_F(ReplTest, arraySliceFromStartTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30, 40, 50]\n";
+    user_input += "목록[:3]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[10, 20, 30]"), std::string::npos);
+}
+
+TEST_F(ReplTest, arraySliceToEndTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30, 40, 50]\n";
+    user_input += "목록[2:]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[30, 40, 50]"), std::string::npos);
+}
+
+TEST_F(ReplTest, arraySliceNegativeEndTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30, 40, 50]\n";
+    user_input += "목록[:-1]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("[10, 20, 30, 40]"), std::string::npos);
+}
+
+TEST_F(ReplTest, stringSliceTest) {
+    std::string user_input;
+    user_input += "문자 s = \"hello\"\n";
+    user_input += "s[1:3]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("el"), std::string::npos);
+}
+
+TEST_F(ReplTest, stringSliceNegativeTest) {
+    std::string user_input;
+    user_input += "문자 s = \"hello\"\n";
+    user_input += "s[:-1]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("hell"), std::string::npos);
+}
+
+TEST_F(ReplTest, existingIndexStillWorksTest) {
+    std::string user_input;
+    user_input += "배열 목록 = [10, 20, 30]\n";
+    user_input += "목록[0]\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("10"), std::string::npos);
 }
 
 // ===== VM REPL Tests =====
@@ -1334,4 +1399,482 @@ TEST_F(ReplTest, vmStringInterpolationTest) {
     user_input += "종료하기\n";
     string output = runRepl(user_input, true);
     EXPECT_NE(output.find("값: 100"), std::string::npos);
+}
+
+// Optional 타입 테스트
+TEST_F(ReplTest, optionalTypeDeclarationWithNull) {
+    std::string user_input;
+    user_input += "정수? x = 없음\n";
+    user_input += "x == 없음\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("true"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalTypeDeclarationWithValue) {
+    std::string user_input;
+    user_input += "정수? x = 42\n";
+    user_input += "x\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("42"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalTypeReassignNullToValue) {
+    std::string user_input;
+    user_input += "정수? x = 없음\n";
+    user_input += "x = 10\n";
+    user_input += "x\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("10"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalTypeReassignValueToNull) {
+    std::string user_input;
+    user_input += "정수? x = 42\n";
+    user_input += "x = 없음\n";
+    user_input += "x == 없음\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("true"), std::string::npos);
+}
+
+TEST_F(ReplTest, nonOptionalRejectsNull) {
+    std::string user_input;
+    user_input += "정수 x = 없음\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("선택적 타입이 아닌 변수에"), std::string::npos);
+}
+
+TEST_F(ReplTest, nonOptionalRejectsNullAssignment) {
+    std::string user_input;
+    user_input += "정수 x = 10\n";
+    user_input += "x = 없음\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("선택적 타입이 아닌 변수에"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalStringType) {
+    std::string user_input;
+    user_input += "문자? s = 없음\n";
+    user_input += "s = \"안녕\"\n";
+    user_input += "s\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("안녕"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalFunctionParameter) {
+    std::string user_input;
+    user_input += "함수 테스트(정수? x) -> 논리:\n";
+    user_input += "    리턴 x == 없음\n";
+    user_input += "테스트(없음)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("true"), std::string::npos);
+}
+
+TEST_F(ReplTest, optionalFunctionParameterWithValue) {
+    std::string user_input;
+    user_input += "함수 테스트(정수? x) -> 정수?:\n";
+    user_input += "    리턴 x\n";
+    user_input += "테스트(42)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("42"), std::string::npos);
+}
+
+// 패턴 매칭: 범위 패턴
+TEST_F(ReplTest, matchRangePatternTest) {
+    std::string user_input;
+    user_input += "정수 x = 3\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 1~5:\n";
+    user_input += "        출력(\"범위안\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"범위밖\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("범위안"), std::string::npos);
+}
+
+// 패턴 매칭: 범위 밖
+TEST_F(ReplTest, matchRangePatternOutsideTest) {
+    std::string user_input;
+    user_input += "정수 x = 10\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 1~5:\n";
+    user_input += "        출력(\"범위안\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"범위밖\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("범위밖"), std::string::npos);
+}
+
+// 패턴 매칭: 타입 패턴
+TEST_F(ReplTest, matchTypePatternIntegerTest) {
+    std::string user_input;
+    user_input += "정수 x = 42\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 문자:\n";
+    user_input += "        출력(\"문자열\")\n";
+    user_input += "    경우 정수:\n";
+    user_input += "        출력(\"정수값\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("정수값"), std::string::npos);
+}
+
+// 패턴 매칭: 타입 패턴 - 문자열
+TEST_F(ReplTest, matchTypePatternStringTest) {
+    std::string user_input;
+    user_input += "문자 s = \"안녕\"\n";
+    user_input += "비교 s:\n";
+    user_input += "    경우 정수:\n";
+    user_input += "        출력(\"정수값\")\n";
+    user_input += "    경우 문자:\n";
+    user_input += "        출력(\"문자열\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("문자열"), std::string::npos);
+}
+
+// 패턴 매칭: 조건 가드
+TEST_F(ReplTest, matchGuardConditionTest) {
+    std::string user_input;
+    user_input += "정수 x = 7\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 7 만약 x > 5:\n";
+    user_input += "        출력(\"큰7\")\n";
+    user_input += "    경우 7:\n";
+    user_input += "        출력(\"작은7\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("큰7"), std::string::npos);
+}
+
+// 패턴 매칭: 범위 + 값 혼합
+TEST_F(ReplTest, matchMixedPatternsTest) {
+    std::string user_input;
+    user_input += "정수 x = 100\n";
+    user_input += "비교 x:\n";
+    user_input += "    경우 1~10:\n";
+    user_input += "        출력(\"작은수\")\n";
+    user_input += "    경우 100:\n";
+    user_input += "        출력(\"백\")\n";
+    user_input += "    기본:\n";
+    user_input += "        출력(\"기타\")\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("백"), std::string::npos);
+}
+
+// ===== 클로저 테스트 =====
+
+TEST_F(ReplTest, closureBasicCapture) {
+    std::string user_input;
+    user_input += "함수 더하기기(정수 x) -> 함수:\n";
+    user_input += "    함수 내부(정수 y) -> 정수:\n";
+    user_input += "        리턴 x + y\n";
+    user_input += "    리턴 내부\n";
+    user_input += "\n";
+    user_input += "함수 f = 더하기기(3)\n";
+    user_input += "f(5)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("8"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureCounter) {
+    std::string user_input;
+    user_input += "함수 카운터() -> 함수:\n";
+    user_input += "    정수 count = 0\n";
+    user_input += "    함수 증가() -> 정수:\n";
+    user_input += "        count += 1\n";
+    user_input += "        리턴 count\n";
+    user_input += "    리턴 증가\n";
+    user_input += "\n";
+    user_input += "함수 c = 카운터()\n";
+    user_input += "출력(c())\n";
+    user_input += "출력(c())\n";
+    user_input += "출력(c())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("1"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureIndependentCounters) {
+    std::string user_input;
+    user_input += "함수 카운터() -> 함수:\n";
+    user_input += "    정수 count = 0\n";
+    user_input += "    함수 증가() -> 정수:\n";
+    user_input += "        count += 1\n";
+    user_input += "        리턴 count\n";
+    user_input += "    리턴 증가\n";
+    user_input += "\n";
+    user_input += "함수 c1 = 카운터()\n";
+    user_input += "함수 c2 = 카운터()\n";
+    user_input += "출력(c1())\n";
+    user_input += "출력(c1())\n";
+    user_input += "출력(c2())\n";
+    user_input += "출력(c1())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    // c1() -> 1, c1() -> 2, c2() -> 1 (independent), c1() -> 3
+    // Output should contain lines: 1, 2, 1, 3
+    // Check output has "3" from c1's third call
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureDeeplyNested) {
+    std::string user_input;
+    user_input += "함수 외부() -> 함수:\n";
+    user_input += "    정수 x = 1\n";
+    user_input += "    함수 중간() -> 함수:\n";
+    user_input += "        함수 내부() -> 정수:\n";
+    user_input += "            x += 1\n";
+    user_input += "            리턴 x\n";
+    user_input += "        리턴 내부\n";
+    user_input += "    리턴 중간\n";
+    user_input += "\n";
+    user_input += "함수 중간fn = 외부()\n";
+    user_input += "함수 내부fn = 중간fn()\n";
+    user_input += "출력(내부fn())\n";
+    user_input += "출력(내부fn())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureBasicCaptureVM) {
+    std::string user_input;
+    user_input += "함수 더하기기(정수 x) -> 함수:\n";
+    user_input += "    함수 내부(정수 y) -> 정수:\n";
+    user_input += "        리턴 x + y\n";
+    user_input += "    리턴 내부\n";
+    user_input += "\n";
+    user_input += "함수 f = 더하기기(3)\n";
+    user_input += "f(5)\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("8"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureCounterVM) {
+    std::string user_input;
+    user_input += "함수 카운터() -> 함수:\n";
+    user_input += "    정수 count = 0\n";
+    user_input += "    함수 증가() -> 정수:\n";
+    user_input += "        count += 1\n";
+    user_input += "        리턴 count\n";
+    user_input += "    리턴 증가\n";
+    user_input += "\n";
+    user_input += "함수 c = 카운터()\n";
+    user_input += "출력(c())\n";
+    user_input += "출력(c())\n";
+    user_input += "출력(c())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("1"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureIndependentCountersVM) {
+    std::string user_input;
+    user_input += "함수 카운터() -> 함수:\n";
+    user_input += "    정수 count = 0\n";
+    user_input += "    함수 증가() -> 정수:\n";
+    user_input += "        count += 1\n";
+    user_input += "        리턴 count\n";
+    user_input += "    리턴 증가\n";
+    user_input += "\n";
+    user_input += "함수 c1 = 카운터()\n";
+    user_input += "함수 c2 = 카운터()\n";
+    user_input += "출력(c1())\n";
+    user_input += "출력(c1())\n";
+    user_input += "출력(c2())\n";
+    user_input += "출력(c1())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, closureDeeplyNestedVM) {
+    std::string user_input;
+    user_input += "함수 외부() -> 함수:\n";
+    user_input += "    정수 x = 1\n";
+    user_input += "    함수 중간() -> 함수:\n";
+    user_input += "        함수 내부() -> 정수:\n";
+    user_input += "            x += 1\n";
+    user_input += "            리턴 x\n";
+    user_input += "        리턴 내부\n";
+    user_input += "    리턴 중간\n";
+    user_input += "\n";
+    user_input += "함수 중간fn = 외부()\n";
+    user_input += "함수 내부fn = 중간fn()\n";
+    user_input += "출력(내부fn())\n";
+    user_input += "출력(내부fn())\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input, true);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, functionTypeVariable) {
+    std::string user_input;
+    user_input += "함수 삼() -> 정수:\n";
+    user_input += "    리턴 3\n";
+    user_input += "\n";
+    user_input += "함수 f = 삼\n";
+    user_input += "f()\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+// ===== Feature Tests: Generator (생산) =====
+
+TEST_F(ReplTest, generatorBasicTest) {
+    std::string user_input;
+    user_input += "함수 숫자생성() -> 정수:\n";
+    user_input += "    생산 1\n";
+    user_input += "    생산 2\n";
+    user_input += "    생산 3\n";
+    user_input += "\n";
+    user_input += "각각 정수 x 숫자생성() 에서:\n";
+    user_input += "    출력(x)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("1"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+}
+
+TEST_F(ReplTest, generatorWithLoopTest) {
+    std::string user_input;
+    user_input += "함수 범위(정수 끝) -> 정수:\n";
+    user_input += "    정수 i = 0\n";
+    user_input += "    반복 i < 끝 동안:\n";
+    user_input += "        생산 i\n";
+    user_input += "        i += 1\n";
+    user_input += "\n";
+    user_input += "각각 정수 x 범위(5) 에서:\n";
+    user_input += "    출력(x)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("0"), std::string::npos);
+    EXPECT_NE(output.find("1"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("3"), std::string::npos);
+    EXPECT_NE(output.find("4"), std::string::npos);
+}
+
+TEST_F(ReplTest, generatorWithParameterTest) {
+    std::string user_input;
+    user_input += "함수 짝수생성(정수 최대) -> 정수:\n";
+    user_input += "    정수 i = 0\n";
+    user_input += "    반복 i < 최대 동안:\n";
+    user_input += "        생산 i * 2\n";
+    user_input += "        i += 1\n";
+    user_input += "\n";
+    user_input += "각각 정수 n 짝수생성(4) 에서:\n";
+    user_input += "    출력(n)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("0"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("4"), std::string::npos);
+    EXPECT_NE(output.find("6"), std::string::npos);
+}
+
+TEST_F(ReplTest, generatorStringTest) {
+    std::string user_input;
+    user_input += "함수 인사생성() -> 문자:\n";
+    user_input += "    생산 \"안녕\"\n";
+    user_input += "    생산 \"하세요\"\n";
+    user_input += "\n";
+    user_input += "각각 문자 s 인사생성() 에서:\n";
+    user_input += "    출력(s)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("안녕"), std::string::npos);
+    EXPECT_NE(output.find("하세요"), std::string::npos);
+}
+
+TEST_F(ReplTest, generatorWithBreakTest) {
+    std::string user_input;
+    user_input += "함수 무한숫자() -> 정수:\n";
+    user_input += "    정수 i = 0\n";
+    user_input += "    반복 i < 100 동안:\n";
+    user_input += "        생산 i\n";
+    user_input += "        i += 1\n";
+    user_input += "\n";
+    user_input += "각각 정수 x 무한숫자() 에서:\n";
+    user_input += "    만약 x == 3 라면:\n";
+    user_input += "        중단\n";
+    user_input += "    출력(x)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("0"), std::string::npos);
+    EXPECT_NE(output.find("1"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    // 3 should NOT be printed (break before print)
+}
+
+TEST_F(ReplTest, generatorWithConditionTest) {
+    std::string user_input;
+    user_input += "함수 조건생산(정수 끝) -> 정수:\n";
+    user_input += "    정수 i = 0\n";
+    user_input += "    반복 i < 끝 동안:\n";
+    user_input += "        만약 i % 2 == 0 라면:\n";
+    user_input += "            생산 i\n";
+    user_input += "        i += 1\n";
+    user_input += "\n";
+    user_input += "각각 정수 x 조건생산(6) 에서:\n";
+    user_input += "    출력(x)\n";
+    user_input += "\n";
+    user_input += "종료하기\n";
+    string output = runRepl(user_input);
+    EXPECT_NE(output.find("0"), std::string::npos);
+    EXPECT_NE(output.find("2"), std::string::npos);
+    EXPECT_NE(output.find("4"), std::string::npos);
+}
+
+// ===== 인덱스 대입 =====
+
+TEST_F(ReplTest, indexAssignmentArray) {
+    string user_input = "배열 목록 = [1, 2, 3]\n목록[0] = 10\n출력(목록[0])\n종료하기\n";
+    auto output = runRepl(user_input);
+    EXPECT_TRUE(output.find("10") != string::npos);
+}
+
+TEST_F(ReplTest, indexAssignmentHashMap) {
+    string user_input = "사전 정보 = {\"이름\": \"홍길동\"}\n정보[\"나이\"] = \"25\"\n출력(정보[\"나이\"])\n종료하기\n";
+    auto output = runRepl(user_input);
+    EXPECT_TRUE(output.find("25") != string::npos);
 }

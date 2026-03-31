@@ -21,9 +21,11 @@ public:
     std::shared_ptr<Token> type;
     std::string name;
     std::shared_ptr<Expression> value;
+    bool isOptional = false;
 
     std::string String() override {
-        return "[" + type->text + "] " + name + " = " + value->String();
+        std::string optStr = isOptional ? "?" : "";
+        return "[" + type->text + optStr + "] " + name + " = " + value->String();
     }
 };
 
@@ -157,9 +159,11 @@ public:
     std::vector<std::shared_ptr<Token>> parameterTypes;
     std::vector<std::shared_ptr<IdentifierExpression>> parameters;
     std::vector<std::shared_ptr<Expression>> defaultValues;
+    std::vector<bool> parameterOptionals;
     std::string name;
     std::shared_ptr<BlockStatement> body;
     std::shared_ptr<Token> returnType;
+    bool returnTypeOptional = false;
 
     std::string String() override {
         std::string str = "함수: ";
@@ -186,12 +190,17 @@ public:
     std::shared_ptr<Expression> subject;
     std::vector<std::shared_ptr<Expression>> caseValues;
     std::vector<std::shared_ptr<BlockStatement>> caseBodies;
+    std::vector<std::shared_ptr<Expression>> caseGuards; // 조건 가드 (만약 ...)
     std::shared_ptr<BlockStatement> defaultBody;
 
     std::string String() override {
         std::string s = "비교 " + subject->String() + ":\n";
         for (size_t i = 0; i < caseValues.size(); i++) {
-            s += "  경우 " + caseValues[i]->String() + ":\n" + caseBodies[i]->String();
+            s += "  경우 " + caseValues[i]->String();
+            if (i < caseGuards.size() && caseGuards[i]) {
+                s += " 만약 " + caseGuards[i]->String();
+            }
+            s += ":\n" + caseBodies[i]->String();
         }
         if (defaultBody) {
             s += "  기본:\n" + defaultBody->String();
@@ -233,6 +242,26 @@ public:
             s += "  " + fieldTypes[i]->text + " " + fieldNames[i] + "\n";
         }
         return s;
+    }
+};
+
+class YieldStatement : public Statement {
+public:
+    std::shared_ptr<Expression> expression;
+
+    std::string String() override {
+        return "생산 " + expression->String();
+    }
+};
+
+class IndexAssignmentStatement : public Statement {
+public:
+    std::shared_ptr<Expression> collection;
+    std::shared_ptr<Expression> index;
+    std::shared_ptr<Expression> value;
+
+    std::string String() override {
+        return collection->String() + "[" + index->String() + "] = " + value->String();
     }
 };
 

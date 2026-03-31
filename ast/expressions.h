@@ -102,6 +102,23 @@ public:
     }
 };
 
+class SliceExpression : public Expression {
+public:
+    std::shared_ptr<Expression> object;
+    std::shared_ptr<Expression> start; // nullptr if omitted
+    std::shared_ptr<Expression> end;   // nullptr if omitted
+
+    std::string String() override {
+        std::string s = object ? object->String() : "<null>";
+        s += "[";
+        if (start) s += start->String();
+        s += ":";
+        if (end) s += end->String();
+        s += "]";
+        return s;
+    }
+};
+
 // 후위 표현식 (변수++ 또는 변수--)
 class PostfixExpression : public Expression {
 public:
@@ -131,6 +148,27 @@ public:
         s += ") ";
         if (body) s += body->String();
         return s;
+    }
+};
+
+// 범위 패턴: 1~5 (1 이상 5 이하)
+class RangePatternExpression : public Expression {
+public:
+    std::shared_ptr<Expression> start;
+    std::shared_ptr<Expression> end;
+
+    std::string String() override {
+        return start->String() + "~" + end->String();
+    }
+};
+
+// 타입 패턴: 정수, 실수, 문자, 논리, 배열, 사전
+class TypePatternExpression : public Expression {
+public:
+    std::shared_ptr<Token> typeToken;
+
+    std::string String() override {
+        return typeToken->text;
     }
 };
 

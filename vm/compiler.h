@@ -65,6 +65,9 @@ private:
     void compileMatch(MatchStatement* stmt);
     void compileTryCatch(TryCatchStatement* stmt);
     void compileImport(ImportStatement* stmt);
+    void compileIndexAssignment(IndexAssignmentStatement* stmt);
+    void compileYield(YieldStatement* stmt);
+    bool containsYield(BlockStatement* block);
 
     // Expressions
     void compileInfix(InfixExpression* expr);
@@ -75,6 +78,7 @@ private:
     void compileMemberAccess(MemberAccessExpression* expr);
     void compileMethodCall(MethodCallExpression* expr);
     void compileIndex(IndexExpression* expr);
+    void compileSlice(SliceExpression* expr);
 
     // Scope
     void beginScope();
@@ -84,6 +88,9 @@ private:
     int resolveUpvalue(CompilerState* state, const std::string& name);
     uint16_t addUpvalue(CompilerState* state, uint16_t index, bool isLocal);
     uint16_t identifierConstant(const std::string& name);
+
+    // Optimization
+    bool tryConstantFold(InfixExpression* expr);
 
     // Helpers
     CompiledFunction& chunk();

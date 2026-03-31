@@ -16,6 +16,16 @@ std::shared_ptr<Object> Environment::Set(const std::string& name, std::shared_pt
     return object;
 }
 
+void Environment::SetOptional(const std::string& name) {
+    optionalVars.insert(name);
+}
+
+bool Environment::IsOptional(const std::string& name) {
+    if (optionalVars.count(name)) return true;
+    if (outer != nullptr) return outer->IsOptional(name);
+    return false;
+}
+
 std::shared_ptr<Object> Environment::Update(const std::string& name, std::shared_ptr<Object> object) {
     auto it = store.find(name);
     if (it != store.end()) {

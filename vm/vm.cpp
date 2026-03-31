@@ -1,9 +1,15 @@
 #include "vm.h"
+#include "compiler.h"
 #include "../environment/environment.h"
 #include "../exception/exception.h"
+#include "../lexer/lexer.h"
+#include "../parser/parser.h"
+#include "../utf8_converter/utf8_converter.h"
 #include "../util/utf8_utils.h"
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
@@ -376,29 +382,27 @@ shared_ptr<Object> VM::run() {
                     push(result ? result : make_shared<Null>());
                 } else if (auto* cls = dynamic_cast<Closure*>(callee.get())) {
                     auto* fn = cls->function.get();
-                    if (fn->arity != argCount) {
-                        throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
-                    }
+                    fillDefaults(fn, argCount);
                     if (frames.size() >= FRAMES_MAX) {
                         throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
                     }
                     CallFrame newFrame;
                     newFrame.function = fn;
                     newFrame.ip = 0;
-                    newFrame.slotOffset = stack.size() - argCount;
+                    newFrame.slotOffset = stack.size() - fn->arity;
                     newFrame.closure = cls;
+                    newFrame.isGenerator = fn->hasYield;
                     frames.push_back(newFrame);
                 } else if (auto* fn = dynamic_cast<CompiledFunction*>(callee.get())) {
-                    if (fn->arity != argCount) {
-                        throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
-                    }
+                    fillDefaults(fn, argCount);
                     if (frames.size() >= FRAMES_MAX) {
                         throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
                     }
                     CallFrame newFrame;
                     newFrame.function = fn;
                     newFrame.ip = 0;
-                    newFrame.slotOffset = stack.size() - argCount;
+                    newFrame.slotOffset = stack.size() - fn->arity;
+                    newFrame.isGenerator = fn->hasYield;
                     frames.push_back(newFrame);
                 } else if (auto* classDef = dynamic_cast<CompiledClassDef*>(callee.get())) {
                     auto instance = make_shared<Instance>();
@@ -409,17 +413,16 @@ shared_ptr<Object> VM::run() {
                     }
 
                     if (classDef->compiledConstructor) {
-                        if (classDef->compiledConstructor->arity != argCount) {
-                            throw RuntimeException("생성자 인자 개수 불일치", currentLine());
-                        }
-                        // 스택: [classDef, arg1, arg2, ...]
+                        auto* ctorFn = classDef->compiledConstructor.get();
+                        fillDefaults(ctorFn, argCount);
+                        // 스택: [classDef, arg1, arg2, ..., defaults...]
                         // 생성자 로컬: [자기(slot0), param1, param2, ...]
-                        stack[stack.size() - argCount - 1] = instance;
+                        stack[stack.size() - ctorFn->arity - 1] = instance;
 
                         CallFrame ctorFrame;
-                        ctorFrame.function = classDef->compiledConstructor.get();
+                        ctorFrame.function = ctorFn;
                         ctorFrame.ip = 0;
-                        ctorFrame.slotOffset = stack.size() - argCount - 1;
+                        ctorFrame.slotOffset = stack.size() - ctorFn->arity - 1;
                         frames.push_back(ctorFrame);
                     } else {
                         for (int i = 0; i < argCount; i++) pop();
@@ -436,6 +439,8 @@ shared_ptr<Object> VM::run() {
                 auto result = pop();
                 size_t slotOffset = currentFrame().slotOffset;
                 bool hasCallee = currentFrame().hasCallee;
+                bool wasGenerator = currentFrame().isGenerator;
+                auto yieldValues = std::move(currentFrame().yieldBuffer);
                 frames.pop_back();
 
                 // 현재 프레임의 로컬 스택 정리
@@ -444,6 +449,11 @@ shared_ptr<Object> VM::run() {
                 }
 
                 if (frames.empty()) {
+                    if (wasGenerator) {
+                        auto arr = make_shared<Array>();
+                        arr->elements = std::move(yieldValues);
+                        return arr;
+                    }
                     return result;
                 }
 
@@ -452,7 +462,14 @@ shared_ptr<Object> VM::run() {
                 if (hasCallee && !stack.empty() && stack.size() > currentFrame().slotOffset) {
                     stack.pop_back(); // callee 제거
                 }
-                push(result);
+
+                if (wasGenerator) {
+                    auto arr = make_shared<Array>();
+                    arr->elements = std::move(yieldValues);
+                    push(arr);
+                } else {
+                    push(result);
+                }
                 break;
             }
 
@@ -532,6 +549,29 @@ shared_ptr<Object> VM::run() {
                 } else {
                     throw RuntimeException("인덱스 연산이 지원되지 않는 형식입니다.", currentLine());
                 }
+                break;
+            }
+
+            case OpCode::OP_INDEX_SET: {
+                auto value = pop();
+                auto index = pop();
+                auto collection = pop();
+                if (auto* arr = dynamic_cast<Array*>(collection.get())) {
+                    auto* idx = dynamic_cast<Integer*>(index.get());
+                    if (!idx) throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
+                    long long actualIdx = idx->value;
+                    if (actualIdx < 0) actualIdx += static_cast<long long>(arr->elements.size());
+                    if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
+                        throw RuntimeException("배열의 범위 밖 인덱스입니다.", currentLine());
+                    arr->elements[actualIdx] = value;
+                } else if (auto* hm = dynamic_cast<HashMap*>(collection.get())) {
+                    auto* key = dynamic_cast<String*>(index.get());
+                    if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
+                    hm->pairs[key->value] = value;
+                } else {
+                    throw RuntimeException("인덱스 대입이 지원되지 않는 형식입니다.", currentLine());
+                }
+                push(value);
                 break;
             }
 
@@ -647,16 +687,14 @@ shared_ptr<Object> VM::run() {
                         auto it = ccd->compiledMethods.find(methodName->value);
                         if (it != ccd->compiledMethods.end()) {
                             auto* methodFn = it->second.get();
-                            if (methodFn->arity != static_cast<int>(argCount)) {
-                                throw RuntimeException("메서드 인자 개수 불일치", currentLine());
-                            }
-                            // 스택: [instance, arg1, arg2, ...]
+                            fillDefaults(methodFn, static_cast<int>(argCount));
+                            // 스택: [instance, arg1, arg2, ..., defaults...]
                             // 메서드 로컬: [자기, param1, param2, ...]
                             // instance가 자기(slot 0), 별도 callee 슬롯 없음
                             CallFrame methodFrame;
                             methodFrame.function = methodFn;
                             methodFrame.ip = 0;
-                            methodFrame.slotOffset = stack.size() - argCount - 1;
+                            methodFrame.slotOffset = stack.size() - methodFn->arity - 1;
                             methodFrame.hasCallee = false;
                             frames.push_back(methodFrame);
                             break;
@@ -826,6 +864,78 @@ shared_ptr<Object> VM::run() {
                 break;
             }
 
+            case OpCode::OP_IMPORT: {
+                uint16_t nameIdx = readUint16();
+                auto* filename = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+                if (!filename) throw RuntimeException("잘못된 파일명입니다.", currentLine());
+
+                // Canonicalize path for dedup
+                string canonicalPath;
+                try {
+                    canonicalPath = std::filesystem::weakly_canonical(filename->value).string();
+                } catch (...) {
+                    canonicalPath = filename->value;
+                }
+
+                // Skip if already imported
+                if (importedFiles.count(canonicalPath)) break;
+                importedFiles.insert(canonicalPath);
+
+                // Read file
+                ifstream importFile(filename->value);
+                if (!importFile.is_open()) {
+                    throw RuntimeException("파일을 열 수 없습니다: " + filename->value, currentLine());
+                }
+                stringstream importBuffer;
+                importBuffer << importFile.rdbuf();
+                string source = importBuffer.str();
+
+                // Lexer -> Parser -> Compiler pipeline
+                Lexer importLexer;
+                vector<shared_ptr<Token>> allTokens;
+                istringstream importStream(source);
+                string srcLine;
+                int indent = 0;
+
+                while (getline(importStream, srcLine)) {
+                    srcLine += "\n";
+                    auto utf8chars = Utf8Converter::Convert(srcLine);
+                    auto tokens = importLexer.Tokenize(utf8chars);
+                    allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
+                    for (auto& t : tokens) {
+                        if (t->type == TokenType::START_BLOCK) indent++;
+                        if (t->type == TokenType::END_BLOCK) indent--;
+                    }
+                }
+                for (int i = 0; i < indent; i++) {
+                    allTokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
+                }
+
+                Parser importParser;
+                auto program = importParser.Parsing(allTokens);
+
+                Compiler importCompiler;
+                auto importedFn = importCompiler.Compile(program);
+
+                // Store ownership
+                importedModules.push_back(importedFn);
+
+                // Execute imported code in current VM context
+                CallFrame importFrame;
+                importFrame.function = importedFn.get();
+                importFrame.ip = 0;
+                importFrame.slotOffset = stack.size();
+                importFrame.hasCallee = false;
+                frames.push_back(importFrame);
+                break;
+            }
+
+            case OpCode::OP_YIELD: {
+                auto value = pop();
+                currentFrame().yieldBuffer.push_back(value);
+                break;
+            }
+
             case OpCode::OP_INTERPOLATE: {
                 uint16_t count = readUint16();
                 vector<shared_ptr<Object>> segments;
@@ -869,4 +979,18 @@ shared_ptr<Object> VM::run() {
 
     if (!stack.empty()) return pop();
     return make_shared<Null>();
+}
+
+void VM::fillDefaults(CompiledFunction* fn, int argCount) {
+    int requiredArgs = fn->arity - fn->defaultCount;
+    if (argCount < requiredArgs || argCount > fn->arity) {
+        throw RuntimeException("함수가 필요한 인자 개수와 입력된 인자 개수가 다릅니다.", currentLine());
+    }
+    for (int i = argCount; i < fn->arity; i++) {
+        if (i < static_cast<int>(fn->defaultValues.size()) && fn->defaultValues[i]) {
+            push(fn->defaultValues[i]);
+        } else {
+            push(make_shared<Null>());
+        }
+    }
 }

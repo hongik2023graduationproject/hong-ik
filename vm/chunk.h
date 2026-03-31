@@ -17,6 +17,9 @@ struct CompiledFunction : public Object {
     std::string name;
     int arity = 0;
     int localCount = 0;
+    int defaultCount = 0;
+    std::vector<std::shared_ptr<Object>> defaultValues; // pre-evaluated constant defaults, nullptr for required params
+    bool hasYield = false;
 
     CompiledFunction() { type = ObjectType::FUNCTION; }
 

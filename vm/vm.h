@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -18,6 +19,8 @@ struct CallFrame {
     size_t slotOffset;              // 스택 내 로컬 시작 위치
     bool hasCallee = true;          // OP_CALL은 true, OP_INVOKE는 false
     Closure* closure = nullptr;     // 클로저인 경우 업밸류 접근용
+    bool isGenerator = false;
+    std::vector<std::shared_ptr<Object>> yieldBuffer;
 };
 
 // 예외 핸들러
@@ -57,6 +60,8 @@ private:
     std::map<std::string, std::shared_ptr<Object>> globals;
     std::map<std::string, std::shared_ptr<Builtin>> builtins;
     std::vector<ExceptionHandler> exceptionHandlers;
+    std::set<std::string> importedFiles;
+    std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
 
     // 실행 루프
     std::shared_ptr<Object> run();
@@ -77,6 +82,9 @@ private:
 
     // 함수 호출
     bool callValue(std::shared_ptr<Object> callee, int argCount);
+
+    // 기본 매개변수 채우기
+    void fillDefaults(CompiledFunction* fn, int argCount);
 
     // 에러
     long long currentLine();

@@ -29,6 +29,7 @@ public:
     ErrorLocation location;
     std::string code;          // 소스 코드 일부
     std::string suggestion;    // 수정 제안 (선택)
+    std::string formattedMessage; // 위치 정보 포함 메시지
 
     HongIkError(
         HongIkErrorType errorType,
@@ -43,10 +44,15 @@ public:
         , code(codeSnippet)
         , suggestion(sug)
     {
+        if (location.line > 0) {
+            formattedMessage = "[줄 " + std::to_string(location.line) + "] " + message;
+        } else {
+            formattedMessage = message;
+        }
     }
 
     const char* what() const noexcept override {
-        return message.c_str();
+        return formattedMessage.c_str();
     }
 
     // 에러 정보를 JSON 문자열로 반환

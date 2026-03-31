@@ -100,9 +100,11 @@ public:
     std::vector<std::shared_ptr<Token>> parameterTypes;
     std::vector<std::shared_ptr<IdentifierExpression>> parameters;
     std::vector<std::shared_ptr<Expression>> defaultValues;
+    std::vector<bool> parameterOptionals;
     std::shared_ptr<BlockStatement> body;
     std::shared_ptr<Environment> env;
     std::shared_ptr<Token> returnType;
+    bool returnTypeOptional = false;
 
     Function() {
         type = ObjectType::FUNCTION;
@@ -254,6 +256,44 @@ public:
 
     std::string ToString() override {
         return classDef->name + " 인스턴스";
+    }
+};
+
+class YieldSignal final : public Object {
+public:
+    std::shared_ptr<Object> value;
+
+    YieldSignal(std::shared_ptr<Object> value) : value(std::move(value)) {
+        type = ObjectType::GENERATOR;
+    }
+
+    std::string ToString() override {
+        return value ? value->ToString() : "";
+    }
+};
+
+class GeneratorObject final : public Object {
+public:
+    std::vector<std::shared_ptr<Object>> values;
+    size_t index = 0;
+
+    GeneratorObject() {
+        type = ObjectType::GENERATOR;
+    }
+
+    bool hasNext() const {
+        return index < values.size();
+    }
+
+    std::shared_ptr<Object> next() {
+        if (index < values.size()) {
+            return values[index++];
+        }
+        return nullptr;
+    }
+
+    std::string ToString() override {
+        return "제너레이터";
     }
 };
 

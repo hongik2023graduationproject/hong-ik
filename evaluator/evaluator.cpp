@@ -40,15 +40,33 @@ Evaluator::Evaluator(IOContext* ioCtx, ExecutionLimiter* limiter)
         {"최대", make_shared<Max>()},
         {"최소", make_shared<Min>()},
         {"난수", make_shared<Random>()},
+        {"사인", make_shared<Sin>()},
+        {"코사인", make_shared<Cos>()},
+        {"탄젠트", make_shared<Tan>()},
+        {"로그", make_shared<Log>()},
+        {"자연로그", make_shared<Ln>()},
+        {"거듭제곱", make_shared<Power>()},
+        {"파이", make_shared<Pi>()},
+        {"자연수e", make_shared<EulerE>()},
+        {"반올림", make_shared<Round>()},
+        {"올림", make_shared<Ceil>()},
+        {"내림", make_shared<Floor>()},
         {"분리", make_shared<Split>()},
         {"대문자", make_shared<ToUpper>()},
         {"소문자", make_shared<ToLower>()},
         {"치환", make_shared<Replace>()},
         {"자르기", make_shared<Trim>()},
+        {"시작확인", make_shared<StartsWith>()},
+        {"끝확인", make_shared<EndsWith>()},
+        {"반복", make_shared<Repeat>()},
+        {"채우기", make_shared<Pad>()},
+        {"부분문자", make_shared<Substring>()},
         {"정렬", make_shared<Sort>()},
         {"뒤집기", make_shared<Reverse>()},
         {"찾기", make_shared<Find>()},
         {"조각", make_shared<Slice>()},
+        {"JSON_파싱", make_shared<JsonParse>()},
+        {"JSON_직렬화", make_shared<JsonSerialize>()},
     };
 }
 
@@ -165,7 +183,13 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         }
 
         if (dynamic_cast<Null*>(value.get())) {
+            if (!initialization_statement->isOptional) {
+                throw RuntimeException("선택적 타입이 아닌 변수에 '없음'을 대입할 수 없습니다.", current_line);
+            }
             environment->Set(initialization_statement->name, value);
+            if (initialization_statement->isOptional) {
+                environment->SetOptional(initialization_statement->name);
+            }
             return value;
         }
 
@@ -177,6 +201,9 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
                     throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", current_line);
                 }
                 environment->Set(initialization_statement->name, value);
+                if (initialization_statement->isOptional) {
+                    environment->SetOptional(initialization_statement->name);
+                }
                 return value;
             }
         }
@@ -185,6 +212,9 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", current_line);
         }
         environment->Set(initialization_statement->name, value);
+        if (initialization_statement->isOptional) {
+            environment->SetOptional(initialization_statement->name);
+        }
         return value;
     }
     if (auto* assignment_statement = dynamic_cast<AssignmentStatement*>(node)) {
@@ -210,11 +240,39 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
 
         auto value = eval(assignment_statement->value.get(), environment);
 
-        if (!dynamic_cast<Null*>(value.get()) && !typeCheck(before->type, value)) {
+        if (dynamic_cast<Null*>(value.get())) {
+            if (!environment->IsOptional(assignment_statement->name)) {
+                throw RuntimeException("선택적 타입이 아닌 변수에 '없음'을 대입할 수 없습니다.", current_line);
+            }
+        } else if (dynamic_cast<Null*>(before.get())) {
+            // Optional 변수가 현재 '없음'인 경우, 새 값 대입 허용 (타입 체크 스킵)
+        } else if (!typeCheck(before->type, value)) {
             throw RuntimeException("값의 형식이 변수의 형식과 일치하지 않습니다.", current_line);
         }
 
         environment->Update(assignment_statement->name, value);
+        return value;
+    }
+    if (auto* idx_assign = dynamic_cast<IndexAssignmentStatement*>(node)) {
+        auto collection = eval(idx_assign->collection.get(), environment);
+        auto index = eval(idx_assign->index.get(), environment);
+        auto value = eval(idx_assign->value.get(), environment);
+
+        if (auto* arr = dynamic_cast<Array*>(collection.get())) {
+            auto* idx = dynamic_cast<Integer*>(index.get());
+            if (!idx) throw RuntimeException("배열 인덱스는 정수여야 합니다.", current_line);
+            long long actualIdx = idx->value;
+            if (actualIdx < 0) actualIdx += static_cast<long long>(arr->elements.size());
+            if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
+                throw RuntimeException("배열의 범위 밖 인덱스입니다.", current_line);
+            arr->elements[actualIdx] = value;
+        } else if (auto* hm = dynamic_cast<HashMap*>(collection.get())) {
+            auto* key = dynamic_cast<String*>(index.get());
+            if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", current_line);
+            hm->pairs[key->value] = value;
+        } else {
+            throw RuntimeException("인덱스 대입이 지원되지 않는 형식입니다.", current_line);
+        }
         return value;
     }
     if (auto* compound_statement = dynamic_cast<CompoundAssignmentStatement*>(node)) {
@@ -305,8 +363,22 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
                 if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
                 if (dynamic_cast<ReturnValue*>(result.get())) return result;
             }
+        } else if (auto* gen = dynamic_cast<GeneratorObject*>(iterable.get())) {
+            while (gen->hasNext()) {
+                if (limiter) limiter->incrementLoopCounter();
+                auto element = gen->next();
+                if (!typeCheck(foreach_statement->elementType.get(), element)) {
+                    throw RuntimeException("각각 반복문에서 원소의 타입이 일치하지 않습니다.", current_line);
+                }
+                auto loopEnv = make_shared<Environment>(environment->shared_from_this());
+                loopEnv->Set(foreach_statement->elementName, element);
+                result = eval(foreach_statement->body.get(), loopEnv.get());
+                if (dynamic_cast<ContinueSignal*>(result.get())) continue;
+                if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
+                if (dynamic_cast<ReturnValue*>(result.get())) return result;
+            }
         } else {
-            throw RuntimeException("각각 반복문은 배열 또는 문자열만 지원합니다.", current_line);
+            throw RuntimeException("각각 반복문은 배열, 문자열 또는 제너레이터만 지원합니다.", current_line);
         }
         return result;
     }
@@ -351,14 +423,19 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         returnValue->value = value;
         return returnValue;
     }
+    if (dynamic_cast<YieldStatement*>(node)) {
+        throw RuntimeException("'생산'은 제너레이터 함수 내에서만 사용할 수 있습니다.", current_line);
+    }
     if (auto* function_statement = dynamic_cast<FunctionStatement*>(node)) {
         auto function = make_shared<Function>();
         function->body = function_statement->body;
         function->parameterTypes = function_statement->parameterTypes;
         function->parameters     = function_statement->parameters;
         function->defaultValues  = function_statement->defaultValues;
+        function->parameterOptionals = function_statement->parameterOptionals;
         function->env            = environment->shared_from_this();
         function->returnType     = function_statement->returnType;
+        function->returnTypeOptional = function_statement->returnTypeOptional;
         environment->Set(function_statement->name, function);
         return function;
     }
@@ -367,8 +444,65 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         string subjectStr = subject->ToString();
 
         for (size_t i = 0; i < match_statement->caseValues.size(); i++) {
-            auto caseVal = eval(match_statement->caseValues[i].get(), environment);
-            if (caseVal->ToString() == subjectStr && caseVal->type == subject->type) {
+            bool matched = false;
+            auto* caseExpr = match_statement->caseValues[i].get();
+
+            // 범위 패턴: 경우 1~5:
+            if (auto* rangePattern = dynamic_cast<RangePatternExpression*>(caseExpr)) {
+                auto startVal = eval(rangePattern->start.get(), environment);
+                auto endVal = eval(rangePattern->end.get(), environment);
+                // 정수 범위
+                if (subject->type == ObjectType::INTEGER &&
+                    startVal->type == ObjectType::INTEGER &&
+                    endVal->type == ObjectType::INTEGER) {
+                    auto subjectInt = dynamic_cast<Integer*>(subject.get())->value;
+                    auto startInt = dynamic_cast<Integer*>(startVal.get())->value;
+                    auto endInt = dynamic_cast<Integer*>(endVal.get())->value;
+                    matched = (subjectInt >= startInt && subjectInt <= endInt);
+                }
+                // 실수 범위
+                else if ((subject->type == ObjectType::FLOAT || subject->type == ObjectType::INTEGER) &&
+                         (startVal->type == ObjectType::FLOAT || startVal->type == ObjectType::INTEGER) &&
+                         (endVal->type == ObjectType::FLOAT || endVal->type == ObjectType::INTEGER)) {
+                    double subjectNum = subject->type == ObjectType::FLOAT
+                        ? dynamic_cast<Float*>(subject.get())->value
+                        : static_cast<double>(dynamic_cast<Integer*>(subject.get())->value);
+                    double startNum = startVal->type == ObjectType::FLOAT
+                        ? dynamic_cast<Float*>(startVal.get())->value
+                        : static_cast<double>(dynamic_cast<Integer*>(startVal.get())->value);
+                    double endNum = endVal->type == ObjectType::FLOAT
+                        ? dynamic_cast<Float*>(endVal.get())->value
+                        : static_cast<double>(dynamic_cast<Integer*>(endVal.get())->value);
+                    matched = (subjectNum >= startNum && subjectNum <= endNum);
+                }
+            }
+            // 타입 패턴: 경우 정수:, 경우 문자: 등
+            else if (auto* typePattern = dynamic_cast<TypePatternExpression*>(caseExpr)) {
+                auto tokenType = typePattern->typeToken->type;
+                if (tokenType == TokenType::정수) matched = (subject->type == ObjectType::INTEGER);
+                else if (tokenType == TokenType::실수) matched = (subject->type == ObjectType::FLOAT);
+                else if (tokenType == TokenType::문자) matched = (subject->type == ObjectType::STRING);
+                else if (tokenType == TokenType::논리) matched = (subject->type == ObjectType::BOOLEAN);
+                else if (tokenType == TokenType::배열) matched = (subject->type == ObjectType::ARRAY);
+                else if (tokenType == TokenType::사전) matched = (subject->type == ObjectType::HASH_MAP);
+            }
+            // 일반 값 매칭
+            else {
+                auto caseVal = eval(caseExpr, environment);
+                matched = (caseVal->ToString() == subjectStr && caseVal->type == subject->type);
+            }
+
+            // 조건 가드 확인
+            if (matched && i < match_statement->caseGuards.size() && match_statement->caseGuards[i]) {
+                auto caseEnv = make_shared<Environment>(environment->shared_from_this());
+                auto guardResult = eval(match_statement->caseGuards[i].get(), caseEnv.get());
+                if (guardResult->type != ObjectType::BOOLEAN ||
+                    !dynamic_cast<Boolean*>(guardResult.get())->value) {
+                    matched = false;
+                }
+            }
+
+            if (matched) {
                 auto caseEnv = make_shared<Environment>(environment->shared_from_this());
                 return eval(match_statement->caseBodies[i].get(), caseEnv.get());
             }
@@ -579,6 +713,12 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         auto left  = eval(index_expression->name.get(), environment);
         auto index = eval(index_expression->index.get(), environment);
         return evalIndexExpression(left, index);
+    }
+    if (auto* slice_expression = dynamic_cast<SliceExpression*>(node)) {
+        auto object = eval(slice_expression->object.get(), environment);
+        shared_ptr<Object> start = slice_expression->start ? eval(slice_expression->start.get(), environment) : nullptr;
+        shared_ptr<Object> end = slice_expression->end ? eval(slice_expression->end.get(), environment) : nullptr;
+        return evalSliceExpression(object, start, end);
     }
 
     if (auto* integer_literal = dynamic_cast<IntegerLiteral*>(node)) {
@@ -834,6 +974,64 @@ shared_ptr<Object> Evaluator::evalHashMapIndexExpression(shared_ptr<Object> hash
     return it->second;
 }
 
+shared_ptr<Object> Evaluator::evalSliceExpression(shared_ptr<Object> object, shared_ptr<Object> startObj, shared_ptr<Object> endObj) {
+    if (object->type == ObjectType::ARRAY) {
+        auto* arr = dynamic_cast<Array*>(object.get());
+        long long len = static_cast<long long>(arr->elements.size());
+
+        long long s = 0;
+        long long e = len;
+
+        if (startObj) {
+            auto* startInt = dynamic_cast<Integer*>(startObj.get());
+            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
+            s = startInt->value;
+            if (s < 0) s = len + s;
+            if (s < 0) s = 0;
+        }
+        if (endObj) {
+            auto* endInt = dynamic_cast<Integer*>(endObj.get());
+            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
+            e = endInt->value;
+            if (e < 0) e = len + e;
+            if (e > len) e = len;
+        }
+        if (s >= e) return make_shared<Array>();
+
+        auto result = make_shared<Array>();
+        for (long long i = s; i < e; i++) {
+            result->elements.push_back(arr->elements[i]);
+        }
+        return result;
+    }
+    if (object->type == ObjectType::STRING) {
+        auto* str = dynamic_cast<String*>(object.get());
+        long long len = static_cast<long long>(utf8::codePointCount(str->value));
+
+        long long s = 0;
+        long long e = len;
+
+        if (startObj) {
+            auto* startInt = dynamic_cast<Integer*>(startObj.get());
+            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
+            s = startInt->value;
+            if (s < 0) s = len + s;
+            if (s < 0) s = 0;
+        }
+        if (endObj) {
+            auto* endInt = dynamic_cast<Integer*>(endObj.get());
+            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
+            e = endInt->value;
+            if (e < 0) e = len + e;
+            if (e > len) e = len;
+        }
+        if (s >= e) return make_shared<String>("");
+
+        return make_shared<String>(utf8::substringCodePoints(str->value, static_cast<size_t>(s), static_cast<size_t>(e)));
+    }
+    throw RuntimeException("슬라이스 연산이 지원되지 않는 형식입니다.", current_line);
+}
+
 shared_ptr<Object> Evaluator::evalPrefixExpression(Token* token, shared_ptr<Object> right) {
     if (token->type == TokenType::MINUS) return evalMinusPrefixExpression(right);
     if (token->type == TokenType::BANG) return evalBangPrefixExpression(right);
@@ -870,16 +1068,34 @@ shared_ptr<Object> Evaluator::applyFunction(shared_ptr<Object> function, std::ve
         }
 
         for (size_t i = 0; i < fn->parameterTypes.size(); i++) {
-            if (!typeCheck(fn->parameterTypes[i].get(), arguments[i])) {
+            bool isParamOptional = i < fn->parameterOptionals.size() && fn->parameterOptionals[i];
+            if (dynamic_cast<Null*>(arguments[i].get())) {
+                if (!isParamOptional) {
+                    throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)", current_line);
+                }
+            } else if (!typeCheck(fn->parameterTypes[i].get(), arguments[i])) {
                 throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자", current_line);
             }
         }
 
         auto extended_env = extendFunctionEnvironment(fn, arguments);
+
+        // 제너레이터 함수 감지: body에 생산(yield) 문이 있으면 GeneratorObject 반환
+        if (containsYield(fn->body.get())) {
+            auto generator = make_shared<GeneratorObject>();
+            evalGeneratorBody(fn->body.get(), extended_env.get(), generator->values);
+            return generator;
+        }
+
         auto evaluated = eval(fn->body.get(), extended_env.get());
 
-        if ((fn->returnType == nullptr && evaluated == nullptr)
-            || typeCheck(fn->returnType.get(), evaluated)) {
+        if (fn->returnType == nullptr && evaluated == nullptr) {
+            return unwrapReturnValue(evaluated);
+        }
+        if (fn->returnTypeOptional && evaluated != nullptr && dynamic_cast<Null*>(unwrapReturnValue(evaluated).get())) {
+            return unwrapReturnValue(evaluated);
+        }
+        if (typeCheck(fn->returnType.get(), evaluated)) {
             return unwrapReturnValue(evaluated);
         }
         throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.", current_line);
@@ -901,6 +1117,9 @@ shared_ptr<Environment> Evaluator::extendFunctionEnvironment(Function* function,
     auto env = make_shared<Environment>(function->env);
     for (size_t i = 0; i < function->parameters.size(); i++) {
         env->Set(function->parameters[i]->name, arguments[i]);
+        if (i < function->parameterOptionals.size() && function->parameterOptionals[i]) {
+            env->SetOptional(function->parameters[i]->name);
+        }
     }
     return env;
 }
@@ -926,6 +1145,7 @@ bool Evaluator::typeCheck(Token* type, const shared_ptr<Object>& value) {
     if (type->type == TokenType::논리) return dynamic_cast<Boolean*>(target) != nullptr;
     if (type->type == TokenType::배열) return dynamic_cast<Array*>(target) != nullptr;
     if (type->type == TokenType::사전) return dynamic_cast<HashMap*>(target) != nullptr;
+    if (type->type == TokenType::함수) return dynamic_cast<Function*>(target) != nullptr || dynamic_cast<Builtin*>(target) != nullptr;
 
     // 클래스 타입 확인: IDENTIFIER인 경우 인스턴스의 클래스 이름과 비교
     if (type->type == TokenType::IDENTIFIER) {
@@ -942,6 +1162,132 @@ bool Evaluator::typeCheck(Token* type, const shared_ptr<Object>& value) {
 bool Evaluator::typeCheck(ObjectType type, const shared_ptr<Object>& value) {
     if (dynamic_cast<Null*>(value.get())) return true;
     return type == value->type;
+}
+
+bool Evaluator::containsYield(BlockStatement* block) {
+    if (!block) return false;
+    for (auto& stmt : block->statements) {
+        if (dynamic_cast<YieldStatement*>(stmt.get())) return true;
+        if (auto* whileStmt = dynamic_cast<WhileStatement*>(stmt.get())) {
+            if (containsYield(whileStmt->body.get())) return true;
+        }
+        if (auto* ifStmt = dynamic_cast<IfStatement*>(stmt.get())) {
+            if (containsYield(ifStmt->consequence.get())) return true;
+            if (containsYield(ifStmt->then.get())) return true;
+        }
+        if (auto* forEachStmt = dynamic_cast<ForEachStatement*>(stmt.get())) {
+            if (containsYield(forEachStmt->body.get())) return true;
+        }
+        if (auto* forRangeStmt = dynamic_cast<ForRangeStatement*>(stmt.get())) {
+            if (containsYield(forRangeStmt->body.get())) return true;
+        }
+    }
+    return false;
+}
+
+shared_ptr<Object> Evaluator::evalGeneratorBody(Node* node, Environment* environment, vector<shared_ptr<Object>>& yieldValues) {
+    checkLimits();
+
+    if (++recursionDepth > MAX_RECURSION_DEPTH) {
+        recursionDepth--;
+        throw RuntimeException("최대 재귀 깊이(" + to_string(MAX_RECURSION_DEPTH) + ")를 초과했습니다.", current_line);
+    }
+    struct RecursionGuard {
+        int& depth;
+        ~RecursionGuard() { depth--; }
+    } guard{recursionDepth};
+
+    long long nodeLine = getLineFromNode(node);
+    if (nodeLine > 0) current_line = nodeLine;
+
+    if (auto* block_statement = dynamic_cast<BlockStatement*>(node)) {
+        return evalGeneratorBlockStatement(block_statement->statements, environment, yieldValues);
+    }
+    if (auto* yield_statement = dynamic_cast<YieldStatement*>(node)) {
+        auto value = eval(yield_statement->expression.get(), environment);
+        yieldValues.push_back(value);
+        return nullptr;
+    }
+    if (auto* if_statement = dynamic_cast<IfStatement*>(node)) {
+        auto condition = eval(if_statement->condition.get(), environment);
+        if (auto* boolean = dynamic_cast<Boolean*>(condition.get())) {
+            if (boolean->value) {
+                return evalGeneratorBody(if_statement->consequence.get(), environment, yieldValues);
+            } else if (if_statement->then != nullptr) {
+                return evalGeneratorBody(if_statement->then.get(), environment, yieldValues);
+            }
+        }
+        return nullptr;
+    }
+    if (auto* while_statement = dynamic_cast<WhileStatement*>(node)) {
+        shared_ptr<Object> result = nullptr;
+        while (true) {
+            if (limiter) limiter->incrementLoopCounter();
+            auto condition = eval(while_statement->condition.get(), environment);
+            auto* boolean = dynamic_cast<Boolean*>(condition.get());
+            if (!boolean) {
+                throw RuntimeException("반복문의 조건은 참/거짓 값이어야 합니다.", current_line);
+            }
+            if (!boolean->value) break;
+            auto loopEnv = make_shared<Environment>(environment->shared_from_this());
+            result = evalGeneratorBody(while_statement->body.get(), loopEnv.get(), yieldValues);
+            if (dynamic_cast<ContinueSignal*>(result.get())) continue;
+            if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
+            if (dynamic_cast<ReturnValue*>(result.get())) return result;
+        }
+        return result;
+    }
+    if (auto* for_range = dynamic_cast<ForRangeStatement*>(node)) {
+        auto startVal = eval(for_range->startExpr.get(), environment);
+        auto endVal = eval(for_range->endExpr.get(), environment);
+        auto* startInt = dynamic_cast<Integer*>(startVal.get());
+        auto* endInt = dynamic_cast<Integer*>(endVal.get());
+        if (!startInt || !endInt) {
+            throw RuntimeException("반복 범위의 시작과 끝은 정수이어야 합니다.", current_line);
+        }
+        shared_ptr<Object> result = nullptr;
+        for (long long i = startInt->value; i < endInt->value; i++) {
+            if (limiter) limiter->incrementLoopCounter();
+            auto loopEnv = make_shared<Environment>(environment->shared_from_this());
+            loopEnv->Set(for_range->varName, make_shared<Integer>(i));
+            result = evalGeneratorBody(for_range->body.get(), loopEnv.get(), yieldValues);
+            if (dynamic_cast<ContinueSignal*>(result.get())) continue;
+            if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
+            if (dynamic_cast<ReturnValue*>(result.get())) return result;
+        }
+        return result;
+    }
+    if (auto* foreach_statement = dynamic_cast<ForEachStatement*>(node)) {
+        auto iterable = eval(foreach_statement->iterable.get(), environment);
+        shared_ptr<Object> result = nullptr;
+        if (auto* array = dynamic_cast<Array*>(iterable.get())) {
+            for (auto& element : array->elements) {
+                if (limiter) limiter->incrementLoopCounter();
+                auto loopEnv = make_shared<Environment>(environment->shared_from_this());
+                loopEnv->Set(foreach_statement->elementName, element);
+                result = evalGeneratorBody(foreach_statement->body.get(), loopEnv.get(), yieldValues);
+                if (dynamic_cast<ContinueSignal*>(result.get())) continue;
+                if (dynamic_cast<BreakSignal*>(result.get())) return nullptr;
+                if (dynamic_cast<ReturnValue*>(result.get())) return result;
+            }
+        }
+        return result;
+    }
+    // For all other nodes, delegate to normal eval
+    return eval(node, environment);
+}
+
+shared_ptr<Object> Evaluator::evalGeneratorBlockStatement(const vector<shared_ptr<Statement>>& statements, Environment* environment, vector<shared_ptr<Object>>& yieldValues) {
+    shared_ptr<Object> result = nullptr;
+    for (const auto& statement : statements) {
+        result = evalGeneratorBody(statement.get(), environment, yieldValues);
+        if (result != nullptr) {
+            if (dynamic_cast<ReturnValue*>(result.get()) || dynamic_cast<BreakSignal*>(result.get()) || dynamic_cast<ContinueSignal*>(result.get())) {
+                return result;
+            }
+        }
+    }
+    return result;
 }
 
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {

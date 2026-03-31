@@ -64,6 +64,8 @@ enum class OpCode : uint8_t {
     OP_BUILD_HASHMAP,   // [uint16 count] (key-value 쌍 수)
     OP_BUILD_TUPLE,     // [uint16 count]
     OP_INDEX_GET,       // pop index, pop collection
+    OP_INDEX_SET,       // pop value, pop index, pop collection; set collection[index] = value
+    OP_SLICE,           // [uint8 flags] flags: bit0=has_start, bit1=has_end
 
     // 클래스 및 인스턴스
     OP_GET_MEMBER,      // [uint16 nameIdx]
@@ -85,6 +87,14 @@ enum class OpCode : uint8_t {
 
     // 문자열 보간
     OP_INTERPOLATE,     // [uint16 segmentCount]
+
+    // 패턴 매칭
+    OP_RANGE_CHECK,     // pop end, pop start, pop subject → push bool (start <= subject <= end)
+    OP_TYPE_CHECK,      // [uint16 typeIdx] pop subject → push bool (subject의 타입이 typeIdx와 일치)
+
+    OP_IMPORT,          // [uint16 nameIdx] import and execute file
+
+    OP_YIELD,           // pop value, add to frame's yield buffer
 };
 
 inline std::string opcodeName(OpCode op) {
@@ -129,6 +139,8 @@ inline std::string opcodeName(OpCode op) {
     case OpCode::OP_BUILD_HASHMAP: return "OP_BUILD_HASHMAP";
     case OpCode::OP_BUILD_TUPLE: return "OP_BUILD_TUPLE";
     case OpCode::OP_INDEX_GET: return "OP_INDEX_GET";
+    case OpCode::OP_INDEX_SET: return "OP_INDEX_SET";
+    case OpCode::OP_SLICE: return "OP_SLICE";
     case OpCode::OP_GET_MEMBER: return "OP_GET_MEMBER";
     case OpCode::OP_SET_MEMBER: return "OP_SET_MEMBER";
     case OpCode::OP_INVOKE: return "OP_INVOKE";
@@ -140,6 +152,10 @@ inline std::string opcodeName(OpCode op) {
     case OpCode::OP_POP: return "OP_POP";
     case OpCode::OP_DUP: return "OP_DUP";
     case OpCode::OP_INTERPOLATE: return "OP_INTERPOLATE";
+    case OpCode::OP_RANGE_CHECK: return "OP_RANGE_CHECK";
+    case OpCode::OP_TYPE_CHECK: return "OP_TYPE_CHECK";
+    case OpCode::OP_IMPORT: return "OP_IMPORT";
+    case OpCode::OP_YIELD: return "OP_YIELD";
     default: return "UNKNOWN";
     }
 }

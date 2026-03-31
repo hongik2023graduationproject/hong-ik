@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "../exception/exception.h"
+#include <limits>
 #include <stdexcept>
 
 using namespace std;
@@ -182,6 +183,14 @@ void Compiler::compileStatement(Statement* stmt) {
         compileImport(s);
         return;
     }
+    if (auto* s = dynamic_cast<IndexAssignmentStatement*>(stmt)) {
+        compileIndexAssignment(s);
+        return;
+    }
+    if (auto* s = dynamic_cast<YieldStatement*>(stmt)) {
+        compileYield(s);
+        return;
+    }
     if (auto* s = dynamic_cast<BlockStatement*>(stmt)) {
         compileBlock(s);
         return;
@@ -304,6 +313,10 @@ void Compiler::compileExpression(Expression* expr) {
         compileIndex(e);
         return;
     }
+    if (auto* e = dynamic_cast<SliceExpression*>(expr)) {
+        compileSlice(e);
+        return;
+    }
     if (auto* e = dynamic_cast<PostfixExpression*>(expr)) {
         auto* ident = dynamic_cast<IdentifierExpression*>(e->left.get());
         if (!ident) {
@@ -397,6 +410,110 @@ void Compiler::compileIdentifier(const string& name, long long line) {
     chunk().emitOpAndUint16(OpCode::OP_GET_GLOBAL, nameIdx, line);
 }
 
+bool Compiler::tryConstantFold(InfixExpression* expr) {
+    long long line = expr->token ? expr->token->line : 0;
+    TokenType op = expr->token->type;
+
+    // 산술 연산만 폴딩 대상
+    if (op != TokenType::PLUS && op != TokenType::MINUS &&
+        op != TokenType::ASTERISK && op != TokenType::SLASH) {
+        return false;
+    }
+
+    // 중첩 상수 표현식 처리: 좌/우가 InfixExpression이면 재귀적으로 폴딩 시도
+    // 폴딩 가능 여부만 판단하므로, 실제 emit은 하지 않고 값만 추출
+
+    // 좌항 값 추출
+    long long leftInt = 0; double leftFloat = 0; string leftStr;
+    enum { T_INT, T_FLOAT, T_STR, T_NONE } leftType = T_NONE;
+
+    if (auto* li = dynamic_cast<IntegerLiteral*>(expr->left.get())) {
+        leftInt = li->value; leftType = T_INT;
+    } else if (auto* lf = dynamic_cast<FloatLiteral*>(expr->left.get())) {
+        leftFloat = lf->value; leftType = T_FLOAT;
+    } else if (auto* ls = dynamic_cast<StringLiteral*>(expr->left.get())) {
+        if (ls->value.find('{') == string::npos) { leftStr = ls->value; leftType = T_STR; }
+    } else {
+        return false;
+    }
+
+    // 우항 값 추출
+    long long rightInt = 0; double rightFloat = 0; string rightStr;
+    enum { R_INT, R_FLOAT, R_STR, R_NONE } rightType = R_NONE;
+
+    if (auto* ri = dynamic_cast<IntegerLiteral*>(expr->right.get())) {
+        rightInt = ri->value; rightType = R_INT;
+    } else if (auto* rf = dynamic_cast<FloatLiteral*>(expr->right.get())) {
+        rightFloat = rf->value; rightType = R_FLOAT;
+    } else if (auto* rs = dynamic_cast<StringLiteral*>(expr->right.get())) {
+        if (rs->value.find('{') == string::npos) { rightStr = rs->value; rightType = R_STR; }
+    } else {
+        return false;
+    }
+
+    // 정수 + 정수
+    if (leftType == T_INT && rightType == R_INT) {
+        // 0으로 나누기는 폴딩하지 않음
+        if (op == TokenType::SLASH && rightInt == 0) return false;
+        long long result;
+        switch (op) {
+        case TokenType::PLUS:
+            if ((rightInt > 0 && leftInt > std::numeric_limits<long long>::max() - rightInt) ||
+                (rightInt < 0 && leftInt < std::numeric_limits<long long>::min() - rightInt))
+                return false;
+            result = leftInt + rightInt;
+            break;
+        case TokenType::MINUS:
+            if ((rightInt < 0 && leftInt > std::numeric_limits<long long>::max() + rightInt) ||
+                (rightInt > 0 && leftInt < std::numeric_limits<long long>::min() + rightInt))
+                return false;
+            result = leftInt - rightInt;
+            break;
+        case TokenType::ASTERISK:
+            if (leftInt != 0 && rightInt != 0) {
+                if ((leftInt > 0) == (rightInt > 0)) {
+                    if (leftInt > 0 ? leftInt > std::numeric_limits<long long>::max() / rightInt
+                                    : leftInt < std::numeric_limits<long long>::max() / rightInt)
+                        return false;
+                } else {
+                    if (leftInt > 0 ? rightInt < std::numeric_limits<long long>::min() / leftInt
+                                    : leftInt < std::numeric_limits<long long>::min() / rightInt)
+                        return false;
+                }
+            }
+            result = leftInt * rightInt;
+            break;
+        case TokenType::SLASH: result = leftInt / rightInt; break;
+        default: return false;
+        }
+        emitConstant(make_shared<Integer>(result), line);
+        return true;
+    }
+
+    // 실수 + 실수
+    if (leftType == T_FLOAT && rightType == R_FLOAT) {
+        if (op == TokenType::SLASH && rightFloat == 0.0) return false;
+        double result;
+        switch (op) {
+        case TokenType::PLUS: result = leftFloat + rightFloat; break;
+        case TokenType::MINUS: result = leftFloat - rightFloat; break;
+        case TokenType::ASTERISK: result = leftFloat * rightFloat; break;
+        case TokenType::SLASH: result = leftFloat / rightFloat; break;
+        default: return false;
+        }
+        emitConstant(make_shared<Float>(result), line);
+        return true;
+    }
+
+    // 문자열 + 문자열 (연결)
+    if (leftType == T_STR && rightType == R_STR && op == TokenType::PLUS) {
+        emitConstant(make_shared<String>(leftStr + rightStr), line);
+        return true;
+    }
+
+    return false;
+}
+
 void Compiler::compileInfix(InfixExpression* expr) {
     long long line = expr->token ? expr->token->line : 0;
 
@@ -429,6 +546,9 @@ void Compiler::compileInfix(InfixExpression* expr) {
         chunk().patchJump(jumpToEnd);
         return;
     }
+
+    // 상수 폴딩: 양쪽이 리터럴이면 컴파일 타임에 계산
+    if (tryConstantFold(expr)) return;
 
     compileExpression(expr->left.get());
     compileExpression(expr->right.get());
@@ -506,6 +626,15 @@ void Compiler::compileAssignment(AssignmentStatement* stmt) {
     }
     // SET_LOCAL/SET_GLOBAL/SET_UPVALUE는 값을 스택에 유지하므로, 문(statement)으로서 pop 필요
     chunk().emitOp(OpCode::OP_POP, 0);
+}
+
+void Compiler::compileIndexAssignment(IndexAssignmentStatement* stmt) {
+    long long line = 0;
+    compileExpression(stmt->collection.get());
+    compileExpression(stmt->index.get());
+    compileExpression(stmt->value.get());
+    chunk().emitOp(OpCode::OP_INDEX_SET, line);
+    chunk().emitOp(OpCode::OP_POP, line);
 }
 
 void Compiler::compileCompoundAssignment(CompoundAssignmentStatement* stmt) {
@@ -707,6 +836,31 @@ void Compiler::compileFunction(FunctionStatement* stmt) {
         declareLocal(param->name);
     }
 
+    // 기본 매개변수 값 사전 평가
+    funcState.function->defaultValues.resize(stmt->parameters.size());
+    int defaultCount = 0;
+    for (size_t i = 0; i < stmt->defaultValues.size(); i++) {
+        if (stmt->defaultValues[i]) {
+            defaultCount++;
+            if (auto* intLit = dynamic_cast<IntegerLiteral*>(stmt->defaultValues[i].get())) {
+                funcState.function->defaultValues[i] = make_shared<Integer>(intLit->value);
+            } else if (auto* floatLit = dynamic_cast<FloatLiteral*>(stmt->defaultValues[i].get())) {
+                funcState.function->defaultValues[i] = make_shared<Float>(floatLit->value);
+            } else if (auto* strLit = dynamic_cast<StringLiteral*>(stmt->defaultValues[i].get())) {
+                funcState.function->defaultValues[i] = make_shared<String>(strLit->value);
+            } else if (auto* boolLit = dynamic_cast<BooleanLiteral*>(stmt->defaultValues[i].get())) {
+                funcState.function->defaultValues[i] = make_shared<Boolean>(boolLit->value);
+            } else if (dynamic_cast<NullLiteral*>(stmt->defaultValues[i].get())) {
+                funcState.function->defaultValues[i] = make_shared<Null>();
+            } else {
+                throw RuntimeException("VM에서는 상수 기본값만 지원합니다.", 0);
+            }
+        }
+    }
+    funcState.function->defaultCount = defaultCount;
+
+    funcState.function->hasYield = containsYield(stmt->body.get());
+
     for (auto& s : stmt->body->statements) {
         compileStatement(s.get());
     }
@@ -785,6 +939,29 @@ void Compiler::compileClass(ClassStatement* stmt) {
         }
         current->function->arity = static_cast<int>(method->parameters.size());
 
+        // 메서드 기본 매개변수 값 사전 평가
+        methodState.function->defaultValues.resize(method->parameters.size());
+        int methodDefaultCount = 0;
+        for (size_t i = 0; i < method->defaultValues.size(); i++) {
+            if (method->defaultValues[i]) {
+                methodDefaultCount++;
+                if (auto* intLit = dynamic_cast<IntegerLiteral*>(method->defaultValues[i].get())) {
+                    methodState.function->defaultValues[i] = make_shared<Integer>(intLit->value);
+                } else if (auto* floatLit = dynamic_cast<FloatLiteral*>(method->defaultValues[i].get())) {
+                    methodState.function->defaultValues[i] = make_shared<Float>(floatLit->value);
+                } else if (auto* strLit = dynamic_cast<StringLiteral*>(method->defaultValues[i].get())) {
+                    methodState.function->defaultValues[i] = make_shared<String>(strLit->value);
+                } else if (auto* boolLit = dynamic_cast<BooleanLiteral*>(method->defaultValues[i].get())) {
+                    methodState.function->defaultValues[i] = make_shared<Boolean>(boolLit->value);
+                } else if (dynamic_cast<NullLiteral*>(method->defaultValues[i].get())) {
+                    methodState.function->defaultValues[i] = make_shared<Null>();
+                } else {
+                    throw RuntimeException("VM에서는 상수 기본값만 지원합니다.", 0);
+                }
+            }
+        }
+        methodState.function->defaultCount = methodDefaultCount;
+
         for (auto& s : method->body->statements) {
             compileStatement(s.get());
         }
@@ -819,20 +996,79 @@ void Compiler::compileMatch(MatchStatement* stmt) {
     vector<size_t> endJumps;
 
     for (size_t i = 0; i < stmt->caseValues.size(); i++) {
-        chunk().emitOp(OpCode::OP_DUP, 0); // subject 복사
-        compileExpression(stmt->caseValues[i].get());
-        chunk().emitOp(OpCode::OP_EQUAL, 0);
-        size_t skipJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+        auto* caseExpr = stmt->caseValues[i].get();
 
-        chunk().emitOp(OpCode::OP_POP, 0); // subject 제거
-        beginScope();
-        for (auto& s : stmt->caseBodies[i]->statements) {
-            compileStatement(s.get());
+        // 범위 패턴: 경우 1~5:
+        if (auto* rangePattern = dynamic_cast<RangePatternExpression*>(caseExpr)) {
+            chunk().emitOp(OpCode::OP_DUP, 0); // subject 복사
+            compileExpression(rangePattern->start.get());
+            compileExpression(rangePattern->end.get());
+            chunk().emitOp(OpCode::OP_RANGE_CHECK, 0);
         }
-        endScope(0);
-        endJumps.push_back(chunk().emitJump(OpCode::OP_JUMP, 0));
+        // 타입 패턴: 경우 정수:
+        else if (auto* typePattern = dynamic_cast<TypePatternExpression*>(caseExpr)) {
+            chunk().emitOp(OpCode::OP_DUP, 0); // subject 복사
+            // 타입 이름을 상수로 저장
+            string typeName = typePattern->typeToken->text;
+            uint16_t idx = chunk().addConstant(make_shared<String>(typeName));
+            chunk().emitOpAndUint16(OpCode::OP_TYPE_CHECK, idx, 0);
+        }
+        // 일반 값 매칭
+        else {
+            chunk().emitOp(OpCode::OP_DUP, 0); // subject 복사
+            compileExpression(caseExpr);
+            chunk().emitOp(OpCode::OP_EQUAL, 0);
+        }
 
-        chunk().patchJump(skipJump);
+        // 조건 가드: 만약 조건
+        size_t skipJump;
+        if (i < stmt->caseGuards.size() && stmt->caseGuards[i]) {
+            // 패턴이 매칭되지 않으면 가드를 건너뜀
+            size_t guardSkip = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+            // 가드 조건 평가
+            compileExpression(stmt->caseGuards[i].get());
+            // 가드 결과로 점프 결정
+            skipJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+            // guardSkip은 가드 실패 시와 같은 곳으로 점프해야 함
+            // 하지만 OP_JUMP_IF_FALSE가 false를 pop하므로, guardSkip 점프 시 false를 push해야 함
+            // 대신 다른 접근: guardSkip을 별도의 위치로 점프시키고, 거기서 false를 push
+            size_t jumpToBody = chunk().emitJump(OpCode::OP_JUMP, 0);
+
+            chunk().patchJump(guardSkip);
+            // 패턴 불일치 -> 다음 case로
+            size_t jumpToNext = chunk().emitJump(OpCode::OP_JUMP, 0);
+
+            chunk().patchJump(skipJump);
+            // 가드 불일치 -> 다음 case로
+            size_t jumpToNext2 = chunk().emitJump(OpCode::OP_JUMP, 0);
+
+            chunk().patchJump(jumpToBody);
+            // case body
+            chunk().emitOp(OpCode::OP_POP, 0); // subject 제거
+            beginScope();
+            for (auto& s : stmt->caseBodies[i]->statements) {
+                compileStatement(s.get());
+            }
+            endScope(0);
+            endJumps.push_back(chunk().emitJump(OpCode::OP_JUMP, 0));
+
+            chunk().patchJump(jumpToNext);
+            chunk().patchJump(jumpToNext2);
+        } else {
+            skipJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
+
+            chunk().emitOp(OpCode::OP_POP, 0); // subject 제거
+            beginScope();
+            for (auto& s : stmt->caseBodies[i]->statements) {
+                compileStatement(s.get());
+            }
+            endScope(0);
+            endJumps.push_back(chunk().emitJump(OpCode::OP_JUMP, 0));
+
+            chunk().patchJump(skipJump);
+        }
     }
 
     // default
@@ -876,7 +1112,8 @@ void Compiler::compileTryCatch(TryCatchStatement* stmt) {
 }
 
 void Compiler::compileImport(ImportStatement* stmt) {
-    throw RuntimeException("VM 모드에서는 가져오기(import)를 지원하지 않습니다: " + stmt->filename, 0);
+    uint16_t nameIdx = chunk().addConstant(make_shared<String>(stmt->filename));
+    chunk().emitOpAndUint16(OpCode::OP_IMPORT, nameIdx, 0);
 }
 
 void Compiler::compileCall(CallExpression* expr) {
@@ -911,4 +1148,47 @@ void Compiler::compileIndex(IndexExpression* expr) {
     compileExpression(expr->name.get());
     compileExpression(expr->index.get());
     chunk().emitOp(OpCode::OP_INDEX_GET, 0);
+}
+
+void Compiler::compileSlice(SliceExpression* expr) {
+    compileExpression(expr->object.get());
+
+    uint8_t flags = 0;
+    if (expr->start) {
+        compileExpression(expr->start.get());
+        flags |= 0x01;
+    }
+    if (expr->end) {
+        compileExpression(expr->end.get());
+        flags |= 0x02;
+    }
+
+    chunk().emitOp(OpCode::OP_SLICE, 0);
+    chunk().emitByte(flags, 0);
+}
+
+bool Compiler::containsYield(BlockStatement* block) {
+    if (!block) return false;
+    for (auto& stmt : block->statements) {
+        if (dynamic_cast<YieldStatement*>(stmt.get())) return true;
+        if (auto* whileStmt = dynamic_cast<WhileStatement*>(stmt.get())) {
+            if (containsYield(whileStmt->body.get())) return true;
+        }
+        if (auto* ifStmt = dynamic_cast<IfStatement*>(stmt.get())) {
+            if (containsYield(ifStmt->consequence.get())) return true;
+            if (containsYield(ifStmt->then.get())) return true;
+        }
+        if (auto* forEachStmt = dynamic_cast<ForEachStatement*>(stmt.get())) {
+            if (containsYield(forEachStmt->body.get())) return true;
+        }
+        if (auto* forRangeStmt = dynamic_cast<ForRangeStatement*>(stmt.get())) {
+            if (containsYield(forRangeStmt->body.get())) return true;
+        }
+    }
+    return false;
+}
+
+void Compiler::compileYield(YieldStatement* stmt) {
+    compileExpression(stmt->expression.get());
+    chunk().emitOp(OpCode::OP_YIELD, 0);
 }

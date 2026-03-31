@@ -85,7 +85,8 @@ void Parser::checkToken(TokenType type) {
 
 bool Parser::isTypeKeyword(TokenType type) {
     return type == TokenType::정수 || type == TokenType::실수 || type == TokenType::문자
-           || type == TokenType::논리 || type == TokenType::배열 || type == TokenType::사전;
+           || type == TokenType::논리 || type == TokenType::배열 || type == TokenType::사전
+           || type == TokenType::함수;
 }
 
 bool Parser::isCompoundAssignToken(TokenType type) {
@@ -97,10 +98,20 @@ bool Parser::isCompoundAssignToken(TokenType type) {
 
 // statement 파싱의 마지막에는 setNextToken()이 실행된다.
 shared_ptr<Statement> Parser::parseStatement() {
+    // Optional 변수 선언: 정수? x = 없음
+    if (isTypeKeyword(current_token->type) && next_token != nullptr
+        && next_token->type == TokenType::QUESTION) {
+        return parseInitializationStatement();
+    }
     // 변수 선언: 정수 x = 10
     if (isTypeKeyword(current_token->type) && next_token != nullptr
         && next_token->type == TokenType::IDENTIFIER && next_next_token != nullptr
         && next_next_token->type == TokenType::ASSIGN) {
+        return parseInitializationStatement();
+    }
+    // 클래스 타입 Optional 변수 선언: 클래스명? x = 없음
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
+        && next_token->type == TokenType::QUESTION) {
         return parseInitializationStatement();
     }
     // 클래스 타입 변수 선언: 클래스명 변수명 = 값
@@ -135,6 +146,29 @@ shared_ptr<Statement> Parser::parseStatement() {
             return stmt;
         }
     }
+    // Index assignment: 변수[인덱스] = 값
+    if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
+        && next_token->type == TokenType::LBRACKET) {
+        auto pos = current_read_position;
+        int bracketDepth = 0;
+        bool isIndexAssign = false;
+        // Start at pos + 2 to skip the IDENTIFIER and opening LBRACKET
+        for (auto p = pos + 2; p < static_cast<long long>(tokens.size()); p++) {
+            if (tokens[p]->type == TokenType::LBRACKET) bracketDepth++;
+            else if (tokens[p]->type == TokenType::RBRACKET) {
+                if (bracketDepth == 0) {
+                    if (p + 1 < static_cast<long long>(tokens.size()) && tokens[p + 1]->type == TokenType::ASSIGN) {
+                        isIndexAssign = true;
+                    }
+                    break;
+                }
+                bracketDepth--;
+            }
+        }
+        if (isIndexAssign) {
+            return parseIndexAssignmentStatement();
+        }
+    }
     if (current_token->type == TokenType::IDENTIFIER && next_token != nullptr
         && next_token->type == TokenType::ASSIGN) {
         return parseAssignmentStatement();
@@ -145,6 +179,9 @@ shared_ptr<Statement> Parser::parseStatement() {
     }
     if (current_token->type == TokenType::리턴) {
         return parseReturnStatement();
+    }
+    if (current_token->type == TokenType::생산) {
+        return parseYieldStatement();
     }
     if (current_token->type == TokenType::만약) {
         return parseIfStatement();
@@ -194,12 +231,18 @@ shared_ptr<Statement> Parser::parseStatement() {
     return parseExpressionStatement();
 }
 
-// 정수 x = 10
+// 정수 x = 10 또는 정수? x = 없음
 shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
     auto statement = make_shared<InitializationStatement>();
 
     statement->type = current_token;
     setNextToken();
+
+    // Optional 타입: 타입? 형태
+    if (current_token != nullptr && current_token->type == TokenType::QUESTION) {
+        statement->isOptional = true;
+        skipToken(TokenType::QUESTION);
+    }
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -224,6 +267,30 @@ shared_ptr<AssignmentStatement> Parser::parseAssignmentStatement() {
     setNextToken();
     skipToken(TokenType::NEW_LINE);
     return statement;
+}
+
+shared_ptr<IndexAssignmentStatement> Parser::parseIndexAssignmentStatement() {
+    auto stmt = make_shared<IndexAssignmentStatement>();
+
+    // Parse collection (identifier)
+    auto ident = make_shared<IdentifierExpression>();
+    ident->name = current_token->text;
+    stmt->collection = ident;
+    skipToken(TokenType::IDENTIFIER);
+
+    // Parse [index]
+    skipToken(TokenType::LBRACKET);
+    stmt->index = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    skipToken(TokenType::RBRACKET);
+
+    // Parse = value
+    skipToken(TokenType::ASSIGN);
+    stmt->value = parseExpression(Precedence::LOWEST);
+    setNextToken();
+    skipToken(TokenType::NEW_LINE);
+
+    return stmt;
 }
 
 shared_ptr<CompoundAssignmentStatement> Parser::parseCompoundAssignmentStatement() {
@@ -380,6 +447,14 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
             statement->parameterTypes.push_back(current_token);
             setNextToken();
 
+            // Optional 파라미터: 타입? 형태
+            bool paramOptional = false;
+            if (current_token != nullptr && current_token->type == TokenType::QUESTION) {
+                paramOptional = true;
+                skipToken(TokenType::QUESTION);
+            }
+            statement->parameterOptionals.push_back(paramOptional);
+
             // 파라미터 이름
             checkToken(TokenType::IDENTIFIER);
             auto ident = make_shared<IdentifierExpression>();
@@ -404,6 +479,11 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
         skipToken(TokenType::RIGHT_ARROW);
         statement->returnType = current_token;
         setNextToken();
+        // Optional 리턴 타입: -> 타입?
+        if (current_token != nullptr && current_token->type == TokenType::QUESTION) {
+            statement->returnTypeOptional = true;
+            skipToken(TokenType::QUESTION);
+        }
     }
 
     skipToken(TokenType::COLON);
@@ -434,9 +514,48 @@ shared_ptr<MatchStatement> Parser::parseMatchStatement() {
     while (current_token != nullptr && current_token->type != TokenType::END_BLOCK) {
         if (current_token->type == TokenType::경우) {
             skipToken(TokenType::경우);
-            auto caseValue = parseExpression(Precedence::LOWEST);
+
+            std::shared_ptr<Expression> caseValue;
+
+            // 타입 패턴: 경우 정수:, 경우 실수:, 경우 문자:, 경우 논리:, 경우 배열:, 경우 사전:
+            if (current_token != nullptr &&
+                (current_token->type == TokenType::정수 ||
+                 current_token->type == TokenType::실수 ||
+                 current_token->type == TokenType::문자 ||
+                 current_token->type == TokenType::논리 ||
+                 current_token->type == TokenType::배열 ||
+                 current_token->type == TokenType::사전) &&
+                next_token != nullptr && next_token->type == TokenType::COLON) {
+                auto typePattern = std::make_shared<TypePatternExpression>();
+                typePattern->typeToken = current_token;
+                caseValue = typePattern;
+                setNextToken(); // skip type keyword
+            } else {
+                caseValue = parseExpression(Precedence::LOWEST);
+                setNextToken();
+
+                // 범위 패턴: 경우 1~5:
+                if (current_token != nullptr && current_token->type == TokenType::TILDE) {
+                    setNextToken(); // skip ~
+                    auto endExpr = parseExpression(Precedence::LOWEST);
+                    auto rangePattern = std::make_shared<RangePatternExpression>();
+                    rangePattern->start = caseValue;
+                    rangePattern->end = endExpr;
+                    caseValue = rangePattern;
+                    setNextToken();
+                }
+            }
+
+            // 조건 가드: 경우 x 만약 x > 0:
+            std::shared_ptr<Expression> guard = nullptr;
+            if (current_token != nullptr && current_token->type == TokenType::만약) {
+                setNextToken(); // skip 만약
+                guard = parseExpression(Precedence::LOWEST);
+                setNextToken();
+            }
+
             statement->caseValues.push_back(caseValue);
-            setNextToken();
+            statement->caseGuards.push_back(guard);
             skipToken(TokenType::COLON);
             skipToken(TokenType::NEW_LINE);
             statement->caseBodies.push_back(parseBlockStatement());
@@ -678,11 +797,43 @@ shared_ptr<Expression> Parser::parseCallInfixExpression(shared_ptr<Expression> l
 }
 
 shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left) {
+    skipToken(TokenType::LBRACKET);
+
+    // Check for slice: [:end]
+    if (current_token && current_token->type == TokenType::COLON) {
+        auto slice = make_shared<SliceExpression>();
+        slice->object = std::move(left);
+        slice->start = nullptr;
+        setNextToken(); // skip ':'
+        if (current_token && current_token->type != TokenType::RBRACKET) {
+            slice->end = parseExpression(Precedence::LOWEST);
+            setNextToken();
+        }
+        checkToken(TokenType::RBRACKET);
+        return slice;
+    }
+
+    auto expr = parseExpression(Precedence::LOWEST);
+    setNextToken();
+
+    // Check for slice: [start:] or [start:end]
+    if (current_token && current_token->type == TokenType::COLON) {
+        auto slice = make_shared<SliceExpression>();
+        slice->object = std::move(left);
+        slice->start = std::move(expr);
+        setNextToken(); // skip ':'
+        if (current_token && current_token->type != TokenType::RBRACKET) {
+            slice->end = parseExpression(Precedence::LOWEST);
+            setNextToken();
+        }
+        checkToken(TokenType::RBRACKET);
+        return slice;
+    }
+
+    // Regular index expression
     auto index_expression  = make_shared<IndexExpression>();
     index_expression->name = std::move(left);
-    skipToken(TokenType::LBRACKET);
-    index_expression->index = parseExpression(Precedence::LOWEST);
-    setNextToken();
+    index_expression->index = std::move(expr);
     checkToken(TokenType::RBRACKET);
 
     return index_expression;
@@ -848,6 +999,15 @@ shared_ptr<ImportStatement> Parser::parseImportStatement() {
     checkToken(TokenType::STRING);
     statement->filename = current_token->text;
     skipToken(TokenType::STRING);
+    skipToken(TokenType::NEW_LINE);
+    return statement;
+}
+
+shared_ptr<YieldStatement> Parser::parseYieldStatement() {
+    skipToken(TokenType::생산);
+    auto statement = make_shared<YieldStatement>();
+    statement->expression = parseExpression(Precedence::LOWEST);
+    setNextToken();
     skipToken(TokenType::NEW_LINE);
     return statement;
 }

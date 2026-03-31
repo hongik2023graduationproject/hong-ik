@@ -93,6 +93,7 @@ std::string Analyzer::getSemanticType(const std::shared_ptr<Token>& token) {
     case TokenType::RIGHT_ARROW:
     case TokenType::DOT:
     case TokenType::ELLIPSIS:
+    case TokenType::QUESTION:
         return "operator";
 
     // 구분자

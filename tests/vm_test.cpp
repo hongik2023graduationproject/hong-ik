@@ -4,6 +4,7 @@
 #include "vm/vm.h"
 #include "utf8_converter/utf8_converter.h"
 #include <gtest/gtest.h>
+#include <fstream>
 #include <memory>
 #include <sstream>
 
@@ -573,4 +574,175 @@ TEST_F(VMTest, StringNegativeIndexUTF8) {
     auto* s = dynamic_cast<String*>(result.get());
     ASSERT_NE(s, nullptr);
     EXPECT_EQ(s->value, "요");
+}
+
+// ===== 기본 매개변수 =====
+
+TEST_F(VMTest, DefaultParameter) {
+    auto result = runVM(
+        "함수 인사(문자 이름, 문자 접미사 = \"님\") -> 문자:\n"
+        "    리턴 이름 + 접미사\n"
+        "인사(\"홍길동\")\n"
+    );
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "홍길동님");
+}
+
+TEST_F(VMTest, DefaultParameterOverride) {
+    auto result = runVM(
+        "함수 인사(문자 이름, 문자 접미사 = \"님\") -> 문자:\n"
+        "    리턴 이름 + 접미사\n"
+        "인사(\"홍길동\", \"씨\")\n"
+    );
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "홍길동씨");
+}
+
+TEST_F(VMTest, DefaultParameterAllDefaults) {
+    auto result = runVM(
+        "함수 더하기(정수 a = 1, 정수 b = 2) -> 정수:\n"
+        "    리턴 a + b\n"
+        "더하기()\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 3);
+}
+
+// ===== 인덱스 대입 =====
+
+TEST_F(VMTest, IndexAssignmentArray) {
+    auto result = runVM(
+        "배열 목록 = [1, 2, 3]\n"
+        "목록[0] = 10\n"
+        "목록[0]\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 10);
+}
+
+TEST_F(VMTest, IndexAssignmentNegative) {
+    auto result = runVM(
+        "배열 목록 = [1, 2, 3]\n"
+        "목록[-1] = 30\n"
+        "목록[2]\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 30);
+}
+
+TEST_F(VMTest, IndexAssignmentHashMap) {
+    auto result = runVM(
+        "사전 정보 = {\"이름\": \"홍길동\"}\n"
+        "정보[\"나이\"] = \"25\"\n"
+        "정보[\"나이\"]\n"
+    );
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "25");
+}
+
+TEST_F(VMTest, ImportBasic) {
+    std::string tmpFile = "test_import_vm.hik";
+    {
+        std::ofstream out(tmpFile);
+        out << "함수 제곱(정수 x) -> 정수:\n    리턴 x * x\n";
+        out.close();
+    }
+
+    auto result = runVM(
+        "가져오기 \"" + tmpFile + "\"\n"
+        "제곱(5)\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 25);
+
+    std::remove(tmpFile.c_str());
+}
+
+TEST_F(VMTest, ImportDoubleNoError) {
+    std::string tmpFile = "test_import_double_vm.hik";
+    {
+        std::ofstream out(tmpFile);
+        out << "함수 하나() -> 정수:\n    리턴 1\n";
+        out.close();
+    }
+
+    auto result = runVM(
+        "가져오기 \"" + tmpFile + "\"\n"
+        "가져오기 \"" + tmpFile + "\"\n"
+        "하나()\n"
+    );
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 1);
+
+    std::remove(tmpFile.c_str());
+}
+
+// ===== 제너레이터/생산 =====
+
+TEST_F(VMTest, GeneratorBasic) {
+    auto output = runVMWithOutput(
+        "함수 세개() -> 정수:\n"
+        "    생산 1\n"
+        "    생산 2\n"
+        "    생산 3\n"
+        "각각 정수 값 세개() 에서:\n"
+        "    출력(값)\n"
+    );
+    EXPECT_EQ(output, "1\n2\n3\n");
+}
+
+TEST_F(VMTest, GeneratorWithLoop) {
+    auto output = runVMWithOutput(
+        "함수 범위(정수 n) -> 정수:\n"
+        "    반복 정수 i = 0 부터 n 까지:\n"
+        "        생산 i\n"
+        "각각 정수 x 범위(3) 에서:\n"
+        "    출력(x)\n"
+    );
+    EXPECT_EQ(output, "0\n1\n2\n");
+}
+
+TEST_F(VMTest, GeneratorEmpty) {
+    auto output = runVMWithOutput(
+        "함수 빈것() -> 정수:\n"
+        "    만약 false 라면:\n"
+        "        생산 1\n"
+        "각각 정수 x 빈것() 에서:\n"
+        "    출력(x)\n"
+    );
+    EXPECT_EQ(output, "");
+}
+
+TEST_F(VMTest, IntegrationDefaultsAndIndexAssignment) {
+    auto output = runVMWithOutput(
+        "함수 초기화(정수 크기 = 3) -> 배열:\n"
+        "    배열 결과 = [0, 0, 0]\n"
+        "    반복 정수 i = 0 부터 크기 까지:\n"
+        "        결과[i] = i * 2\n"
+        "    리턴 결과\n"
+        "배열 목록 = 초기화()\n"
+        "각각 정수 값 목록 에서:\n"
+        "    출력(값)\n"
+    );
+    EXPECT_EQ(output, "0\n2\n4\n");
+}
+
+TEST_F(VMTest, IntegrationGeneratorWithDefaults) {
+    auto output = runVMWithOutput(
+        "함수 짝수(정수 최대 = 6) -> 정수:\n"
+        "    반복 정수 i = 0 부터 최대 까지:\n"
+        "        만약 i % 2 == 0 라면:\n"
+        "            생산 i\n"
+        "각각 정수 n 짝수() 에서:\n"
+        "    출력(n)\n"
+    );
+    EXPECT_EQ(output, "0\n2\n4\n");
 }

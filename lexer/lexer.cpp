@@ -38,6 +38,7 @@ Lexer::Lexer() {
         {"부모", TokenType::부모},
         {"부터", TokenType::부터},
         {"까지", TokenType::까지},
+        {"생산", TokenType::생산},
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
     };
@@ -62,6 +63,8 @@ Lexer::Lexer() {
         {">", TokenType::GREATER_THAN},
         {"&", TokenType::BITWISE_AND},
         {"|", TokenType::BITWISE_OR},
+        {"?", TokenType::QUESTION},
+        {"~", TokenType::TILDE},
     };
     multiCharacterTokens = {
         {"->", TokenType::RIGHT_ARROW},

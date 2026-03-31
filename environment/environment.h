@@ -4,6 +4,7 @@
 #include "../object/object.h"
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 // Environment
@@ -11,6 +12,7 @@
 class Environment : public std::enable_shared_from_this<Environment> {
 public:
     std::map<std::string, std::shared_ptr<Object>> store;
+    std::set<std::string> optionalVars;
     std::shared_ptr<Environment> outer;
 
     Environment() = default;
@@ -19,6 +21,10 @@ public:
     std::shared_ptr<Object> Get(const std::string& name);
 
     std::shared_ptr<Object> Set(const std::string& name, std::shared_ptr<Object> object);
+
+    void SetOptional(const std::string& name);
+
+    bool IsOptional(const std::string& name);
 
     // 외부 스코프까지 탐색하여 변수를 업데이트
     std::shared_ptr<Object> Update(const std::string& name, std::shared_ptr<Object> object);

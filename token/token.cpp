@@ -164,6 +164,8 @@ std::string TokenTypeToString(TokenType type) {
         return "DECREMENT";
     case TokenType::POWER:
         return "POWER";
+    case TokenType::QUESTION:
+        return "QUESTION";
 
     default:
         break;

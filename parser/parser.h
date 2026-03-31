@@ -59,11 +59,15 @@ private:
 
     std::shared_ptr<ImportStatement> parseImportStatement();
 
+    std::shared_ptr<IndexAssignmentStatement> parseIndexAssignmentStatement();
+
     std::shared_ptr<MatchStatement> parseMatchStatement();
 
     std::shared_ptr<ClassStatement> parseClassStatement();
 
     std::shared_ptr<ForRangeStatement> parseForRangeStatement();
+
+    std::shared_ptr<YieldStatement> parseYieldStatement();
 
     std::vector<std::string> errors;
     void skipToNextLine();

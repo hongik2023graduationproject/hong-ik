@@ -1,5 +1,6 @@
 #include "built_in.h"
 
+#include "../util/json_util.h"
 #include "../util/utf8_utils.h"
 #include <algorithm>
 #include <cmath>
@@ -433,9 +434,176 @@ std::shared_ptr<Object> Random::function(std::vector<std::shared_ptr<Object>> pa
     if (!minVal || !maxVal) {
         throw runtime_error("난수 함수의 인자는 정수이어야 합니다.");
     }
+    if (minVal->value > maxVal->value) {
+        throw runtime_error("난수: 최소값이 최대값보다 클 수 없습니다.");
+    }
     static std::mt19937 gen(std::random_device{}());
     std::uniform_int_distribution<long long> dist(minVal->value, maxVal->value);
     return make_shared<Integer>(dist(gen));
+}
+
+// ===== 삼각함수 =====
+
+std::shared_ptr<Object> Sin::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("사인 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("사인 함수는 정수 또는 실수만 지원합니다.");
+    }
+    return make_shared<Float>(std::sin(val));
+}
+
+std::shared_ptr<Object> Cos::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("코사인 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("코사인 함수는 정수 또는 실수만 지원합니다.");
+    }
+    return make_shared<Float>(std::cos(val));
+}
+
+std::shared_ptr<Object> Tan::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("탄젠트 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("탄젠트 함수는 정수 또는 실수만 지원합니다.");
+    }
+    return make_shared<Float>(std::tan(val));
+}
+
+// ===== 로그/지수 =====
+
+std::shared_ptr<Object> Log::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("로그 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("로그 함수는 정수 또는 실수만 지원합니다.");
+    }
+    if (val <= 0) {
+        throw runtime_error("로그 함수의 인자는 양수여야 합니다.");
+    }
+    return make_shared<Float>(std::log10(val));
+}
+
+std::shared_ptr<Object> Ln::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("자연로그 함수는 인자를 1개만 받습니다.");
+    }
+    double val;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        val = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        val = f->value;
+    } else {
+        throw runtime_error("자연로그 함수는 정수 또는 실수만 지원합니다.");
+    }
+    if (val <= 0) {
+        throw runtime_error("자연로그 함수의 인자는 양수여야 합니다.");
+    }
+    return make_shared<Float>(std::log(val));
+}
+
+std::shared_ptr<Object> Power::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("거듭제곱 함수는 인자를 2개 받습니다 (밑, 지수).");
+    }
+    double base, exp;
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        base = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        base = f->value;
+    } else {
+        throw runtime_error("거듭제곱 함수는 숫자만 지원합니다.");
+    }
+    if (auto* i = dynamic_cast<Integer*>(parameters[1].get())) {
+        exp = static_cast<double>(i->value);
+    } else if (auto* f = dynamic_cast<Float*>(parameters[1].get())) {
+        exp = f->value;
+    } else {
+        throw runtime_error("거듭제곱 함수는 숫자만 지원합니다.");
+    }
+    return make_shared<Float>(std::pow(base, exp));
+}
+
+// ===== 상수 =====
+
+std::shared_ptr<Object> Pi::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (!parameters.empty()) {
+        throw runtime_error("파이 함수는 인자를 받지 않습니다.");
+    }
+    return make_shared<Float>(3.14159265358979323846);
+}
+
+std::shared_ptr<Object> EulerE::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (!parameters.empty()) {
+        throw runtime_error("자연수e 함수는 인자를 받지 않습니다.");
+    }
+    return make_shared<Float>(2.71828182845904523536);
+}
+
+// ===== 반올림 계열 =====
+
+std::shared_ptr<Object> Round::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("반올림 함수는 인자를 1개만 받습니다.");
+    }
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        return parameters[0];
+    }
+    if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        return make_shared<Integer>(static_cast<long long>(std::round(f->value)));
+    }
+    throw runtime_error("반올림 함수는 정수 또는 실수만 지원합니다.");
+}
+
+std::shared_ptr<Object> Ceil::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("올림 함수는 인자를 1개만 받습니다.");
+    }
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        return parameters[0];
+    }
+    if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        return make_shared<Integer>(static_cast<long long>(std::ceil(f->value)));
+    }
+    throw runtime_error("올림 함수는 정수 또는 실수만 지원합니다.");
+}
+
+std::shared_ptr<Object> Floor::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("내림 함수는 인자를 1개만 받습니다.");
+    }
+    if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        return parameters[0];
+    }
+    if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
+        return make_shared<Integer>(static_cast<long long>(std::floor(f->value)));
+    }
+    throw runtime_error("내림 함수는 정수 또는 실수만 지원합니다.");
 }
 
 // ===== 문자열 내장함수 =====
@@ -526,6 +694,107 @@ std::shared_ptr<Object> Trim::function(std::vector<std::shared_ptr<Object>> para
     return make_shared<String>(result.substr(start, end - start + 1));
 }
 
+std::shared_ptr<Object> StartsWith::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("시작확인 함수는 인자를 2개 받습니다 (문자열, 접두사).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* prefix = dynamic_cast<String*>(parameters[1].get());
+    if (!str || !prefix) {
+        throw runtime_error("시작확인 함수의 인자는 모두 문자열이어야 합니다.");
+    }
+    return make_shared<Boolean>(utf8::startsWithStr(str->value, prefix->value));
+}
+
+std::shared_ptr<Object> EndsWith::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("끝확인 함수는 인자를 2개 받습니다 (문자열, 접미사).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* suffix = dynamic_cast<String*>(parameters[1].get());
+    if (!str || !suffix) {
+        throw runtime_error("끝확인 함수의 인자는 모두 문자열이어야 합니다.");
+    }
+    return make_shared<Boolean>(utf8::endsWithStr(str->value, suffix->value));
+}
+
+std::shared_ptr<Object> Repeat::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 2) {
+        throw runtime_error("반복 함수는 인자를 2개 받습니다 (문자열, 횟수).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* count = dynamic_cast<Integer*>(parameters[1].get());
+    if (!str) {
+        throw runtime_error("반복 함수의 첫 번째 인자는 문자열이어야 합니다.");
+    }
+    if (!count) {
+        throw runtime_error("반복 함수의 두 번째 인자는 정수이어야 합니다.");
+    }
+    if (count->value < 0) {
+        throw runtime_error("반복 횟수는 0 이상이어야 합니다.");
+    }
+    if (count->value > 100000) {
+        throw runtime_error("반복 횟수는 100000 이하여야 합니다.");
+    }
+    string result;
+    for (long long i = 0; i < count->value; i++) {
+        result += str->value;
+    }
+    return make_shared<String>(result);
+}
+
+std::shared_ptr<Object> Pad::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 3) {
+        throw runtime_error("채우기 함수는 인자를 3개 받습니다 (문자열, 길이, 채울문자).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* length = dynamic_cast<Integer*>(parameters[1].get());
+    auto* padChar = dynamic_cast<String*>(parameters[2].get());
+    if (!str) {
+        throw runtime_error("채우기 함수의 첫 번째 인자는 문자열이어야 합니다.");
+    }
+    if (!length) {
+        throw runtime_error("채우기 함수의 두 번째 인자는 정수이어야 합니다.");
+    }
+    if (!padChar) {
+        throw runtime_error("채우기 함수의 세 번째 인자는 문자열이어야 합니다.");
+    }
+    if (utf8::codePointCount(padChar->value) != 1) {
+        throw runtime_error("채우기 함수의 세 번째 인자는 한 글자여야 합니다.");
+    }
+
+    size_t currentLen = utf8::codePointCount(str->value);
+    if (static_cast<long long>(currentLen) >= length->value) {
+        return make_shared<String>(str->value);
+    }
+    string result = str->value;
+    for (long long i = currentLen; i < length->value; i++) {
+        result += padChar->value;
+    }
+    return make_shared<String>(result);
+}
+
+std::shared_ptr<Object> Substring::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 3) {
+        throw runtime_error("부분문자 함수는 인자를 3개 받습니다 (문자열, 시작, 끝).");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    auto* start = dynamic_cast<Integer*>(parameters[1].get());
+    auto* end = dynamic_cast<Integer*>(parameters[2].get());
+    if (!str) {
+        throw runtime_error("부분문자 함수의 첫 번째 인자는 문자열이어야 합니다.");
+    }
+    if (!start || !end) {
+        throw runtime_error("부분문자 함수의 두 번째, 세 번째 인자는 정수이어야 합니다.");
+    }
+    long long s = start->value;
+    long long e = end->value;
+    if (s < 0) s = 0;
+    if (e < 0) e = 0;
+    return make_shared<String>(utf8::substringCodePoints(str->value,
+        static_cast<size_t>(s), static_cast<size_t>(e)));
+}
+
 // ===== 배열 내장함수 =====
 
 std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> parameters) {
@@ -610,4 +879,290 @@ std::shared_ptr<Object> Slice::function(std::vector<std::shared_ptr<Object>> par
         result->elements.push_back(arr->elements[i]);
     }
     return result;
+}
+
+// ===== JSON 내장함수 =====
+
+// JSON 파서: 재귀 하강 파서
+namespace {
+
+class JsonParser {
+public:
+    explicit JsonParser(const string& input) : src(input), pos(0) {}
+
+    shared_ptr<Object> parse() {
+        skipWhitespace();
+        auto result = parseValue();
+        skipWhitespace();
+        if (pos != src.size()) {
+            throw runtime_error("JSON 파싱 오류: 예상치 못한 문자가 남아있습니다.");
+        }
+        return result;
+    }
+
+private:
+    const string& src;
+    size_t pos;
+
+    char peek() const {
+        if (pos >= src.size()) throw runtime_error("JSON 파싱 오류: 예상치 못한 입력 끝.");
+        return src[pos];
+    }
+
+    char advance() {
+        if (pos >= src.size()) throw runtime_error("JSON 파싱 오류: 예상치 못한 입력 끝.");
+        return src[pos++];
+    }
+
+    void expect(char c) {
+        skipWhitespace();
+        if (advance() != c) {
+            throw runtime_error(string("JSON 파싱 오류: '") + c + "' 문자가 필요합니다.");
+        }
+    }
+
+    void skipWhitespace() {
+        while (pos < src.size() && (src[pos] == ' ' || src[pos] == '\t' || src[pos] == '\n' || src[pos] == '\r')) {
+            pos++;
+        }
+    }
+
+    shared_ptr<Object> parseValue() {
+        skipWhitespace();
+        if (pos >= src.size()) throw runtime_error("JSON 파싱 오류: 예상치 못한 입력 끝.");
+
+        char c = peek();
+        if (c == '"') return parseString();
+        if (c == '{') return parseObject();
+        if (c == '[') return parseArray();
+        if (c == 't' || c == 'f') return parseBoolean();
+        if (c == 'n') return parseNull();
+        if (c == '-' || (c >= '0' && c <= '9')) return parseNumber();
+
+        throw runtime_error(string("JSON 파싱 오류: 예상치 못한 문자 '") + c + "'.");
+    }
+
+    shared_ptr<Object> parseString() {
+        expect('"');
+        string result;
+        while (pos < src.size() && src[pos] != '"') {
+            if (src[pos] == '\\') {
+                pos++;
+                if (pos >= src.size()) throw runtime_error("JSON 파싱 오류: 문자열이 완료되지 않았습니다.");
+                switch (src[pos]) {
+                case '"': result += '"'; break;
+                case '\\': result += '\\'; break;
+                case '/': result += '/'; break;
+                case 'b': result += '\b'; break;
+                case 'f': result += '\f'; break;
+                case 'n': result += '\n'; break;
+                case 'r': result += '\r'; break;
+                case 't': result += '\t'; break;
+                case 'u': {
+                    if (pos + 4 >= src.size()) throw runtime_error("JSON 파싱 오류: 유니코드 이스케이프가 불완전합니다.");
+                    string hex = src.substr(pos + 1, 4);
+                    unsigned long cp = stoul(hex, nullptr, 16);
+                    pos += 4;
+                    // UTF-16 surrogate pair 처리
+                    if (cp >= 0xD800 && cp <= 0xDBFF) {
+                        if (pos + 1 < src.size() && src[pos + 1] == '\\' && pos + 2 < src.size() && src[pos + 2] == 'u') {
+                            if (pos + 6 >= src.size()) throw runtime_error("JSON 파싱 오류: 유니코드 surrogate pair가 불완전합니다.");
+                            string hex2 = src.substr(pos + 3, 4);
+                            unsigned long low = stoul(hex2, nullptr, 16);
+                            if (low >= 0xDC00 && low <= 0xDFFF) {
+                                cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                                pos += 6;
+                            } else {
+                                throw runtime_error("JSON 파싱 오류: 잘못된 surrogate pair입니다.");
+                            }
+                        } else {
+                            throw runtime_error("JSON 파싱 오류: high surrogate 뒤에 low surrogate가 필요합니다.");
+                        }
+                    } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+                        throw runtime_error("JSON 파싱 오류: 예상치 못한 low surrogate입니다.");
+                    }
+                    // UTF-8 인코딩
+                    if (cp < 0x80) {
+                        result += static_cast<char>(cp);
+                    } else if (cp < 0x800) {
+                        result += static_cast<char>(0xC0 | (cp >> 6));
+                        result += static_cast<char>(0x80 | (cp & 0x3F));
+                    } else if (cp < 0x10000) {
+                        result += static_cast<char>(0xE0 | (cp >> 12));
+                        result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                        result += static_cast<char>(0x80 | (cp & 0x3F));
+                    } else {
+                        result += static_cast<char>(0xF0 | (cp >> 18));
+                        result += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+                        result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                        result += static_cast<char>(0x80 | (cp & 0x3F));
+                    }
+                    break;
+                }
+                default:
+                    throw runtime_error(string("JSON 파싱 오류: 알 수 없는 이스케이프 시퀀스 '\\") + src[pos] + "'.");
+                }
+                pos++;
+            } else {
+                result += src[pos++];
+            }
+        }
+        if (pos >= src.size()) throw runtime_error("JSON 파싱 오류: 문자열이 완료되지 않았습니다.");
+        pos++; // closing "
+        return make_shared<String>(result);
+    }
+
+    shared_ptr<Object> parseNumber() {
+        size_t start = pos;
+        if (src[pos] == '-') pos++;
+        while (pos < src.size() && src[pos] >= '0' && src[pos] <= '9') pos++;
+        bool isFloat = false;
+        if (pos < src.size() && src[pos] == '.') {
+            isFloat = true;
+            pos++;
+            while (pos < src.size() && src[pos] >= '0' && src[pos] <= '9') pos++;
+        }
+        if (pos < src.size() && (src[pos] == 'e' || src[pos] == 'E')) {
+            isFloat = true;
+            pos++;
+            if (pos < src.size() && (src[pos] == '+' || src[pos] == '-')) pos++;
+            while (pos < src.size() && src[pos] >= '0' && src[pos] <= '9') pos++;
+        }
+        string numStr = src.substr(start, pos - start);
+        if (isFloat) {
+            return make_shared<Float>(stod(numStr));
+        }
+        return make_shared<Integer>(stoll(numStr));
+    }
+
+    shared_ptr<Object> parseObject() {
+        expect('{');
+        auto obj = make_shared<HashMap>();
+        skipWhitespace();
+        if (pos < src.size() && peek() == '}') {
+            pos++;
+            return obj;
+        }
+        while (true) {
+            skipWhitespace();
+            if (peek() != '"') throw runtime_error("JSON 파싱 오류: 사전의 키는 문자열이어야 합니다.");
+            auto keyObj = parseString();
+            string key = dynamic_cast<String*>(keyObj.get())->value;
+            expect(':');
+            auto value = parseValue();
+            obj->pairs[key] = value;
+            skipWhitespace();
+            if (peek() == ',') {
+                pos++;
+            } else {
+                break;
+            }
+        }
+        expect('}');
+        return obj;
+    }
+
+    shared_ptr<Object> parseArray() {
+        expect('[');
+        auto arr = make_shared<Array>();
+        skipWhitespace();
+        if (pos < src.size() && peek() == ']') {
+            pos++;
+            return arr;
+        }
+        while (true) {
+            arr->elements.push_back(parseValue());
+            skipWhitespace();
+            if (peek() == ',') {
+                pos++;
+            } else {
+                break;
+            }
+        }
+        expect(']');
+        return arr;
+    }
+
+    shared_ptr<Object> parseBoolean() {
+        if (src.compare(pos, 4, "true") == 0) {
+            pos += 4;
+            return make_shared<Boolean>(true);
+        }
+        if (src.compare(pos, 5, "false") == 0) {
+            pos += 5;
+            return make_shared<Boolean>(false);
+        }
+        throw runtime_error("JSON 파싱 오류: 잘못된 값입니다.");
+    }
+
+    shared_ptr<Object> parseNull() {
+        if (src.compare(pos, 4, "null") == 0) {
+            pos += 4;
+            return make_shared<Null>();
+        }
+        throw runtime_error("JSON 파싱 오류: 잘못된 값입니다.");
+    }
+};
+
+// hong-ik 객체를 JSON 문자열로 직렬화
+string serializeToJson(const shared_ptr<Object>& obj) {
+    if (!obj || dynamic_cast<Null*>(obj.get())) {
+        return "null";
+    }
+    if (auto* str = dynamic_cast<String*>(obj.get())) {
+        return "\"" + json_util::escape(str->value) + "\"";
+    }
+    if (auto* i = dynamic_cast<Integer*>(obj.get())) {
+        return to_string(i->value);
+    }
+    if (auto* f = dynamic_cast<Float*>(obj.get())) {
+        ostringstream oss;
+        oss << f->value;
+        return oss.str();
+    }
+    if (auto* b = dynamic_cast<Boolean*>(obj.get())) {
+        return b->value ? "true" : "false";
+    }
+    if (auto* arr = dynamic_cast<Array*>(obj.get())) {
+        string result = "[";
+        for (size_t i = 0; i < arr->elements.size(); i++) {
+            if (i > 0) result += ",";
+            result += serializeToJson(arr->elements[i]);
+        }
+        result += "]";
+        return result;
+    }
+    if (auto* map = dynamic_cast<HashMap*>(obj.get())) {
+        string result = "{";
+        size_t i = 0;
+        for (auto& [key, value] : map->pairs) {
+            if (i > 0) result += ",";
+            result += "\"" + json_util::escape(key) + "\":" + serializeToJson(value);
+            i++;
+        }
+        result += "}";
+        return result;
+    }
+    throw runtime_error("JSON_직렬화 오류: 지원하지 않는 타입입니다.");
+}
+
+} // anonymous namespace
+
+std::shared_ptr<Object> JsonParse::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("JSON_파싱 함수는 인자를 1개만 받습니다.");
+    }
+    auto* str = dynamic_cast<String*>(parameters[0].get());
+    if (!str) {
+        throw runtime_error("JSON_파싱 함수의 인자는 문자열이어야 합니다.");
+    }
+    JsonParser parser(str->value);
+    return parser.parse();
+}
+
+std::shared_ptr<Object> JsonSerialize::function(std::vector<std::shared_ptr<Object>> parameters) {
+    if (parameters.size() != 1) {
+        throw runtime_error("JSON_직렬화 함수는 인자를 1개만 받습니다.");
+    }
+    return make_shared<String>(serializeToJson(parameters[0]));
 }

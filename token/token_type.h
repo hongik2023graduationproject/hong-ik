@@ -77,6 +77,7 @@ enum class TokenType {
     부모, // parent/super
     부터, // from (for range loop)
     까지, // to (for range loop)
+    생산, // yield (generator)
 
     BITWISE_AND, // &
     LOGICAL_AND, // &&
@@ -104,6 +105,10 @@ enum class TokenType {
     DECREMENT, // --
 
     POWER, // **
+
+    QUESTION, // ?
+
+    TILDE, // ~
 };
 
 #endif // TOKEN_TYPE_H
