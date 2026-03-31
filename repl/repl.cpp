@@ -3,8 +3,11 @@
 #include "../lexer/lexer.h"
 #include "../token/token.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../error/hongik_error.h"
+#include "../exception/exception.h"
 #include <fstream>
 #include <iostream>
+#include <regex>
 
 using namespace std;
 
@@ -102,7 +105,9 @@ void Repl::FileMode(const string& filename) {
     if (useVM) {
         // VM 모드: 파일 전체를 한 번에 파싱 후 컴파일/실행
         string code;
+        vector<string> sourceLines;
         while (getline(file, code)) {
+            sourceLines.push_back(code);
             code += "\n";
             auto utf8 = Utf8Converter::Convert(code);
             auto newTokens = lexer->Tokenize(utf8);
@@ -126,6 +131,21 @@ void Repl::FileMode(const string& filename) {
             if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
                 cout << object->ToString() << endl;
             }
+        } catch (const RuntimeException& e) {
+            string msg = e.what();
+            // 줄 번호 추출 시도: "[줄 N] ..." 형식
+            long long errorLine = 0;
+            std::regex lineRegex("\\[줄 ([0-9]+)\\]");
+            std::smatch match;
+            if (std::regex_search(msg, match, lineRegex)) {
+                errorLine = std::stoll(match[1].str());
+            }
+            if (errorLine > 0 && errorLine <= static_cast<long long>(sourceLines.size())) {
+                cout << HongIkError::formatError(
+                    msg, errorLine, sourceLines[errorLine - 1]) << endl;
+            } else {
+                cout << "Error: " << msg << endl;
+            }
         } catch (const exception& e) {
             cout << "Error: " << e.what() << endl;
         }
@@ -134,7 +154,9 @@ void Repl::FileMode(const string& filename) {
 
     // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행
     string code;
+    vector<string> sourceLines;
     while (getline(file, code)) {
+        sourceLines.push_back(code);
         code += "\n";
         auto utf8 = Utf8Converter::Convert(code);
         auto newTokens = lexer->Tokenize(utf8);
@@ -154,6 +176,20 @@ void Repl::FileMode(const string& filename) {
         auto object = evaluator->Evaluate(program);
         if (object != nullptr) {
             cout << object->ToString() << endl;
+        }
+    } catch (const RuntimeException& e) {
+        string msg = e.what();
+        long long errorLine = 0;
+        std::regex lineRegex("\\[줄 ([0-9]+)\\]");
+        std::smatch match;
+        if (std::regex_search(msg, match, lineRegex)) {
+            errorLine = std::stoll(match[1].str());
+        }
+        if (errorLine > 0 && errorLine <= static_cast<long long>(sourceLines.size())) {
+            cout << HongIkError::formatError(
+                msg, errorLine, sourceLines[errorLine - 1]) << endl;
+        } else {
+            cout << "Error: " << msg << endl;
         }
     } catch (const exception& e) {
         cout << "Error: " << e.what() << endl;

@@ -840,3 +840,25 @@ TEST_F(VMTest, BinaryOpBetterErrorMessage) {
         EXPECT_TRUE(msg.find("문자") != string::npos) << "Error message should contain right type: " << msg;
     }
 }
+
+TEST_F(VMTest, ErrorMessageIncludesIndexInfo) {
+    try {
+        runVM("배열 a = [1, 2, 3]\na[10]\n");
+        FAIL() << "Expected RuntimeException";
+    } catch (const RuntimeException& e) {
+        string msg = e.what();
+        EXPECT_TRUE(msg.find("10") != string::npos) << "Error message should contain index: " << msg;
+        EXPECT_TRUE(msg.find("3") != string::npos) << "Error message should contain array size: " << msg;
+    }
+}
+
+TEST_F(VMTest, ErrorMessageIncludesUncallableType) {
+    try {
+        runVM("정수 x = 42\nx()\n");
+        FAIL() << "Expected RuntimeException";
+    } catch (const RuntimeException& e) {
+        string msg = e.what();
+        EXPECT_TRUE(msg.find("정수") != string::npos || msg.find("호출") != string::npos)
+            << "Error message should contain type or call info: " << msg;
+    }
+}

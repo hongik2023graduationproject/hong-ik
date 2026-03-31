@@ -485,7 +485,7 @@ shared_ptr<Object> VM::run() {
                         push(VMValue::Obj(instance));
                     }
                 } else {
-                    throw RuntimeException("호출할 수 없는 객체입니다.", currentLine());
+                    throw RuntimeException("호출할 수 없는 객체입니다: " + typeToKorean(vmValueToObjectType(callee)) + " 타입", currentLine());
                 }
                 break;
             }
@@ -596,7 +596,7 @@ shared_ptr<Object> VM::run() {
                     long long actualIdx = idx->value;
                     if (actualIdx < 0) actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
                     if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
-                        throw RuntimeException("배열의 범위 밖 인덱스입니다.", currentLine());
+                        throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 " + to_string(arr->elements.size()), currentLine());
                     push(VMValue::fromObject(arr->elements[actualIdx]));
                 } else if (auto* str = dynamic_cast<String*>(collectionObj.get())) {
                     auto* idx = dynamic_cast<Integer*>(indexObj.get());
@@ -639,7 +639,7 @@ shared_ptr<Object> VM::run() {
                     long long actualIdx = idx->value;
                     if (actualIdx < 0) actualIdx += static_cast<long long>(arr->elements.size());
                     if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
-                        throw RuntimeException("배열의 범위 밖 인덱스입니다.", currentLine());
+                        throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 " + to_string(arr->elements.size()), currentLine());
                     arr->elements[actualIdx] = valueObj;
                 } else if (auto* hm = dynamic_cast<HashMap*>(collectionObj.get())) {
                     auto* key = dynamic_cast<String*>(indexObj.get());

@@ -72,6 +72,16 @@ public:
         return HongIkError(HongIkErrorType::TYPE_ERROR, msg, loc);
     }
 
+    // 에러 메시지를 소스 코드 컨텍스트와 함께 포맷
+    static std::string formatError(const std::string& message, long long line,
+                                    const std::string& sourceLine = "") {
+        std::string result = "[" + std::to_string(line) + "행] 에러: " + message;
+        if (!sourceLine.empty()) {
+            result += "\n  " + sourceLine;
+        }
+        return result;
+    }
+
     // 문법 에러 생성 헬퍼
     static HongIkError SyntaxError(const std::string& msg, long long line = 0) {
         ErrorLocation loc;
