@@ -31,6 +31,7 @@ struct ExceptionHandler {
 struct IteratorState : public Object {
     std::shared_ptr<Object> iterable;
     size_t index = 0;
+    std::vector<std::string> codePoints; // UTF-8 code points for string iteration
 
     IteratorState() { type = ObjectType::ITERATOR; }
     std::string ToString() override { return "<이터레이터>"; }

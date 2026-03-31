@@ -1,6 +1,8 @@
 #include "vm.h"
 #include "../environment/environment.h"
 #include "../exception/exception.h"
+#include "../util/utf8_utils.h"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -29,15 +31,33 @@ VM::VM() {
         {"최대", make_shared<Max>()},
         {"최소", make_shared<Min>()},
         {"난수", make_shared<Random>()},
+        {"사인", make_shared<Sin>()},
+        {"코사인", make_shared<Cos>()},
+        {"탄젠트", make_shared<Tan>()},
+        {"로그", make_shared<Log>()},
+        {"자연로그", make_shared<Ln>()},
+        {"거듭제곱", make_shared<Power>()},
+        {"파이", make_shared<Pi>()},
+        {"자연수e", make_shared<EulerE>()},
+        {"반올림", make_shared<Round>()},
+        {"올림", make_shared<Ceil>()},
+        {"내림", make_shared<Floor>()},
         {"분리", make_shared<Split>()},
         {"대문자", make_shared<ToUpper>()},
         {"소문자", make_shared<ToLower>()},
         {"치환", make_shared<Replace>()},
         {"자르기", make_shared<Trim>()},
+        {"시작확인", make_shared<StartsWith>()},
+        {"끝확인", make_shared<EndsWith>()},
+        {"반복", make_shared<Repeat>()},
+        {"채우기", make_shared<Pad>()},
+        {"부분문자", make_shared<Substring>()},
         {"정렬", make_shared<Sort>()},
         {"뒤집기", make_shared<Reverse>()},
         {"찾기", make_shared<Find>()},
         {"조각", make_shared<Slice>()},
+        {"JSON_파싱", make_shared<JsonParse>()},
+        {"JSON_직렬화", make_shared<JsonSerialize>()},
     };
 }
 
@@ -439,9 +459,11 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_BUILD_ARRAY: {
                 uint16_t count = readUint16();
                 auto array = make_shared<Array>();
+                array->elements.reserve(count);
                 for (uint16_t i = 0; i < count; i++) {
-                    array->elements.insert(array->elements.begin(), pop());
+                    array->elements.push_back(pop());
                 }
+                std::reverse(array->elements.begin(), array->elements.end());
                 push(array);
                 break;
             }
@@ -488,11 +510,13 @@ shared_ptr<Object> VM::run() {
                 } else if (auto* str = dynamic_cast<String*>(collection.get())) {
                     auto* idx = dynamic_cast<Integer*>(index.get());
                     if (!idx) throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
+                    auto cps = utf8::toCodePoints(str->value);
+                    long long len = static_cast<long long>(cps.size());
                     long long actualIdx = idx->value;
-                    if (actualIdx < 0) actualIdx = static_cast<long long>(str->value.size()) + actualIdx;
-                    if (actualIdx < 0 || actualIdx >= static_cast<long long>(str->value.size()))
+                    if (actualIdx < 0) actualIdx = len + actualIdx;
+                    if (actualIdx < 0 || actualIdx >= len)
                         throw RuntimeException("문자열의 범위 밖 인덱스입니다.", currentLine());
-                    push(make_shared<String>(string(1, str->value[actualIdx])));
+                    push(make_shared<String>(cps[actualIdx]));
                 } else if (auto* hm = dynamic_cast<HashMap*>(collection.get())) {
                     auto* key = dynamic_cast<String*>(index.get());
                     if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
@@ -507,6 +531,67 @@ shared_ptr<Object> VM::run() {
                     push(tup->elements[idx->value]);
                 } else {
                     throw RuntimeException("인덱스 연산이 지원되지 않는 형식입니다.", currentLine());
+                }
+                break;
+            }
+
+            case OpCode::OP_SLICE: {
+                uint8_t flags = readByte();
+                bool hasStart = flags & 0x01;
+                bool hasEnd = flags & 0x02;
+
+                shared_ptr<Object> endObj = hasEnd ? pop() : nullptr;
+                shared_ptr<Object> startObj = hasStart ? pop() : nullptr;
+                auto collection = pop();
+
+                if (auto* arr = dynamic_cast<Array*>(collection.get())) {
+                    long long len = static_cast<long long>(arr->elements.size());
+                    long long s = 0, e = len;
+
+                    if (startObj) {
+                        auto* si = dynamic_cast<Integer*>(startObj.get());
+                        if (!si) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+                        s = si->value;
+                        if (s < 0) s = len + s;
+                        if (s < 0) s = 0;
+                    }
+                    if (endObj) {
+                        auto* ei = dynamic_cast<Integer*>(endObj.get());
+                        if (!ei) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+                        e = ei->value;
+                        if (e < 0) e = len + e;
+                        if (e > len) e = len;
+                    }
+                    auto result = make_shared<Array>();
+                    for (long long i = s; i < e; i++) {
+                        result->elements.push_back(arr->elements[i]);
+                    }
+                    push(result);
+                } else if (auto* str = dynamic_cast<String*>(collection.get())) {
+                    long long len = static_cast<long long>(utf8::codePointCount(str->value));
+                    long long s = 0, e = len;
+
+                    if (startObj) {
+                        auto* si = dynamic_cast<Integer*>(startObj.get());
+                        if (!si) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+                        s = si->value;
+                        if (s < 0) s = len + s;
+                        if (s < 0) s = 0;
+                    }
+                    if (endObj) {
+                        auto* ei = dynamic_cast<Integer*>(endObj.get());
+                        if (!ei) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+                        e = ei->value;
+                        if (e < 0) e = len + e;
+                        if (e > len) e = len;
+                    }
+                    if (s >= e) {
+                        push(make_shared<String>(""));
+                    } else {
+                        push(make_shared<String>(utf8::substringCodePoints(str->value, static_cast<size_t>(s), static_cast<size_t>(e))));
+                    }
+                } else {
+                    throw RuntimeException("슬라이스 연산이 지원되지 않는 형식입니다.", currentLine());
                 }
                 break;
             }
@@ -603,6 +688,9 @@ shared_ptr<Object> VM::run() {
                 auto iter = make_shared<IteratorState>();
                 iter->iterable = iterable;
                 iter->index = 0;
+                if (auto* str = dynamic_cast<String*>(iterable.get())) {
+                    iter->codePoints = utf8::toCodePoints(str->value);
+                }
                 push(iter);
                 break;
             }
@@ -616,7 +704,7 @@ shared_ptr<Object> VM::run() {
                 if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
                     exhausted = iter->index >= arr->elements.size();
                 } else if (auto* str = dynamic_cast<String*>(iter->iterable.get())) {
-                    exhausted = iter->index >= str->value.size();
+                    exhausted = iter->index >= iter->codePoints.size();
                 } else {
                     exhausted = true;
                 }
@@ -629,16 +717,14 @@ shared_ptr<Object> VM::run() {
                 if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
                     push(arr->elements[iter->index]);
                 } else if (auto* str = dynamic_cast<String*>(iter->iterable.get())) {
-                    push(make_shared<String>(string(1, str->value[iter->index])));
+                    push(make_shared<String>(iter->codePoints[iter->index]));
                 }
                 iter->index++;
                 break;
             }
 
             case OpCode::OP_CLOSURE: {
-                // TODO: 현재 업밸류는 값 캡처(by-value) 방식으로, 캡처 시점의 스냅샷을 저장함.
-                // 외부 변수가 이후 변경되어도 클로저 내부에는 반영되지 않음.
-                // 참조 캡처(by-reference)를 구현하려면 open/closed upvalue 메커니즘이 필요함.
+                // Upvalue 객체를 통한 간접 참조로 캡처된 변수의 변경이 클로저 간에 공유됨.
                 uint16_t constIdx = readUint16();
                 auto fn = dynamic_pointer_cast<CompiledFunction>(frame.function->constants[constIdx]);
                 auto closure = make_shared<Closure>(fn);
@@ -683,6 +769,62 @@ shared_ptr<Object> VM::run() {
 
             case OpCode::OP_POP: pop(); break;
             case OpCode::OP_DUP: push(peek(0)); break;
+
+            case OpCode::OP_RANGE_CHECK: {
+                // stack: ... subject subject start end
+                auto endVal = pop();
+                auto startVal = pop();
+                auto subject = pop(); // the DUP'd subject
+                bool result = false;
+                if (subject->type == ObjectType::INTEGER &&
+                    startVal->type == ObjectType::INTEGER &&
+                    endVal->type == ObjectType::INTEGER) {
+                    auto sv = dynamic_cast<Integer*>(subject.get())->value;
+                    auto sv_start = dynamic_cast<Integer*>(startVal.get())->value;
+                    auto sv_end = dynamic_cast<Integer*>(endVal.get())->value;
+                    result = (sv >= sv_start && sv <= sv_end);
+                } else {
+                    // float/mixed numeric range
+                    auto toDouble = [](Object* o) -> double {
+                        if (o->type == ObjectType::FLOAT) return dynamic_cast<Float*>(o)->value;
+                        if (o->type == ObjectType::INTEGER) return static_cast<double>(dynamic_cast<Integer*>(o)->value);
+                        return 0.0;
+                    };
+                    if ((subject->type == ObjectType::INTEGER || subject->type == ObjectType::FLOAT) &&
+                        (startVal->type == ObjectType::INTEGER || startVal->type == ObjectType::FLOAT) &&
+                        (endVal->type == ObjectType::INTEGER || endVal->type == ObjectType::FLOAT)) {
+                        double sv = toDouble(subject.get());
+                        double sv_start = toDouble(startVal.get());
+                        double sv_end = toDouble(endVal.get());
+                        result = (sv >= sv_start && sv <= sv_end);
+                    }
+                }
+                push(make_shared<Boolean>(result));
+                break;
+            }
+
+            case OpCode::OP_TYPE_CHECK: {
+                uint16_t typeIdx = readUint16();
+                auto subject = pop(); // the DUP'd subject
+                auto typeNameObj = currentFrame().function->constants[typeIdx];
+                string typeName = typeNameObj->ToString();
+                bool result = false;
+                // 타입 이름과 ObjectType 매핑
+                static const map<string, ObjectType> typeMap = {
+                    {"\xEC\xA0\x95\xEC\x88\x98", ObjectType::INTEGER},       // 정수
+                    {"\xEC\x8B\xA4\xEC\x88\x98", ObjectType::FLOAT},        // 실수
+                    {"\xEB\xAC\xB8\xEC\x9E\x90", ObjectType::STRING},       // 문자
+                    {"\xEB\x85\xBC\xEB\xA6\xAC", ObjectType::BOOLEAN},      // 논리
+                    {"\xEB\xB0\xB0\xEC\x97\xB4", ObjectType::ARRAY},        // 배열
+                    {"\xEC\x82\xAC\xEC\xA0\x84", ObjectType::HASH_MAP},     // 사전
+                };
+                auto it = typeMap.find(typeName);
+                if (it != typeMap.end()) {
+                    result = (subject->type == it->second);
+                }
+                push(make_shared<Boolean>(result));
+                break;
+            }
 
             case OpCode::OP_INTERPOLATE: {
                 uint16_t count = readUint16();

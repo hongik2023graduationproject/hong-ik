@@ -220,6 +220,56 @@ TEST_F(VMTest, TupleIndex) {
     EXPECT_EQ(i->value, 20);
 }
 
+TEST_F(VMTest, ArraySlice) {
+    auto result = runVM("[10, 20, 30, 40, 50][1:3]\n");
+    auto* arr = dynamic_cast<Array*>(result.get());
+    ASSERT_NE(arr, nullptr);
+    ASSERT_EQ(arr->elements.size(), 2u);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[0].get())->value, 20);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[1].get())->value, 30);
+}
+
+TEST_F(VMTest, ArraySliceFromStart) {
+    auto result = runVM("[10, 20, 30][:2]\n");
+    auto* arr = dynamic_cast<Array*>(result.get());
+    ASSERT_NE(arr, nullptr);
+    ASSERT_EQ(arr->elements.size(), 2u);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[0].get())->value, 10);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[1].get())->value, 20);
+}
+
+TEST_F(VMTest, ArraySliceToEnd) {
+    auto result = runVM("[10, 20, 30][1:]\n");
+    auto* arr = dynamic_cast<Array*>(result.get());
+    ASSERT_NE(arr, nullptr);
+    ASSERT_EQ(arr->elements.size(), 2u);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[0].get())->value, 20);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[1].get())->value, 30);
+}
+
+TEST_F(VMTest, ArraySliceNegativeEnd) {
+    auto result = runVM("[10, 20, 30, 40][:-1]\n");
+    auto* arr = dynamic_cast<Array*>(result.get());
+    ASSERT_NE(arr, nullptr);
+    ASSERT_EQ(arr->elements.size(), 3u);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[0].get())->value, 10);
+    EXPECT_EQ(dynamic_cast<Integer*>(arr->elements[2].get())->value, 30);
+}
+
+TEST_F(VMTest, StringSlice) {
+    auto result = runVM("\"hello\"[1:3]\n");
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "el");
+}
+
+TEST_F(VMTest, StringSliceNegativeEnd) {
+    auto result = runVM("\"hello\"[:-1]\n");
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "hell");
+}
+
 TEST_F(VMTest, NullValue) {
     auto result = runVM("없음\n");
     ASSERT_NE(dynamic_cast<Null*>(result.get()), nullptr);
@@ -264,6 +314,49 @@ TEST_F(VMTest, MatchStatement) {
         "\n"
     );
     EXPECT_NE(output.find("이"), string::npos);
+}
+
+TEST_F(VMTest, MatchRangePattern) {
+    string output = runVMWithOutput(
+        "정수 x = 3\n"
+        "비교 x:\n"
+        "    경우 1~5:\n"
+        "        출력(\"범위안\")\n"
+        "    기본:\n"
+        "        출력(\"범위밖\")\n"
+        "\n"
+    );
+    EXPECT_NE(output.find("범위안"), string::npos);
+}
+
+TEST_F(VMTest, MatchTypePattern) {
+    string output = runVMWithOutput(
+        "정수 x = 42\n"
+        "비교 x:\n"
+        "    경우 문자:\n"
+        "        출력(\"문자열\")\n"
+        "    경우 정수:\n"
+        "        출력(\"정수값\")\n"
+        "    기본:\n"
+        "        출력(\"기타\")\n"
+        "\n"
+    );
+    EXPECT_NE(output.find("정수값"), string::npos);
+}
+
+TEST_F(VMTest, MatchGuardCondition) {
+    string output = runVMWithOutput(
+        "정수 x = 7\n"
+        "비교 x:\n"
+        "    경우 7 만약 x > 5:\n"
+        "        출력(\"큰7\")\n"
+        "    경우 7:\n"
+        "        출력(\"작은7\")\n"
+        "    기본:\n"
+        "        출력(\"기타\")\n"
+        "\n"
+    );
+    EXPECT_NE(output.find("큰7"), string::npos);
 }
 
 // ===== Try-Catch =====
@@ -351,6 +444,98 @@ TEST_F(VMTest, ClosureCapture) {
     EXPECT_EQ(i->value, 10);
 }
 
+// ===== 상수 폴딩 =====
+
+TEST_F(VMTest, ConstantFoldIntegerAdd) {
+    auto result = runVM("1 + 2\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 3);
+}
+
+TEST_F(VMTest, ConstantFoldIntegerSub) {
+    auto result = runVM("10 - 3\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 7);
+}
+
+TEST_F(VMTest, ConstantFoldIntegerMul) {
+    auto result = runVM("4 * 5\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 20);
+}
+
+TEST_F(VMTest, ConstantFoldIntegerDiv) {
+    auto result = runVM("20 / 4\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 5);
+}
+
+TEST_F(VMTest, ConstantFoldFloatAdd) {
+    auto result = runVM("1.5 + 2.5\n");
+    auto* f = dynamic_cast<Float*>(result.get());
+    ASSERT_NE(f, nullptr);
+    EXPECT_NEAR(f->value, 4.0, 0.001);
+}
+
+TEST_F(VMTest, ConstantFoldFloatMul) {
+    auto result = runVM("3.0 * 2.0\n");
+    auto* f = dynamic_cast<Float*>(result.get());
+    ASSERT_NE(f, nullptr);
+    EXPECT_NEAR(f->value, 6.0, 0.001);
+}
+
+TEST_F(VMTest, ConstantFoldStringConcat) {
+    auto result = runVM("\"hello\" + \" world\"\n");
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "hello world");
+}
+
+TEST_F(VMTest, ConstantFoldDivByZeroNotFolded) {
+    // 0으로 나누기는 폴딩하지 않고 런타임에 처리
+    string output = runVMWithOutput(
+        "시도:\n"
+        "    정수 x = 10 / 0\n"
+        "실패 오류:\n"
+        "    출력(오류)\n"
+        "\n"
+    );
+    EXPECT_NE(output.find("0으로 나눌 수 없습니다"), string::npos);
+}
+
+TEST_F(VMTest, ConstantFoldBytecodeSize) {
+    // 상수 폴딩 시 바이트코드가 더 작아야 함
+    // 1 + 2는 OP_CONSTANT 1개로 컴파일되어야 함 (OP_CONSTANT + OP_RETURN)
+    Lexer lexer;
+    vector<shared_ptr<Token>> allTokens;
+    string source = "1 + 2\n";
+    auto utf8 = Utf8Converter::Convert(source);
+    auto tokens = lexer.Tokenize(utf8);
+    allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
+
+    Parser parser;
+    auto program = parser.Parsing(allTokens);
+
+    Compiler compiler;
+    auto bytecode = compiler.Compile(program);
+
+    // 폴딩된 경우: OP_CONSTANT(3바이트) + OP_RETURN(1바이트) = 4바이트
+    // 폴딩 안 된 경우: OP_CONSTANT(3) + OP_CONSTANT(3) + OP_ADD(1) + OP_RETURN(1) = 8바이트
+    EXPECT_EQ(bytecode->code.size(), 4u);
+    EXPECT_EQ(static_cast<OpCode>(bytecode->code[0]), OpCode::OP_CONSTANT);
+    EXPECT_EQ(static_cast<OpCode>(bytecode->code[3]), OpCode::OP_RETURN);
+
+    // 상수 풀에 결과값 3만 있어야 함
+    ASSERT_EQ(bytecode->constants.size(), 1u);
+    auto* val = dynamic_cast<Integer*>(bytecode->constants[0].get());
+    ASSERT_NE(val, nullptr);
+    EXPECT_EQ(val->value, 3);
+}
+
 TEST_F(VMTest, ClassMethod) {
     auto result = runVM(
         "클래스 계산기:\n"
@@ -366,4 +551,26 @@ TEST_F(VMTest, ClassMethod) {
     auto* i = dynamic_cast<Integer*>(result.get());
     ASSERT_NE(i, nullptr);
     EXPECT_EQ(i->value, 15);
+}
+
+TEST_F(VMTest, StringIterationUTF8) {
+    auto output = runVMWithOutput(
+        "각각 문자 c \"안녕\" 에서:\n"
+        "    출력(c)\n"
+    );
+    EXPECT_EQ(output, "안\n녕\n");
+}
+
+TEST_F(VMTest, StringIndexUTF8) {
+    auto result = runVM("\"안녕하세요\"[1]\n");
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "녕");
+}
+
+TEST_F(VMTest, StringNegativeIndexUTF8) {
+    auto result = runVM("\"안녕하세요\"[-1]\n");
+    auto* s = dynamic_cast<String*>(result.get());
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->value, "요");
 }
