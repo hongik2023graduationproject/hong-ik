@@ -1,0 +1,27 @@
+ninja_dyndep_version = 1.0
+build CMakeFiles/HongIkLib.dir/repl/repl.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/utf8_converter/utf8_converter.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/lexer/lexer.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/token/token.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/parser/parser.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/evaluator/evaluator.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/environment/environment.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/object/built_in.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/vm/compiler.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/vm/vm.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/io/io_interface.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/error/hongik_error.cpp.o: dyndep
+
+build CMakeFiles/HongIkLib.dir/analyzer/analyzer.cpp.o: dyndep
+

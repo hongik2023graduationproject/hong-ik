@@ -1,0 +1,35 @@
+{
+	"bmi-installation" : null,
+	"compiler-frontend-variant" : "GNU",
+	"compiler-id" : "Clang",
+	"compiler-simulate-id" : "",
+	"config" : "Release",
+	"cxx-modules" : {},
+	"database-info" : null,
+	"dir-cur-bld" : "E:/projects/hongik/hong-ik/build-wasm",
+	"dir-cur-src" : "E:/projects/hongik/hong-ik",
+	"dir-top-bld" : "E:/projects/hongik/hong-ik/build-wasm",
+	"dir-top-src" : "E:/projects/hongik/hong-ik",
+	"exports" : [],
+	"forward-modules-from-target-dirs" : [],
+	"include-dirs" : 
+	[
+		"E:\\projects\\hongik\\hong-ik"
+	],
+	"language" : "CXX",
+	"linked-target-dirs" : [],
+	"module-dir" : "E:/projects/hongik/hong-ik/build-wasm/CMakeFiles/hongik-wasm.dir",
+	"sources" : 
+	{
+		"CMakeFiles/hongik-wasm.dir/web/bindings.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "E:/projects/hongik/hong-ik/web/bindings.cpp"
+		},
+		"CMakeFiles/hongik-wasm.dir/web/wasm_interface.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "E:/projects/hongik/hong-ik/web/wasm_interface.cpp"
+		}
+	}
+}

@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "../exception/exception.h"
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
@@ -414,9 +415,13 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
     long long line = expr->token ? expr->token->line : 0;
     TokenType op = expr->token->type;
 
-    // 산술 연산만 폴딩 대상
+    // 산술/비교/모듈로/거듭제곱 연산 폴딩 대상
     if (op != TokenType::PLUS && op != TokenType::MINUS &&
-        op != TokenType::ASTERISK && op != TokenType::SLASH) {
+        op != TokenType::ASTERISK && op != TokenType::SLASH &&
+        op != TokenType::PERCENT && op != TokenType::POWER &&
+        op != TokenType::EQUAL && op != TokenType::NOT_EQUAL &&
+        op != TokenType::LESS_THAN && op != TokenType::GREATER_THAN &&
+        op != TokenType::LESS_EQUAL && op != TokenType::GREATER_EQUAL) {
         return false;
     }
 
@@ -453,8 +458,26 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
 
     // 정수 + 정수
     if (leftType == T_INT && rightType == R_INT) {
+        // 비교 연산 폴딩
+        if (op == TokenType::EQUAL || op == TokenType::NOT_EQUAL ||
+            op == TokenType::LESS_THAN || op == TokenType::GREATER_THAN ||
+            op == TokenType::LESS_EQUAL || op == TokenType::GREATER_EQUAL) {
+            bool cmpResult;
+            switch (op) {
+            case TokenType::EQUAL: cmpResult = (leftInt == rightInt); break;
+            case TokenType::NOT_EQUAL: cmpResult = (leftInt != rightInt); break;
+            case TokenType::LESS_THAN: cmpResult = (leftInt < rightInt); break;
+            case TokenType::GREATER_THAN: cmpResult = (leftInt > rightInt); break;
+            case TokenType::LESS_EQUAL: cmpResult = (leftInt <= rightInt); break;
+            case TokenType::GREATER_EQUAL: cmpResult = (leftInt >= rightInt); break;
+            default: return false;
+            }
+            chunk().emitOp(cmpResult ? OpCode::OP_TRUE : OpCode::OP_FALSE, line);
+            return true;
+        }
+
         // 0으로 나누기는 폴딩하지 않음
-        if (op == TokenType::SLASH && rightInt == 0) return false;
+        if ((op == TokenType::SLASH || op == TokenType::PERCENT) && rightInt == 0) return false;
         long long result;
         switch (op) {
         case TokenType::PLUS:
@@ -484,6 +507,23 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
             result = leftInt * rightInt;
             break;
         case TokenType::SLASH: result = leftInt / rightInt; break;
+        case TokenType::PERCENT: result = leftInt % rightInt; break;
+        case TokenType::POWER: {
+            // 간단한 거듭제곱 (음수 지수는 폴딩하지 않음)
+            if (rightInt < 0) return false;
+            long long base = leftInt;
+            long long exp = rightInt;
+            result = 1;
+            for (long long e = 0; e < exp; e++) {
+                // 오버플로우 검사
+                if (result != 0 && base != 0) {
+                    if (std::abs(result) > std::numeric_limits<long long>::max() / std::abs(base))
+                        return false;
+                }
+                result *= base;
+            }
+            break;
+        }
         default: return false;
         }
         emitConstant(make_shared<Integer>(result), line);
@@ -492,6 +532,24 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
 
     // 실수 + 실수
     if (leftType == T_FLOAT && rightType == R_FLOAT) {
+        // 비교 연산 폴딩
+        if (op == TokenType::EQUAL || op == TokenType::NOT_EQUAL ||
+            op == TokenType::LESS_THAN || op == TokenType::GREATER_THAN ||
+            op == TokenType::LESS_EQUAL || op == TokenType::GREATER_EQUAL) {
+            bool cmpResult;
+            switch (op) {
+            case TokenType::EQUAL: cmpResult = (leftFloat == rightFloat); break;
+            case TokenType::NOT_EQUAL: cmpResult = (leftFloat != rightFloat); break;
+            case TokenType::LESS_THAN: cmpResult = (leftFloat < rightFloat); break;
+            case TokenType::GREATER_THAN: cmpResult = (leftFloat > rightFloat); break;
+            case TokenType::LESS_EQUAL: cmpResult = (leftFloat <= rightFloat); break;
+            case TokenType::GREATER_EQUAL: cmpResult = (leftFloat >= rightFloat); break;
+            default: return false;
+            }
+            chunk().emitOp(cmpResult ? OpCode::OP_TRUE : OpCode::OP_FALSE, line);
+            return true;
+        }
+
         if (op == TokenType::SLASH && rightFloat == 0.0) return false;
         double result;
         switch (op) {
@@ -575,6 +633,25 @@ void Compiler::compileInfix(InfixExpression* expr) {
 
 void Compiler::compilePrefix(PrefixExpression* expr) {
     long long line = expr->token ? expr->token->line : 0;
+
+    // 단항 상수 폴딩
+    if (expr->token->type == TokenType::MINUS) {
+        if (auto* intLit = dynamic_cast<IntegerLiteral*>(expr->right.get())) {
+            emitConstant(make_shared<Integer>(-intLit->value), line);
+            return;
+        }
+        if (auto* floatLit = dynamic_cast<FloatLiteral*>(expr->right.get())) {
+            emitConstant(make_shared<Float>(-floatLit->value), line);
+            return;
+        }
+    }
+    if (expr->token->type == TokenType::BANG) {
+        if (auto* boolLit = dynamic_cast<BooleanLiteral*>(expr->right.get())) {
+            chunk().emitOp(boolLit->value ? OpCode::OP_FALSE : OpCode::OP_TRUE, line);
+            return;
+        }
+    }
+
     compileExpression(expr->right.get());
     if (expr->token->type == TokenType::MINUS) {
         chunk().emitOp(OpCode::OP_NEGATE, line);
