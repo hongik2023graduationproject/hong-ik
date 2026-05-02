@@ -5,6 +5,7 @@
 #include "../utf8_converter/utf8_converter.h"
 #include "../error/hongik_error.h"
 #include "../exception/exception.h"
+#include "../util/token_utils.h"
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -94,7 +95,6 @@ void Repl::Run() {
 
 void Repl::FileMode(const string& filename) {
     vector<shared_ptr<Token>> tokens;
-    int indent = 0;
 
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -112,14 +112,8 @@ void Repl::FileMode(const string& filename) {
             auto utf8 = Utf8Converter::Convert(code);
             auto newTokens = lexer->Tokenize(utf8);
             tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
-            for (auto& t : newTokens) {
-                if (t->type == TokenType::START_BLOCK) indent++;
-                if (t->type == TokenType::END_BLOCK) indent--;
-            }
         }
-        for (int i = 0; i < indent; i++) {
-            tokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
-        }
+        token_utils::appendMissingBlockClosers(tokens);
         if (tokens.empty()) return;
 
         try {
@@ -161,14 +155,8 @@ void Repl::FileMode(const string& filename) {
         auto utf8 = Utf8Converter::Convert(code);
         auto newTokens = lexer->Tokenize(utf8);
         tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
-        for (auto& t : newTokens) {
-            if (t->type == TokenType::START_BLOCK) indent++;
-            if (t->type == TokenType::END_BLOCK) indent--;
-        }
     }
-    for (int i = 0; i < indent; i++) {
-        tokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
-    }
+    token_utils::appendMissingBlockClosers(tokens);
     if (tokens.empty()) return;
 
     try {

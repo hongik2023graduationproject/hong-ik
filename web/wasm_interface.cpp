@@ -1,5 +1,6 @@
 #include "wasm_interface.h"
 #include "../util/json_util.h"
+#include "../util/token_utils.h"
 #include <sstream>
 
 WasmInterface::WasmInterface() {
@@ -30,29 +31,20 @@ void WasmInterface::setupIOContext() {
     };
 }
 
-std::string WasmInterface::Execute(const std::string& code, long long timeoutMs, size_t maxMemoryBytes) {
+std::string WasmInterface::Execute(const std::string& code, long long timeoutMs) {
     outputBuffer.clear();
 
     std::ostringstream json;
 
     try {
-        ExecutionLimiter limiter(timeoutMs, maxMemoryBytes);
+        ExecutionLimiter limiter(timeoutMs);
 
         // 기존 evaluator를 리미터와 함께 재생성
         evaluator = std::make_unique<Evaluator>(&ioCtx, &limiter);
 
         auto utf8Strings = Utf8Converter::Convert(code + "\n");
         auto tokens = lexer->Tokenize(utf8Strings);
-
-        // 블록 종료 토큰 보정
-        int indent = 0;
-        for (const auto& t : tokens) {
-            if (t->type == TokenType::START_BLOCK) indent++;
-            if (t->type == TokenType::END_BLOCK) indent--;
-        }
-        for (int i = 0; i < indent; i++) {
-            tokens.push_back(std::make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
-        }
+        token_utils::appendMissingBlockClosers(tokens);
 
         auto program = parser->Parsing(tokens);
         auto result = evaluator->Evaluate(program);

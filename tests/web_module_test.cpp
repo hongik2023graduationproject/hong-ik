@@ -14,7 +14,6 @@ class ExecutionLimiterTest : public ::testing::Test {};
 
 TEST_F(ExecutionLimiterTest, DefaultValues) {
     ExecutionLimiter limiter;
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 0u);
     EXPECT_EQ(limiter.getLoopIterationCount(), 0);
     EXPECT_FALSE(limiter.isTimeoutExceeded());
 }
@@ -31,41 +30,8 @@ TEST_F(ExecutionLimiterTest, TimeoutExceeded) {
     EXPECT_TRUE(limiter.isTimeoutExceeded());
 }
 
-TEST_F(ExecutionLimiterTest, MemoryTracking) {
-    ExecutionLimiter limiter(5000, 1024); // 1KB 메모리 제한
-    limiter.trackMemoryAllocation(512);
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 512u);
-
-    limiter.trackMemoryAllocation(256);
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 768u);
-
-    limiter.freeMemory(256);
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 512u);
-}
-
-TEST_F(ExecutionLimiterTest, MemoryExceeded) {
-    ExecutionLimiter limiter(5000, 1024);
-    EXPECT_THROW(limiter.trackMemoryAllocation(2048), std::runtime_error);
-}
-
-TEST_F(ExecutionLimiterTest, MemoryExceededAfterPartialAllocation) {
-    ExecutionLimiter limiter(5000, 1024);
-    limiter.trackMemoryAllocation(800);
-    EXPECT_THROW(limiter.trackMemoryAllocation(300), std::runtime_error);
-}
-
-TEST_F(ExecutionLimiterTest, FreeMemoryUnderflowProtection) {
-    ExecutionLimiter limiter;
-    limiter.trackMemoryAllocation(100);
-    limiter.freeMemory(200); // bytes > currentMemoryBytes이면 free 무시
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 100u);
-
-    limiter.freeMemory(100); // 정확한 크기로 해제
-    EXPECT_EQ(limiter.getCurrentMemoryUsage(), 0u);
-}
-
 TEST_F(ExecutionLimiterTest, LoopCounter) {
-    ExecutionLimiter limiter(5000, 33554432, 10); // 10회 루프 제한
+    ExecutionLimiter limiter(5000, 10); // 10회 루프 제한
     for (int i = 0; i < 10; i++) {
         EXPECT_NO_THROW(limiter.incrementLoopCounter());
     }
@@ -74,7 +40,7 @@ TEST_F(ExecutionLimiterTest, LoopCounter) {
 }
 
 TEST_F(ExecutionLimiterTest, LoopCounterReset) {
-    ExecutionLimiter limiter(5000, 33554432, 5);
+    ExecutionLimiter limiter(5000, 5);
     for (int i = 0; i < 5; i++) {
         limiter.incrementLoopCounter();
     }

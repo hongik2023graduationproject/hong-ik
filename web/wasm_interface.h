@@ -24,8 +24,7 @@ public:
     // { "success": false, "error": { ... } }
     std::string Execute(
         const std::string& code,
-        long long timeoutMs = ExecutionLimiter::DEFAULT_TIMEOUT_MS,
-        size_t maxMemoryBytes = ExecutionLimiter::DEFAULT_MAX_MEMORY_BYTES
+        long long timeoutMs = ExecutionLimiter::DEFAULT_TIMEOUT_MS
     );
 
     // 신택스 하이라이팅용 토큰 정보 반환 (JSON)
