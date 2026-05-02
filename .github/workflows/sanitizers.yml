@@ -1,0 +1,51 @@
+name: Sanitizers
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sanitizers:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: AddressSanitizer + UBSan
+            sanitizers: "address;undefined"
+          # ThreadSanitizer is incompatible with ASan; ship as a separate
+          # cell so concurrency regressions are caught independently.
+          - label: ThreadSanitizer
+            sanitizers: "thread"
+    env:
+      CC: clang
+      CXX: clang++
+      # Loud, fail-fast sanitizer behavior. halt_on_error guarantees the
+      # very first finding turns into a non-zero exit code so flaky
+      # post-error output never masks the real problem.
+      ASAN_OPTIONS: "abort_on_error=1:halt_on_error=1:detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
+      UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+      TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld cmake ninja-build
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DHONGIK_ENABLE_SANITIZERS=ON \
+            -DHONGIK_SANITIZERS="${{ matrix.sanitizers }}"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure --parallel 2

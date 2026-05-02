@@ -3,6 +3,44 @@ project(HongIk)
 
 # set(CMAKE_EXE_LINKER_FLAGS "-static")
 
+# ----------------------------------------------------------------------------
+# Sanitizer support
+#
+# Enable with: cmake -B build -DHONGIK_ENABLE_SANITIZERS=ON
+# Pick a subset via HONGIK_SANITIZERS (default: "address;undefined").
+# TSan and MSan are mutually exclusive with ASan, so don't combine them.
+# Skipped automatically for Emscripten/WASM builds (no sanitizer runtime).
+# ----------------------------------------------------------------------------
+option(HONGIK_ENABLE_SANITIZERS "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+set(HONGIK_SANITIZERS "address;undefined" CACHE STRING "Semicolon-separated sanitizer list (e.g. address;undefined or thread)")
+
+function(hongik_apply_sanitizers target)
+    if(NOT HONGIK_ENABLE_SANITIZERS OR EMSCRIPTEN)
+        return()
+    endif()
+
+    set(_flags "")
+    if(MSVC)
+        # MSVC supports ASan only; UBSan/TSan/MSan are unavailable.
+        list(FIND HONGIK_SANITIZERS "address" _has_asan)
+        if(_has_asan GREATER -1)
+            list(APPEND _flags /fsanitize=address)
+        endif()
+    else()
+        foreach(_san IN LISTS HONGIK_SANITIZERS)
+            list(APPEND _flags -fsanitize=${_san})
+        endforeach()
+        list(APPEND _flags -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    endif()
+
+    if(_flags)
+        target_compile_options(${target} PRIVATE ${_flags})
+        if(NOT MSVC)
+            target_link_options(${target} PRIVATE ${_flags})
+        endif()
+    endif()
+endfunction()
+
 # 공통 소스 (네이티브 + WASM 모두 사용)
 set(HONGIK_CORE_SOURCES
         repl/repl.cpp
@@ -78,13 +116,16 @@ else()
     enable_testing()
 
     add_library(HongIkLib STATIC ${HONGIK_CORE_SOURCES})
+    hongik_apply_sanitizers(HongIkLib)
 
     add_executable(HongIk main.cpp)
     target_link_libraries(HongIk HongIkLib)
+    hongik_apply_sanitizers(HongIk)
 
     add_executable(HongIkBench tests/benchmark.cpp)
     target_include_directories(HongIkBench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(HongIkBench HongIkLib)
+    hongik_apply_sanitizers(HongIkBench)
 
     add_executable(HongIkTests
             tests/lexer_test.cpp
@@ -106,6 +147,7 @@ else()
             HongIkLib
             GTest::gtest_main
     )
+    hongik_apply_sanitizers(HongIkTests)
 
     include(GoogleTest)
     gtest_discover_tests(HongIkTests)
