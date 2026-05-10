@@ -95,13 +95,13 @@ Expected: 최소 `web/wasm_interface.h` 가 나와야 함. 그 외 사용처가 
 `tests/fixtures/golden/arith_basic.hik`:
 
 ```
-:(1 + 2 * 3)출력
-:(10 - 4)출력
-:(15 / 4)출력
-:(15 % 4)출력
+출력(1 + 2 * 3)
+출력(10 - 4)
+출력(15 / 4)
+출력(15 % 4)
 ```
 
-(이 언어의 함수 호출 형식은 `:(인자)함수명`. `출력` 은 stdout 으로 인자를 출력하는 빌트인.)
+(이 언어의 함수 호출 형식은 `함수명(인자)`. `출력` 은 stdout 으로 인자를 출력하는 빌트인.)
 
 - [ ] **Step 2: 기존 빌드로 기대 출력 캡처**
 
@@ -268,42 +268,42 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/vars_types.hik`:
 
 ```
-[정수] a = 42
-[실수] b = 3.14
-[문자] c = "안녕"
-[논리] d = true
-[배열] e = [1, 2, 3]
-[사전] f = {"키": 100}
-:(a)출력
-:(b)출력
-:(c)출력
-:(d)출력
-:(e)출력
-:(f)출력
+정수 a = 42
+실수 b = 3.14
+문자 c = "안녕"
+논리 d = true
+배열 e = [1, 2, 3]
+사전 f = {"키": 100}
+출력(a)
+출력(b)
+출력(c)
+출력(d)
+출력(e)
+출력(f)
 ```
 
 ```powershell
 ./cmake-build-debug/HongIk tests/fixtures/golden/vars_types.hik > tests/fixtures/golden/vars_types.expected.txt
 ```
 
-캡처된 파일 내용 확인. 기대 라인: `42`, `3.14`, `안녕`, `true`, 그리고 배열/사전의 ToString 표현(언어가 실제로 출력하는 형식 — 캡처값 그대로 받아들이고 사람이 한 번 검토). 만약 `[배열]` 또는 `[사전]` 타입 선언 키워드가 다르면 ([CLAUDE.md](../../CLAUDE.md) 참고) 멈추고 사용자에게 보고.
+캡처된 파일 내용 확인. 기대 라인: `42`, `3.14`, `안녕`, `true`, 그리고 배열/사전의 ToString 표현(언어가 실제로 출력하는 형식 — 캡처값 그대로 받아들이고 사람이 한 번 검토). 만약 `배열` 또는 `사전` 타입 선언 키워드가 다르게 동작하면 (실제 기존 테스트 `tests/vm_test.cpp` 의 `"배열 결과 = [0, 0, 0]"` 패턴 참고) 멈추고 사용자에게 보고.
 
 - [ ] **Step 2: if_else fixture**
 
 `tests/fixtures/golden/if_else.hik`:
 
 ```
-[정수] x = 7
+정수 x = 7
 만약 x > 5 라면:
-    :("크다")출력
+    출력("크다")
 아니면:
-    :("작다")출력
+    출력("작다")
 
-[정수] y = 3
+정수 y = 3
 만약 y > 5 라면:
-    :("크다")출력
+    출력("크다")
 아니면:
-    :("작다")출력
+    출력("작다")
 ```
 
 ```powershell
@@ -317,11 +317,11 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/loops_break.hik`:
 
 ```
-[정수] i = 0
+정수 i = 0
 반복 i < 5 동안:
     만약 i == 3 라면:
         중단
-    :(i)출력
+    출력(i)
     i = i + 1
 ```
 
@@ -338,15 +338,15 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/func_recursion.hik`:
 
 ```
-함수: [정수]n 피보 -> [정수]:
+함수 피보(정수 n) -> 정수:
     만약 n < 2 라면:
         리턴 n
-    리턴 :(n - 1)피보 + :(n - 2)피보
+    리턴 피보(n - 1) + 피보(n - 2)
 
-:(:(0)피보)출력
-:(:(1)피보)출력
-:(:(5)피보)출력
-:(:(10)피보)출력
+출력(피보(0))
+출력(피보(1))
+출력(피보(5))
+출력(피보(10))
 ```
 
 ```powershell
@@ -360,12 +360,12 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/builtins.hik`:
 
 ```
-[배열] arr = [1, 2, 3]
-:(:(arr)길이)출력
-:(arr, 4)추가
-:(:(arr)길이)출력
-[문자] s = "안녕세상"
-:(:(s)길이)출력
+배열 arr = [1, 2, 3]
+출력(길이(arr))
+추가(arr, 4)
+출력(길이(arr))
+문자 s = "안녕세상"
+출력(길이(s))
 ```
 
 ```powershell
@@ -379,10 +379,10 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/utf8_strings.hik`:
 
 ```
-[문자] greeting = "안녕하세요"
-:(greeting)출력
-[문자] mixed = "Hello, 세상!"
-:(mixed)출력
+문자 greeting = "안녕하세요"
+출력(greeting)
+문자 mixed = "Hello, 세상!"
+출력(mixed)
 ```
 
 ```powershell
@@ -396,7 +396,7 @@ git commit -m "test: add golden output harness with arith_basic fixture"
 `tests/fixtures/golden/error_undefined.hik`:
 
 ```
-:(없는변수)출력
+출력(없는변수)
 ```
 
 ```powershell
