@@ -135,11 +135,16 @@ else()
             tests/repl_test.cpp
             tests/vm_test.cpp
             tests/web_module_test.cpp
+            tests/golden_test.cpp
     )
 
     # 헤더 파일 경로 추가
     target_include_directories(HongIkTests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}  # 프로젝트 루트 디렉토리
+    )
+
+    target_compile_definitions(HongIkTests PRIVATE
+            "HONGIK_GOLDEN_FIXTURES_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/golden\""
     )
 
     target_link_libraries(
