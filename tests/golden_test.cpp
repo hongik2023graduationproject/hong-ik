@@ -36,31 +36,23 @@ std::string runFile(const std::filesystem::path& fixturePath, bool useVM) {
     return captured.str();
 }
 
+void runGolden(const std::string& name, bool useVM) {
+    std::filesystem::path dir = HONGIK_GOLDEN_FIXTURES_DIR;
+    auto source   = dir / (name + ".hik");
+    auto expected = slurp(dir / (name + ".expected.txt"));
+    auto actual   = runFile(source, useVM);
+    EXPECT_EQ(expected, actual)
+        << (useVM ? "VM" : "Evaluator") << " output diverged for fixture: " << name;
+}
+
 struct GoldenCase {
     std::string name;
 };
 
 class GoldenTest : public ::testing::TestWithParam<GoldenCase> {};
 
-TEST_P(GoldenTest, Evaluator) {
-    const auto& c = GetParam();
-    std::filesystem::path dir = HONGIK_GOLDEN_FIXTURES_DIR;
-    auto source   = dir / (c.name + ".hik");
-    auto expected = slurp(dir / (c.name + ".expected.txt"));
-    auto actual   = runFile(source, /*useVM=*/false);
-    EXPECT_EQ(expected, actual)
-        << "Evaluator output diverged for fixture: " << c.name;
-}
-
-TEST_P(GoldenTest, VM) {
-    const auto& c = GetParam();
-    std::filesystem::path dir = HONGIK_GOLDEN_FIXTURES_DIR;
-    auto source   = dir / (c.name + ".hik");
-    auto expected = slurp(dir / (c.name + ".expected.txt"));
-    auto actual   = runFile(source, /*useVM=*/true);
-    EXPECT_EQ(expected, actual)
-        << "VM output diverged for fixture: " << c.name;
-}
+TEST_P(GoldenTest, Evaluator) { runGolden(GetParam().name, /*useVM=*/false); }
+TEST_P(GoldenTest, VM)        { runGolden(GetParam().name, /*useVM=*/true); }
 
 INSTANTIATE_TEST_SUITE_P(
     PhaseZeroGoldens, GoldenTest,
