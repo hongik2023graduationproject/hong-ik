@@ -1,0 +1,4 @@
+문자 greeting = "안녕하세요"
+출력(greeting)
+문자 mixed = "Hello, 세상!"
+출력(mixed)

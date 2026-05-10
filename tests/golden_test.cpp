@@ -57,7 +57,14 @@ TEST_P(GoldenTest, VM)        { runGolden(GetParam().name, /*useVM=*/true); }
 INSTANTIATE_TEST_SUITE_P(
     PhaseZeroGoldens, GoldenTest,
     ::testing::Values(
-        GoldenCase{"arith_basic"}
+        GoldenCase{"arith_basic"},
+        GoldenCase{"vars_types"},
+        GoldenCase{"if_else"},
+        GoldenCase{"loops_break"},
+        GoldenCase{"func_recursion"},
+        GoldenCase{"builtins"},
+        GoldenCase{"utf8_strings"},
+        GoldenCase{"error_undefined"}
     ),
     [](const ::testing::TestParamInfo<GoldenCase>& info) {
         return info.param.name;
