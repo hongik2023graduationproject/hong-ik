@@ -50,7 +50,13 @@ set(HONGIK_CORE_SOURCES
         parser/parser.cpp
         evaluator/evaluator.cpp
         environment/environment.cpp
-        object/built_in.cpp
+        object/builtins/math.cpp
+        object/builtins/string.cpp
+        object/builtins/array.cpp
+        object/builtins/collection.cpp
+        object/builtins/io.cpp
+        object/builtins/conversion.cpp
+        object/builtins/json.cpp
         vm/compiler.cpp
         vm/vm.cpp
         io/io_interface.cpp
