@@ -9,8 +9,10 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // VM 호출 프레임
@@ -65,8 +67,8 @@ private:
     std::shared_ptr<CompiledFunction> topLevelFn; // 소유권 유지
     std::vector<VMValue> stack;
     std::vector<CallFrame> frames;
-    std::map<std::string, VMValue> globals;
-    std::map<std::string, std::shared_ptr<Builtin>> builtins;
+    std::unordered_map<std::string, VMValue> globals;
+    std::unordered_map<std::string, std::shared_ptr<Builtin>> builtins;
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
@@ -95,6 +97,40 @@ private:
 
     // 에러
     long long currentLine();
+
+    // ===== Opcode handlers (Phase 2-1에서 추출) =====
+    void opNegate();
+    void opNot();
+    void opGetGlobal();
+    void opSetGlobal();
+    void opDefineGlobal();
+    void opJump();
+    void opJumpIfFalse();
+    void opLoop();
+    void opCall();
+    std::optional<std::shared_ptr<Object>> opReturn();
+    void opBuildArray();
+    void opBuildHashMap();
+    void opBuildTuple();
+    void opIndexGet();
+    void opIndexSet();
+    void opSlice();
+    void opGetMember();
+    void opSetMember();
+    void opInvoke();
+    void opTryBegin();
+    void opTryEnd();
+    void opIterInit();
+    void opIterNext();
+    void opIterValue();
+    void opClosure();
+    void opGetUpvalue();
+    void opSetUpvalue();
+    void opRangeCheck();
+    void opTypeCheck();
+    void opImport();
+    void opYield();
+    void opInterpolate();
 };
 
 #endif // VM_H
