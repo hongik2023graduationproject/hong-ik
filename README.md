@@ -1,5 +1,11 @@
 # hong-ik: 한글 프로그래밍 언어 프로젝트
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![C++26](https://img.shields.io/badge/C%2B%2B-26-00599C.svg?logo=cplusplus)](https://isocpp.org/)
+[![Tests](https://img.shields.io/badge/tests-GoogleTest%20%2B%20CTest-brightgreen.svg)](#테스트)
+
+📖 **문서**: [기여 가이드](./CONTRIBUTING.md) · [보안 정책](./SECURITY.md) · [변경 이력](./CHANGELOG.md) · [라이선스](./LICENSE)
+
 ## 소개
 
 **hong-ik**은 한글을 기반으로 설계된 자체 프로그래밍 언어 프로젝트입니다. C++로 작성된 트리워킹 인터프리터와 바이트코드 VM을 모두 지원합니다.

@@ -2,6 +2,30 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다. [Keep a Changelog](https://keepachangelog.com/ko/1.0.0/) 형식을 따릅니다.
 
+## [Unreleased] - 2026-05-19
+
+### 보안 (Security)
+- `opImport`(`가져오기`)의 경로 검증 추가 — `..`, 절대 경로, 드라이브 문자 차단. 인터프리터를 호스팅하는 백엔드의 임의 파일 읽기 위협까지 함께 차단.
+- `currentFrame()`의 빈 vector UB 가드 — 손상된 바이트코드 등으로 호출 프레임이 비면 명시적 `RuntimeException`을 던진다.
+
+### 수정 (Fixed)
+- `OP_POW` 정수 오버플로 — `__builtin_mul_overflow` 감지 후 double 경로로 폴백 (signed integer overflow UB 제거).
+- void 빌트인의 nullptr 반환을 `Null` 객체로 통일. 호출자(VM, evaluator)의 redundant 삼항 분기 제거.
+
+### 리팩토링 (Refactor)
+- `VMValue`의 union 멤버 + tag를 private화하고 inline accessor(`isInt`/`asInt`/`kind` 등)로 캡슐화. 외부에서 활성 union 멤버 mismatch를 만들 수 없게 됨. 향후 `std::variant` 전환은 단일 파일 수정으로 가능.
+
+### 운영/인프라 (Ops)
+- `.gitignore`에 `build-wasm/` 추가 + 기존 82개 산출물 untrack.
+- MIT LICENSE 추가.
+- `SECURITY.md` (취약점 신고 절차 + 알려진 보안 모델).
+- `.github/PULL_REQUEST_TEMPLATE.md`, `.env.example` 추가.
+- Dependabot (github-actions, weekly).
+
+### 테스트
+- VMTest 신규 7건 (path traversal 거부 ×4, `OP_POW` 오버플로 ×3).
+- `ReplTest.import*`의 `std::tmpnam` 절대 경로 사용을 상대 경로로 전환 — Windows에서 사전 실패하던 케이스도 해소.
+
 ## [0.7.0] - 2026-03-20
 
 ### 추가
