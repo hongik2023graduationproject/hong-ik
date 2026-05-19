@@ -62,6 +62,7 @@ set(HONGIK_CORE_SOURCES
         io/io_interface.cpp
         error/hongik_error.cpp
         analyzer/analyzer.cpp
+        util/type.cpp
 )
 
 if(EMSCRIPTEN)
