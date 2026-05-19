@@ -130,13 +130,13 @@ shared_ptr<Object> VM::Execute(shared_ptr<CompiledFunction> topLevel) {
 }
 
 static ObjectType vmValueToObjectType(const VMValue& val) {
-    switch (val.tag) {
+    switch (val.kind()) {
     case ValueTag::INT: return ObjectType::INTEGER;
     case ValueTag::FLOAT: return ObjectType::FLOAT;
     case ValueTag::BOOL: return ObjectType::BOOLEAN;
     case ValueTag::NULL_V: return ObjectType::NULL_OBJ;
     case ValueTag::OBJECT:
-        if (val.objVal) return val.objVal->type;
+        if (val.asObject()) return val.asObject()->type;
         return ObjectType::NULL_OBJ;
     }
     return ObjectType::NULL_OBJ;
@@ -144,15 +144,15 @@ static ObjectType vmValueToObjectType(const VMValue& val) {
 
 VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long long line) {
     // Null checks
-    if (left.tag == ValueTag::NULL_V || right.tag == ValueTag::NULL_V) {
-        if (op == OpCode::OP_EQUAL) return VMValue::Bool(left.tag == ValueTag::NULL_V && right.tag == ValueTag::NULL_V);
-        if (op == OpCode::OP_NOT_EQUAL) return VMValue::Bool(!(left.tag == ValueTag::NULL_V && right.tag == ValueTag::NULL_V));
+    if (left.isNull() || right.isNull()) {
+        if (op == OpCode::OP_EQUAL) return VMValue::Bool(left.isNull() && right.isNull());
+        if (op == OpCode::OP_NOT_EQUAL) return VMValue::Bool(!(left.isNull() && right.isNull()));
         throw RuntimeException("없음(null) 값에 대해서는 == 와 != 비교만 지원합니다.", line);
     }
 
     // Int + Int (hot path -- no heap allocation!)
-    if (left.tag == ValueTag::INT && right.tag == ValueTag::INT) {
-        long long lv = left.intVal, rv = right.intVal;
+    if (left.isInt() && right.isInt()) {
+        long long lv = left.asInt(), rv = right.asInt();
         switch (op) {
         case OpCode::OP_ADD: return VMValue::Int(lv + rv);
         case OpCode::OP_SUB: return VMValue::Int(lv - rv);
@@ -192,10 +192,10 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
     // Float path (one or both are float, or int+float mix)
     double lv = 0, rv = 0;
     bool isFloat = false;
-    if (left.tag == ValueTag::FLOAT) { lv = left.floatVal; isFloat = true; }
-    else if (left.tag == ValueTag::INT) { lv = static_cast<double>(left.intVal); }
-    if (right.tag == ValueTag::FLOAT) { rv = right.floatVal; isFloat = true; }
-    else if (right.tag == ValueTag::INT) { rv = static_cast<double>(right.intVal); }
+    if (left.isFloat()) { lv = left.asFloat(); isFloat = true; }
+    else if (left.isInt()) { lv = static_cast<double>(left.asInt()); }
+    if (right.isFloat()) { rv = right.asFloat(); isFloat = true; }
+    else if (right.isInt()) { rv = static_cast<double>(right.asInt()); }
 
     if (isFloat) {
         switch (op) {
@@ -217,20 +217,20 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
     }
 
     // Boolean path
-    if (left.tag == ValueTag::BOOL && right.tag == ValueTag::BOOL) {
+    if (left.isBool() && right.isBool()) {
         switch (op) {
-        case OpCode::OP_AND: return VMValue::Bool(left.boolVal && right.boolVal);
-        case OpCode::OP_OR: return VMValue::Bool(left.boolVal || right.boolVal);
-        case OpCode::OP_EQUAL: return VMValue::Bool(left.boolVal == right.boolVal);
-        case OpCode::OP_NOT_EQUAL: return VMValue::Bool(left.boolVal != right.boolVal);
+        case OpCode::OP_AND: return VMValue::Bool(left.asBool() && right.asBool());
+        case OpCode::OP_OR: return VMValue::Bool(left.asBool() || right.asBool());
+        case OpCode::OP_EQUAL: return VMValue::Bool(left.asBool() == right.asBool());
+        case OpCode::OP_NOT_EQUAL: return VMValue::Bool(left.asBool() != right.asBool());
         default: break;
         }
     }
 
     // String path -- need to convert to Object for complex operations
-    if (left.tag == ValueTag::OBJECT && right.tag == ValueTag::OBJECT) {
-        auto* ls = dynamic_cast<String*>(left.objVal.get());
-        auto* rs = dynamic_cast<String*>(right.objVal.get());
+    if (left.isObject() && right.isObject()) {
+        auto* ls = dynamic_cast<String*>(left.asObject().get());
+        auto* rs = dynamic_cast<String*>(right.asObject().get());
         if (ls && rs) {
             switch (op) {
             case OpCode::OP_ADD: return VMValue::Obj(make_shared<String>(ls->value + rs->value));
@@ -395,18 +395,18 @@ void VM::fillDefaults(CompiledFunction* fn, int argCount) {
 
 void VM::opNegate() {
     auto operand = pop();
-    if (operand.tag == ValueTag::INT)
-        push(VMValue::Int(-operand.intVal));
-    else if (operand.tag == ValueTag::FLOAT)
-        push(VMValue::Float(-operand.floatVal));
+    if (operand.isInt())
+        push(VMValue::Int(-operand.asInt()));
+    else if (operand.isFloat())
+        push(VMValue::Float(-operand.asFloat()));
     else
         throw RuntimeException("'-' 전위 연산자가 지원되지 않는 타입입니다.", currentLine());
 }
 
 void VM::opNot() {
     auto operand = pop();
-    if (operand.tag == ValueTag::BOOL)
-        push(VMValue::Bool(!operand.boolVal));
+    if (operand.isBool())
+        push(VMValue::Bool(!operand.asBool()));
     else
         throw RuntimeException("'!' 전위 연산자가 지원되지 않는 타입입니다.", currentLine());
 }
@@ -436,12 +436,12 @@ void VM::opDefineGlobal() {
     auto* name = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
     auto val = pop();
     // 상속 해결: CompiledClassDef의 부모 참조 설정
-    if (val.tag == ValueTag::OBJECT) {
-        if (auto* ccd = dynamic_cast<CompiledClassDef*>(val.objVal.get())) {
+    if (val.isObject()) {
+        if (auto* ccd = dynamic_cast<CompiledClassDef*>(val.asObject().get())) {
             if (!ccd->parentName.empty() && !ccd->parent) {
                 auto parentIt = globals.find(ccd->parentName);
-                if (parentIt != globals.end() && parentIt->second.tag == ValueTag::OBJECT) {
-                    auto parentCcd = dynamic_pointer_cast<CompiledClassDef>(parentIt->second.objVal);
+                if (parentIt != globals.end() && parentIt->second.isObject()) {
+                    auto parentCcd = dynamic_pointer_cast<CompiledClassDef>(parentIt->second.asObject());
                     if (parentCcd) {
                         ccd->parent = parentCcd;
                         // 부모 필드 병합
@@ -489,10 +489,10 @@ void VM::opJump() {
 void VM::opJumpIfFalse() {
     uint16_t offset = readUint16();
     auto condition = pop();
-    if (condition.tag != ValueTag::BOOL) {
+    if (!condition.isBool()) {
         throw RuntimeException("조건식의 결과는 논리(참/거짓) 값이어야 합니다.", currentLine());
     }
-    if (!condition.boolVal) {
+    if (!condition.asBool()) {
         currentFrame().ip += offset;
     }
 }
@@ -506,8 +506,8 @@ void VM::opCall() {
     uint8_t argCount = readByte();
     auto& callee = peek(argCount);
 
-    if (callee.tag == ValueTag::OBJECT && dynamic_cast<Builtin*>(callee.objVal.get())) {
-        auto* builtin = dynamic_cast<Builtin*>(callee.objVal.get());
+    if (callee.isObject() && dynamic_cast<Builtin*>(callee.asObject().get())) {
+        auto* builtin = dynamic_cast<Builtin*>(callee.asObject().get());
         vector<shared_ptr<Object>> args(argCount);
         for (int i = 0; i < argCount; i++) {
             args[i] = peek(argCount - 1 - i).toObject();
@@ -517,8 +517,8 @@ void VM::opCall() {
         auto result = builtin->function(args);
         // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를 VMValue::Null()로 정규화.
         push(VMValue::fromObject(result));
-    } else if (callee.tag == ValueTag::OBJECT && dynamic_cast<Closure*>(callee.objVal.get())) {
-        auto* cls = dynamic_cast<Closure*>(callee.objVal.get());
+    } else if (callee.isObject() && dynamic_cast<Closure*>(callee.asObject().get())) {
+        auto* cls = dynamic_cast<Closure*>(callee.asObject().get());
         auto* fn = cls->function.get();
         fillDefaults(fn, argCount);
         // 매개변수 타입 체크
@@ -548,8 +548,8 @@ void VM::opCall() {
         newFrame.closure = cls;
         newFrame.isGenerator = fn->hasYield;
         frames.push_back(newFrame);
-    } else if (callee.tag == ValueTag::OBJECT && dynamic_cast<CompiledFunction*>(callee.objVal.get())) {
-        auto* fn = dynamic_cast<CompiledFunction*>(callee.objVal.get());
+    } else if (callee.isObject() && dynamic_cast<CompiledFunction*>(callee.asObject().get())) {
+        auto* fn = dynamic_cast<CompiledFunction*>(callee.asObject().get());
         fillDefaults(fn, argCount);
         // 매개변수 타입 체크
         if (!fn->paramTypeChecks.empty()) {
@@ -577,10 +577,10 @@ void VM::opCall() {
         newFrame.slotOffset = stack.size() - fn->arity;
         newFrame.isGenerator = fn->hasYield;
         frames.push_back(newFrame);
-    } else if (callee.tag == ValueTag::OBJECT && dynamic_cast<CompiledClassDef*>(callee.objVal.get())) {
-        auto* classDef = dynamic_cast<CompiledClassDef*>(callee.objVal.get());
+    } else if (callee.isObject() && dynamic_cast<CompiledClassDef*>(callee.asObject().get())) {
+        auto* classDef = dynamic_cast<CompiledClassDef*>(callee.asObject().get());
         auto instance = make_shared<Instance>();
-        instance->classDef = dynamic_pointer_cast<ClassDef>(callee.objVal);
+        instance->classDef = dynamic_pointer_cast<ClassDef>(callee.asObject());
         instance->fields = make_shared<Environment>();
         for (auto& fieldName : classDef->fieldNames) {
             instance->fields->Set(fieldName, make_shared<Null>());
@@ -832,8 +832,8 @@ void VM::opGetMember() {
     uint16_t nameIdx = readUint16();
     auto* memberName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
     auto obj = pop();
-    if (obj.tag == ValueTag::OBJECT) {
-        if (auto* inst = dynamic_cast<Instance*>(obj.objVal.get())) {
+    if (obj.isObject()) {
+        if (auto* inst = dynamic_cast<Instance*>(obj.asObject().get())) {
             auto val = inst->fields->Get(memberName->value);
             if (val) { push(VMValue::fromObject(val)); return; }
             throw RuntimeException("인스턴스에 '" + memberName->value + "' 필드가 존재하지 않습니다.", currentLine());
@@ -848,8 +848,8 @@ void VM::opSetMember() {
     auto* memberName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
     auto instance = pop();
     auto& value = peek(0);
-    if (instance.tag == ValueTag::OBJECT) {
-        if (auto* inst = dynamic_cast<Instance*>(instance.objVal.get())) {
+    if (instance.isObject()) {
+        if (auto* inst = dynamic_cast<Instance*>(instance.asObject().get())) {
             inst->fields->Set(memberName->value, value.toObject());
             return;
         }
@@ -865,8 +865,8 @@ void VM::opInvoke() {
     auto& obj = peek(argCount);
 
     // 내장 타입에 대한 메서드 호출 지원
-    if (obj.tag == ValueTag::OBJECT &&
-        (dynamic_cast<String*>(obj.objVal.get()) || dynamic_cast<Array*>(obj.objVal.get()) || dynamic_cast<HashMap*>(obj.objVal.get()))) {
+    if (obj.isObject() &&
+        (dynamic_cast<String*>(obj.asObject().get()) || dynamic_cast<Array*>(obj.asObject().get()) || dynamic_cast<HashMap*>(obj.asObject().get()))) {
         auto bit = builtins.find(methodName->value);
         if (bit != builtins.end()) {
             vector<shared_ptr<Object>> args(argCount + 1);
@@ -882,8 +882,8 @@ void VM::opInvoke() {
         }
     }
 
-    if (obj.tag == ValueTag::OBJECT) {
-        if (auto* inst = dynamic_cast<Instance*>(obj.objVal.get())) {
+    if (obj.isObject()) {
+        if (auto* inst = dynamic_cast<Instance*>(obj.asObject().get())) {
             auto* ccd = dynamic_cast<CompiledClassDef*>(inst->classDef.get());
             if (ccd) {
                 auto it = ccd->compiledMethods.find(methodName->value);
@@ -933,8 +933,8 @@ void VM::opIterInit() {
 void VM::opIterNext() {
     uint16_t exitOffset = readUint16();
     auto& iterVal = peek(0);
-    if (iterVal.tag != ValueTag::OBJECT) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
-    auto* iter = dynamic_cast<IteratorState*>(iterVal.objVal.get());
+    if (!iterVal.isObject()) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    auto* iter = dynamic_cast<IteratorState*>(iterVal.asObject().get());
     if (!iter) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
 
     bool exhausted = false;
@@ -950,7 +950,7 @@ void VM::opIterNext() {
 
 void VM::opIterValue() {
     auto& iterVal = peek(0);
-    auto* iter = dynamic_cast<IteratorState*>(iterVal.objVal.get());
+    auto* iter = dynamic_cast<IteratorState*>(iterVal.asObject().get());
     if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
         push(VMValue::fromObject(arr->elements[iter->index]));
     } else if (auto* str = dynamic_cast<String*>(iter->iterable.get())) {
@@ -1009,23 +1009,23 @@ void VM::opRangeCheck() {
     auto startVal = pop();
     auto subject = pop();
     bool result = false;
-    if (subject.tag == ValueTag::INT &&
-        startVal.tag == ValueTag::INT &&
-        endVal.tag == ValueTag::INT) {
-        auto sv = subject.intVal;
-        auto sv_start = startVal.intVal;
-        auto sv_end = endVal.intVal;
+    if (subject.isInt() &&
+        startVal.isInt() &&
+        endVal.isInt()) {
+        auto sv = subject.asInt();
+        auto sv_start = startVal.asInt();
+        auto sv_end = endVal.asInt();
         result = (sv >= sv_start && sv <= sv_end);
     } else {
         // float/mixed numeric range
         auto toDouble = [](const VMValue& v) -> double {
-            if (v.tag == ValueTag::FLOAT) return v.floatVal;
-            if (v.tag == ValueTag::INT) return static_cast<double>(v.intVal);
+            if (v.isFloat()) return v.asFloat();
+            if (v.isInt()) return static_cast<double>(v.asInt());
             return 0.0;
         };
-        if ((subject.tag == ValueTag::INT || subject.tag == ValueTag::FLOAT) &&
-            (startVal.tag == ValueTag::INT || startVal.tag == ValueTag::FLOAT) &&
-            (endVal.tag == ValueTag::INT || endVal.tag == ValueTag::FLOAT)) {
+        if ((subject.isInt() || subject.isFloat()) &&
+            (startVal.isInt() || startVal.isFloat()) &&
+            (endVal.isInt() || endVal.isFloat())) {
             double sv = toDouble(subject);
             double sv_start = toDouble(startVal);
             double sv_end = toDouble(endVal);
@@ -1043,12 +1043,12 @@ void VM::opTypeCheck() {
     bool result = false;
     // Map VMValue tag to ObjectType for comparison
     ObjectType subjectType;
-    switch (subject.tag) {
+    switch (subject.kind()) {
     case ValueTag::INT: subjectType = ObjectType::INTEGER; break;
     case ValueTag::FLOAT: subjectType = ObjectType::FLOAT; break;
     case ValueTag::BOOL: subjectType = ObjectType::BOOLEAN; break;
     case ValueTag::NULL_V: subjectType = ObjectType::NULL_OBJ; break;
-    case ValueTag::OBJECT: subjectType = subject.objVal->type; break;
+    case ValueTag::OBJECT: subjectType = subject.asObject()->type; break;
     }
     static const map<string, ObjectType> typeMap = {
         {"\xEC\xA0\x95\xEC\x88\x98", ObjectType::INTEGER},       // 정수
