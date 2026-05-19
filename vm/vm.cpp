@@ -515,7 +515,8 @@ void VM::opCall() {
         for (int i = 0; i < argCount; i++) pop();
         pop(); // callee
         auto result = builtin->function(args);
-        push(result ? VMValue::fromObject(result) : VMValue::Null());
+        // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를 VMValue::Null()로 정규화.
+        push(VMValue::fromObject(result));
     } else if (callee.tag == ValueTag::OBJECT && dynamic_cast<Closure*>(callee.objVal.get())) {
         auto* cls = dynamic_cast<Closure*>(callee.objVal.get());
         auto* fn = cls->function.get();
@@ -876,7 +877,7 @@ void VM::opInvoke() {
             auto target = pop(); // the object itself
             args[0] = target.toObject();
             auto result = bit->second->function(args);
-            push(result ? VMValue::fromObject(result) : VMValue::Null());
+            push(VMValue::fromObject(result));
             return;
         }
     }

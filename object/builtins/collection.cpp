@@ -84,7 +84,7 @@ std::shared_ptr<Object> MapSet::function(std::vector<std::shared_ptr<Object>> pa
         throw runtime_error("사전의 키는 문자열이어야 합니다.");
     }
     hashmap->pairs[key->value] = parameters[2];
-    return nullptr;
+    return make_shared<Null>();
 }
 
 std::shared_ptr<Object> Remove::function(std::vector<std::shared_ptr<Object>> parameters) {
@@ -96,7 +96,7 @@ std::shared_ptr<Object> Remove::function(std::vector<std::shared_ptr<Object>> pa
         auto* key = dynamic_cast<String*>(parameters[1].get());
         if (!key) throw runtime_error("사전의 키는 문자열이어야 합니다.");
         hashmap->pairs.erase(key->value);
-        return nullptr;
+        return make_shared<Null>();
     }
     if (auto* array = dynamic_cast<Array*>(parameters[0].get())) {
         auto* index = dynamic_cast<Integer*>(parameters[1].get());
@@ -105,7 +105,7 @@ std::shared_ptr<Object> Remove::function(std::vector<std::shared_ptr<Object>> pa
             throw runtime_error("배열의 범위 밖 인덱스입니다.");
         }
         array->elements.erase(array->elements.begin() + index->value);
-        return nullptr;
+        return make_shared<Null>();
     }
 
     throw runtime_error("삭제 함수는 사전 또는 배열만 지원합니다.");

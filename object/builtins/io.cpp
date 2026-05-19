@@ -50,7 +50,7 @@ std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> par
         cout << output;
     }
 
-    return nullptr;
+    return make_shared<Null>();
 }
 
 std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> parameters) {
@@ -133,7 +133,7 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
     // IOContext가 있으면 사용, 없으면 기본 파일 I/O 사용
     if (ioCtx && ioCtx->fileWrite) {
         ioCtx->fileWrite(filename->value, content->value);
-        return nullptr;
+        return make_shared<Null>();
     }
 
     // 기본 파일 I/O
@@ -154,5 +154,5 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
     }
 
     file << content->value;
-    return nullptr;
+    return make_shared<Null>();
 }

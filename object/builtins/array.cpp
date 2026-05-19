@@ -15,7 +15,7 @@ std::shared_ptr<Object> Push::function(std::vector<std::shared_ptr<Object>> para
     }
     if (auto array = dynamic_cast<Array*>(parameters[0].get())) {
         array->elements.push_back(parameters[1]);
-        return nullptr;
+        return make_shared<Null>();
     }
 
     throw runtime_error("추가 함수의 첫 번째 인자는 배열이어야 합니다.");

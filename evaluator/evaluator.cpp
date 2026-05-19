@@ -1119,8 +1119,9 @@ shared_ptr<Object> Evaluator::applyFunction(shared_ptr<Object> function, std::ve
     }
 
     if (auto* builtin_object = dynamic_cast<Builtin*>(function.get())) {
+        // builtin은 항상 non-null Object를 반환한다 (void 의미는 Null 객체로 표현).
         auto evaluated = builtin_object->function(arguments);
-        if (builtin_object->returnType != nullptr && evaluated != nullptr) {
+        if (builtin_object->returnType != nullptr) {
             if (typeCheck(builtin_object->returnType.get(), evaluated)) return evaluated;
             throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다.", current_line);
         }

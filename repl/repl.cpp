@@ -162,7 +162,8 @@ void Repl::FileMode(const string& filename) {
     try {
         auto program = parser->Parsing(tokens);
         auto object = evaluator->Evaluate(program);
-        if (object != nullptr) {
+        // VM 모드와 일관되게: Null 객체는 출력하지 않는다 (builtin 부수효과 호출의 결과).
+        if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
             cout << object->ToString() << endl;
         }
     } catch (const RuntimeException& e) {
