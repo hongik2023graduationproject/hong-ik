@@ -1,0 +1,133 @@
+name: WASM Publish
+
+# WASM 산출물을 emscripten으로 빌드해서 두 방식으로 배포한다:
+#   - main push  →  rolling GitHub Release `wasm-latest` (소비자가 안정 URL로 fetch)
+#   - PR         →  workflow artifact (리뷰어가 다운로드해서 수동 검증 가능)
+#
+# 소비자(hongik-web, hongik-docs)는 다음 URL에서 받을 수 있다:
+#   https://github.com/hongik2023graduationproject/hong-ik/releases/download/wasm-latest/hongik-wasm.js
+#   https://github.com/hongik2023graduationproject/hong-ik/releases/download/wasm-latest/hongik-wasm.wasm
+
+on:
+  push:
+    branches: [main]
+    # WASM 산출물에 실제 영향을 주는 변경만 트리거. 문서/테스트 단독 변경은 건너뛴다.
+    paths:
+      - '**/*.cpp'
+      - '**/*.h'
+      - 'CMakeLists.txt'
+      - '.github/workflows/wasm-publish.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.cpp'
+      - '**/*.h'
+      - 'CMakeLists.txt'
+      - '.github/workflows/wasm-publish.yml'
+  workflow_dispatch:
+    # 수동 트리거 — 빌드 검증이나 강제 재배포가 필요할 때.
+
+# 동일 브랜치에서 연속 푸시 시 진행 중인 빌드를 취소. 마지막 커밋 기준 산출물만 release에 남는다.
+concurrency:
+  group: wasm-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # rolling release 생성/갱신용
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Emscripten SDK 설정
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.61
+          actions-cache-folder: emsdk-cache
+
+      - name: CMake 설정 (Emscripten 툴체인)
+        run: emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
+
+      - name: WASM 빌드
+        run: cmake --build build-wasm --target hongik-wasm -j
+
+      - name: 산출물 수집
+        # CMake가 build-wasm/hongik-wasm.{js,wasm}를 생성. 검증 후 dist 디렉터리로 모은다.
+        run: |
+          mkdir -p wasm-dist
+          cp build-wasm/hongik-wasm.js wasm-dist/
+          cp build-wasm/hongik-wasm.wasm wasm-dist/
+          ls -la wasm-dist/
+          # 크기 sanity check (정상 빌드는 보통 .wasm 200KB+ 수준)
+          test -s wasm-dist/hongik-wasm.js
+          test -s wasm-dist/hongik-wasm.wasm
+
+      - name: 산출물 메타 생성
+        # 소비자가 현재 어느 commit에서 빌드된 산출물을 쓰는지 알 수 있게 동봉.
+        run: |
+          cat > wasm-dist/manifest.json <<EOF
+          {
+            "commit": "${{ github.sha }}",
+            "ref": "${{ github.ref }}",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run": "${{ github.run_id }}"
+          }
+          EOF
+          cat wasm-dist/manifest.json
+
+      # ────────────────────────────────────────
+      # PR: workflow artifact (release 만들지 않음)
+      # ────────────────────────────────────────
+      - name: PR 산출물 업로드
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hongik-wasm-pr-${{ github.event.pull_request.number }}
+          path: wasm-dist/
+          retention-days: 14
+          if-no-files-found: error
+
+      # ────────────────────────────────────────
+      # main push / 수동 트리거: rolling release 갱신
+      # ────────────────────────────────────────
+      # softprops/action-gh-release@v2는 같은 tag의 release가 있으면 파일을 overwrite한다
+      # (delete-then-create가 아니므로 다운로드 URL 404 race condition이 없다).
+      - name: Rolling release 갱신 (wasm-latest)
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: wasm-latest
+          name: "WASM rolling build (latest main)"
+          prerelease: true
+          make_latest: 'false'   # SHA-pinned release가 GitHub UI에서 latest로 표시되도록.
+          files: |
+            wasm-dist/hongik-wasm.js
+            wasm-dist/hongik-wasm.wasm
+            wasm-dist/manifest.json
+          fail_on_unmatched_files: true
+          body: |
+            Rolling build — updated on every push to `main`.
+
+            Built from commit [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}).
+
+            Stable URLs (consumers fetch these):
+            - `https://github.com/${{ github.repository }}/releases/download/wasm-latest/hongik-wasm.js`
+            - `https://github.com/${{ github.repository }}/releases/download/wasm-latest/hongik-wasm.wasm`
+
+      # 안정 참조용 — commit SHA로 별도 release. 소비자가 특정 빌드에 고정하고 싶을 때.
+      - name: SHA-pinned release 생성
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: wasm-${{ github.sha }}
+          name: "WASM ${{ github.sha }}"
+          prerelease: true
+          files: |
+            wasm-dist/hongik-wasm.js
+            wasm-dist/hongik-wasm.wasm
+            wasm-dist/manifest.json
+          fail_on_unmatched_files: true
+          generate_release_notes: false
