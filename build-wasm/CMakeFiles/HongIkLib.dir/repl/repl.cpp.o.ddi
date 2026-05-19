@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\HongIkLib.dir\\repl\\repl.cpp.o"
-    }
-  ],
-  "version": 1
-}

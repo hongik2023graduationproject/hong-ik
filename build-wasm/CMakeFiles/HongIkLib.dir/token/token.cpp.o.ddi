@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\HongIkLib.dir\\token\\token.cpp.o"
-    }
-  ],
-  "version": 1
-}

@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"E:/projects/hongik/hong-ik/build-wasm/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

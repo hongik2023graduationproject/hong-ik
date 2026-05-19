@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\HongIkLib.dir\\analyzer\\analyzer.cpp.o"
-    }
-  ],
-  "version": 1
-}

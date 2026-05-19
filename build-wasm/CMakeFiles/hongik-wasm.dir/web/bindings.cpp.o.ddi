@@ -1,9 +1,0 @@
-{
-  "revision": 0,
-  "rules": [
-    {
-      "primary-output": "CMakeFiles\\hongik-wasm.dir\\web\\bindings.cpp.o"
-    }
-  ],
-  "version": 1
-}
