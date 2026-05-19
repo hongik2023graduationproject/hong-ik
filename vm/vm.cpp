@@ -160,8 +160,16 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
             return VMValue::Int(lv % rv);
         case OpCode::OP_POW: {
             if (rv < 0) return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
+            // 누적 곱 시 long long 오버플로가 감지되면 즉시 double 경로로 폴백한다.
+            // 그대로 두면 signed integer overflow가 일어나 UB가 발생하고 잘못된 정수 결과가 반환된다.
             long long result = 1;
-            for (long long i = 0; i < rv; i++) result *= lv;
+            for (long long i = 0; i < rv; i++) {
+                long long next;
+                if (__builtin_mul_overflow(result, lv, &next)) {
+                    return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
+                }
+                result = next;
+            }
             return VMValue::Int(result);
         }
         case OpCode::OP_BITWISE_AND: return VMValue::Int(lv & rv);

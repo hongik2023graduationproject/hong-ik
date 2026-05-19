@@ -67,6 +67,29 @@ TEST_F(VMTest, IntegerArithmetic) {
     EXPECT_EQ(i->value, 7);
 }
 
+// 거듭제곱: long long 범위 안의 결과는 정수로 유지
+TEST_F(VMTest, PowIntegerInRange) {
+    auto result = runVM("2 ** 62\n");
+    auto* i = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(i, nullptr);
+    EXPECT_EQ(i->value, 4611686018427387904LL);
+}
+
+// 거듭제곱: long long 오버플로 시 double로 폴백 (UB 방지)
+TEST_F(VMTest, PowIntegerOverflowFallsBackToFloat) {
+    auto result = runVM("2 ** 63\n");
+    auto* f = dynamic_cast<Float*>(result.get());
+    ASSERT_NE(f, nullptr) << "overflow should fall back to Float, not silently wrap";
+    EXPECT_NEAR(f->value, 9.223372036854776e18, 1e10);
+}
+
+TEST_F(VMTest, PowIntegerLargeOverflow) {
+    auto result = runVM("10 ** 30\n");
+    auto* f = dynamic_cast<Float*>(result.get());
+    ASSERT_NE(f, nullptr);
+    EXPECT_NEAR(f->value, 1e30, 1e22);
+}
+
 TEST_F(VMTest, FloatArithmetic) {
     auto result = runVM("3.14 + 1.0\n");
     auto* f = dynamic_cast<Float*>(result.get());
