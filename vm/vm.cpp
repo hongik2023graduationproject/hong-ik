@@ -89,6 +89,11 @@ VMValue& VM::peek(int distance) {
 }
 
 CallFrame& VM::currentFrame() {
+    // 손상된 바이트코드 등으로 호출 프레임이 모두 비었을 때 빈 vector::back()을 호출하면 UB가 발생한다.
+    // 정상 경로(opReturn)에서는 frames.empty() 분기로 안전하게 종료되므로, 이 가드는 비정상 경로 한정 방어다.
+    if (frames.empty()) {
+        throw RuntimeException("VM 호출 프레임이 비어 있습니다.", 0);
+    }
     return frames.back();
 }
 
