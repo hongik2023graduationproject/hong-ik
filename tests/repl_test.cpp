@@ -438,9 +438,8 @@ TEST_F(ReplTest, booleanTypeMismatchTest) {
 
 
 TEST_F(ReplTest, importTest) {
-    // 테스트용 파일 생성 (임시 디렉토리에)
-    std::string tmpFile = std::tmpnam(nullptr);
-    tmpFile += ".hik";
+    // 보안 정책상 절대 경로/`..`/드라이브 문자는 거부되므로 CWD 기준 상대 경로 사용
+    std::string tmpFile = "test_repl_import.hik";
     {
         std::ofstream f(tmpFile);
         f << "함수 두배(정수 x) -> 정수:" << std::endl;
@@ -678,8 +677,8 @@ TEST_F(ReplTest, classMethodTest) {
 }
 
 TEST_F(ReplTest, importCircularTest) {
-    std::string tmpFile = std::tmpnam(nullptr);
-    tmpFile += ".hik";
+    // 보안 정책상 절대 경로는 거부되므로 CWD 기준 상대 경로 사용
+    std::string tmpFile = "test_repl_import_circular.hik";
     {
         std::ofstream f(tmpFile);
         f << "정수 임포트값 = 99" << std::endl;

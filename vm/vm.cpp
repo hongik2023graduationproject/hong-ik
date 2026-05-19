@@ -1065,12 +1065,24 @@ void VM::opImport() {
     auto* filename = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
     if (!filename) throw RuntimeException("잘못된 파일명입니다.", currentLine());
 
+    // 경로 탐색 방지 (FileRead/FileWrite와 동일한 정책; 완전한 샌드박스는 아님)
+    const string& path = filename->value;
+    if (path.find("..") != string::npos) {
+        throw RuntimeException("파일 경로에 '..'을 사용할 수 없습니다.", currentLine());
+    }
+    if (!path.empty() && (path[0] == '/' || path[0] == '\\')) {
+        throw RuntimeException("절대 경로는 사용할 수 없습니다.", currentLine());
+    }
+    if (path.size() >= 2 && path[1] == ':') {
+        throw RuntimeException("절대 경로는 사용할 수 없습니다.", currentLine());
+    }
+
     // Canonicalize path for dedup
     string canonicalPath;
     try {
-        canonicalPath = std::filesystem::weakly_canonical(filename->value).string();
+        canonicalPath = std::filesystem::weakly_canonical(path).string();
     } catch (...) {
-        canonicalPath = filename->value;
+        canonicalPath = path;
     }
 
     // Skip if already imported
@@ -1078,7 +1090,7 @@ void VM::opImport() {
     importedFiles.insert(canonicalPath);
 
     // Read file
-    ifstream importFile(filename->value);
+    ifstream importFile(path);
     if (!importFile.is_open()) {
         throw RuntimeException("파일을 열 수 없습니다: " + filename->value, currentLine());
     }

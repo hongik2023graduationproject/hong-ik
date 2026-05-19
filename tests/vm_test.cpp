@@ -709,6 +709,31 @@ TEST_F(VMTest, ImportDoubleNoError) {
     std::remove(tmpFile.c_str());
 }
 
+// 보안: 가져오기 경로 검증 (FileRead/FileWrite와 동일한 규칙)
+TEST_F(VMTest, ImportRejectsParentPath) {
+    EXPECT_THROW({
+        runVM("가져오기 \"../secret.hik\"\n");
+    }, RuntimeException);
+}
+
+TEST_F(VMTest, ImportRejectsAbsoluteUnixPath) {
+    EXPECT_THROW({
+        runVM("가져오기 \"/etc/passwd\"\n");
+    }, RuntimeException);
+}
+
+TEST_F(VMTest, ImportRejectsAbsoluteBackslashPath) {
+    EXPECT_THROW({
+        runVM("가져오기 \"\\\\windows\\\\path\"\n");
+    }, RuntimeException);
+}
+
+TEST_F(VMTest, ImportRejectsWindowsDriveLetter) {
+    EXPECT_THROW({
+        runVM("가져오기 \"C:/Windows/System32/cmd.exe\"\n");
+    }, RuntimeException);
+}
+
 // ===== 제너레이터/생산 =====
 
 TEST_F(VMTest, GeneratorBasic) {
