@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # GitHub Actions: workflow에 쓰는 액션 버전 업데이트
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
