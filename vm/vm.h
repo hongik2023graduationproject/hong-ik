@@ -1,6 +1,7 @@
 #ifndef VM_H
 #define VM_H
 
+#include "../io/io_interface.h"
 #include "../object/object.h"
 #include "../object/built_in.h"
 #include "../sandbox/execution_limiter.h"
@@ -46,8 +47,9 @@ struct IteratorState : public Object {
 
 class VM {
 public:
-    // limiter는 옵션이며 nullptr이면 모든 제한 검사는 no-op이다 (기존 호출부 호환).
-    explicit VM(ExecutionLimiter* limiter = nullptr);
+    // ioCtx와 limiter 둘 다 옵션이며 nullptr이면 각각 기본 stdio / 제한 없음.
+    // 인자 순서는 Evaluator(IOContext*, ExecutionLimiter*)와 동일하다.
+    explicit VM(IOContext* ioCtx = nullptr, ExecutionLimiter* limiter = nullptr);
 
     std::shared_ptr<Object> Execute(std::shared_ptr<CompiledFunction> topLevel);
 
@@ -74,6 +76,7 @@ private:
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
+    IOContext* ioCtx = nullptr;
     ExecutionLimiter* limiter = nullptr;
 
     // 실행 루프

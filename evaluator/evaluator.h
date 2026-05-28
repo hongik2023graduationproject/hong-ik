@@ -10,6 +10,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Evaluator {
@@ -24,7 +25,7 @@ private:
     IOContext* ioCtx = nullptr;
     ExecutionLimiter* limiter = nullptr;
 
-    std::map<std::string, std::shared_ptr<Builtin>> builtins;
+    std::unordered_map<std::string, std::shared_ptr<Builtin>> builtins;
 
     std::shared_ptr<Object> evalProgram(const std::shared_ptr<Program>& program, Environment* environment);
 

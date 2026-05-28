@@ -1,3 +1,4 @@
+#include "io/io_interface.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
 #include "sandbox/execution_limiter.h"
@@ -939,7 +940,7 @@ std::shared_ptr<Object> runVMWithLimiter(const std::string& source, ExecutionLim
     auto program = parser.Parsing(allTokens);
     Compiler compiler;
     auto bytecode = compiler.Compile(program);
-    VM vm(limiter);
+    VM vm(/*ioCtx=*/nullptr, limiter);
     return vm.Execute(bytecode);
 }
 } // namespace
@@ -989,6 +990,32 @@ TEST_F(VMTest, ForEachHitsIterationCap) {
             &limiter);
     }, RuntimeException);
     EXPECT_GE(limiter.getLoopIterationCount(), 9);
+}
+
+// ===== IOContext wiring (S4 of VM unification) =====
+// 이전에는 VM이 IOContext를 받지 않아 출력이 std::cout 직행이었고,
+// WASM/test harness가 buffer로 캡쳐할 수 없었다. 이제 BuiltinRegistry가
+// ioCtx를 Print/Input/FileRead/FileWrite에 전달하므로, 콜백을 설정하면
+// 출력이 그쪽으로 라우팅돼야 한다.
+TEST_F(VMTest, OutputRoutesThroughIOContext) {
+    std::string captured;
+    IOContext ctx;
+    ctx.print = [&captured](const std::string& s) { captured += s; };
+
+    Lexer lexer;
+    auto utf8 = Utf8Converter::Convert(std::string("출력(\"안녕\")\n"));
+    auto tokens = lexer.Tokenize(utf8);
+    Parser parser;
+    auto program = parser.Parsing(tokens);
+    Compiler compiler;
+    auto bytecode = compiler.Compile(program);
+    VM vm(&ctx);
+    vm.Execute(bytecode);
+
+    // 출력 builtin이 endl을 emit하므로 trailing newline 포함.
+    EXPECT_NE(captured.find("안녕"), std::string::npos)
+        << "VM output should route through IOContext.print, but captured: '"
+        << captured << "'";
 }
 
 TEST_F(VMTest, TimeoutZeroFiresImmediatelyInLoop) {

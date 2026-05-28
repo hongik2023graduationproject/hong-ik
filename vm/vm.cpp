@@ -3,6 +3,7 @@
 #include "../environment/environment.h"
 #include "../exception/exception.h"
 #include "../lexer/lexer.h"
+#include "../object/builtin_registry.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/type_utils.h"
@@ -42,56 +43,10 @@ const std::shared_ptr<Object>& checkedConstant(
 }
 } // namespace
 
-VM::VM(ExecutionLimiter* limiterPtr) : limiter(limiterPtr) {
+VM::VM(IOContext* ioCtxPtr, ExecutionLimiter* limiterPtr)
+    : ioCtx(ioCtxPtr), limiter(limiterPtr) {
     stack.reserve(STACK_MAX);
-    builtins = {
-        {"길이", make_shared<Length>()},
-        {"출력", make_shared<Print>()},
-        {"추가", make_shared<Push>()},
-        {"타입", make_shared<TypeOf>()},
-        {"정수변환", make_shared<ToInteger>()},
-        {"실수변환", make_shared<ToFloat>()},
-        {"문자변환", make_shared<ToString_>()},
-        {"입력", make_shared<Input>()},
-        {"키목록", make_shared<Keys>()},
-        {"포함", make_shared<Contains>()},
-        {"설정", make_shared<MapSet>()},
-        {"삭제", make_shared<Remove>()},
-        {"파일읽기", make_shared<FileRead>()},
-        {"파일쓰기", make_shared<FileWrite>()},
-        {"절대값", make_shared<Abs>()},
-        {"제곱근", make_shared<Sqrt>()},
-        {"최대", make_shared<Max>()},
-        {"최소", make_shared<Min>()},
-        {"난수", make_shared<Random>()},
-        {"사인", make_shared<Sin>()},
-        {"코사인", make_shared<Cos>()},
-        {"탄젠트", make_shared<Tan>()},
-        {"로그", make_shared<Log>()},
-        {"자연로그", make_shared<Ln>()},
-        {"거듭제곱", make_shared<Power>()},
-        {"파이", make_shared<Pi>()},
-        {"자연수e", make_shared<EulerE>()},
-        {"반올림", make_shared<Round>()},
-        {"올림", make_shared<Ceil>()},
-        {"내림", make_shared<Floor>()},
-        {"분리", make_shared<Split>()},
-        {"대문자", make_shared<ToUpper>()},
-        {"소문자", make_shared<ToLower>()},
-        {"치환", make_shared<Replace>()},
-        {"자르기", make_shared<Trim>()},
-        {"시작확인", make_shared<StartsWith>()},
-        {"끝확인", make_shared<EndsWith>()},
-        {"반복", make_shared<Repeat>()},
-        {"채우기", make_shared<Pad>()},
-        {"부분문자", make_shared<Substring>()},
-        {"정렬", make_shared<Sort>()},
-        {"뒤집기", make_shared<Reverse>()},
-        {"찾기", make_shared<Find>()},
-        {"조각", make_shared<Slice>()},
-        {"JSON_파싱", make_shared<JsonParse>()},
-        {"JSON_직렬화", make_shared<JsonSerialize>()},
-    };
+    builtins = BuiltinRegistry::build(ioCtx);
 }
 
 void VM::push(VMValue value) {
