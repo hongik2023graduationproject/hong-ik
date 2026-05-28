@@ -62,9 +62,9 @@ private:
     // 출력 캡처 버퍼
     std::string outputBuffer;
 
-    // 백엔드 선택. 초기값 false(=evaluator)로 두면 기존 호출자 호환성 유지.
-    // S3.3에서 true로 flip 예정.
-    bool useVM = false;
+    // 백엔드 선택. VM은 5–10x 빠르고 S1/S4를 거치며 IOContext와 ExecutionLimiter가
+    // 완전히 와이어업됐다. evaluator 경로는 SetBackend("evaluator")로 명시할 때만 사용.
+    bool useVM = true;
 
     // I/O 컨텍스트 초기화 (MemoryFileSystem 연동)
     void setupIOContext();

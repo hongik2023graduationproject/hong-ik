@@ -421,10 +421,11 @@ std::string extractField(const std::string& json, const std::string& field) {
 }
 } // namespace
 
-TEST_F(WasmInterfaceBackendTest, DefaultBackendIsEvaluator) {
-    // S3.1 시점에서는 default가 evaluator. S3.3에서 vm으로 flip 예정.
+TEST_F(WasmInterfaceBackendTest, DefaultBackendIsVM) {
+    // S3.3에서 default를 vm으로 flip했다. 명시적으로 SetBackend("evaluator")할 때만
+    // 트리워킹 경로 사용.
     WasmInterface w;
-    EXPECT_EQ(w.GetBackend(), "evaluator");
+    EXPECT_EQ(w.GetBackend(), "vm");
 }
 
 TEST_F(WasmInterfaceBackendTest, SetBackendToVMAndBack) {
