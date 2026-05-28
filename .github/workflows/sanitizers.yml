@@ -51,7 +51,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure --parallel 2
 
       # Sanitizer 실패 원인을 워크플로 출력에 직접 dump한다.
-      # admin 토큰 없이도 raw log를 public web에서 조회 가능하도록 한다.
+      # 작업 로그는 admin 권한이 필요하지만, $GITHUB_STEP_SUMMARY는 public-readable.
       - name: Dump test logs on failure
         if: failure()
         run: |
@@ -59,6 +59,19 @@ jobs:
           cat build/Testing/Temporary/LastTest.log || echo "(no LastTest.log)"
           echo "=== LastTestsFailed.log ==="
           cat build/Testing/Temporary/LastTestsFailed.log || echo "(no LastTestsFailed.log)"
+          {
+            echo "## Sanitizer failure — ${{ matrix.label }}"
+            echo
+            echo "### LastTestsFailed.log"
+            echo '```'
+            cat build/Testing/Temporary/LastTestsFailed.log || echo "(missing)"
+            echo '```'
+            echo
+            echo "### LastTest.log (last 400 lines)"
+            echo '```'
+            tail -n 400 build/Testing/Temporary/LastTest.log || echo "(missing)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test logs on failure
         if: failure()
