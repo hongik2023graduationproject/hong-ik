@@ -3,18 +3,20 @@
 
 #include "../object/object.h"
 #include "../object/object_type.h"
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 
 // Environment
 // scope 내의 변수들을 저장하는 환경
 class Environment : public std::enable_shared_from_this<Environment> {
 public:
-    std::map<std::string, std::shared_ptr<Object>> store;
+    // 평가기 변수 조회는 핫 패스이므로 정렬이 필요 없는 unordered_map을 사용한다.
+    // 어디에서도 store/typeMap을 정렬 순회하지 않는다 (Get/Set/Update/Clear만 사용).
+    std::unordered_map<std::string, std::shared_ptr<Object>> store;
     std::set<std::string> optionalVars;
-    std::map<std::string, ObjectType> typeMap;
+    std::unordered_map<std::string, ObjectType> typeMap;
     std::shared_ptr<Environment> outer;
 
     Environment() = default;

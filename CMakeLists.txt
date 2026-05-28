@@ -74,7 +74,9 @@ if(EMSCRIPTEN)
 
     add_library(HongIkLib STATIC ${HONGIK_CORE_SOURCES})
     target_include_directories(HongIkLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_options(HongIkLib PRIVATE -fexceptions)
+    # WASM 빌드는 링크 시점에만 -O3 -flto가 들어가 있었다.
+    # 정적 라이브러리(HongIkLib) 컴파일에도 동일 최적화를 명시해 LTO/devirtualization 기회를 늘린다.
+    target_compile_options(HongIkLib PRIVATE -fexceptions -O3 -flto)
 
     # WASM 타겟
     add_executable(hongik-wasm

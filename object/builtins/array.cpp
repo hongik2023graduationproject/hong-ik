@@ -31,17 +31,18 @@ std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> para
     auto result = make_shared<Array>();
     result->elements = arr->elements;
 
+    // 정렬 비교자는 O(N log N)번 호출되므로 dynamic_cast RTTI 비용을 피하기 위해
+    // Object::type 태그로 먼저 분기한 뒤 static_cast로 값에 접근한다.
     std::sort(result->elements.begin(), result->elements.end(),
               [](const shared_ptr<Object>& a, const shared_ptr<Object>& b) {
-                  // 정수 비교
-                  auto* ai = dynamic_cast<Integer*>(a.get());
-                  auto* bi = dynamic_cast<Integer*>(b.get());
-                  if (ai && bi) return ai->value < bi->value;
-                  // 실수 비교
-                  auto* af = dynamic_cast<Float*>(a.get());
-                  auto* bf = dynamic_cast<Float*>(b.get());
-                  if (af && bf) return af->value < bf->value;
-                  // 문자열 비교
+                  if (a->type == ObjectType::INTEGER && b->type == ObjectType::INTEGER) {
+                      return static_cast<Integer*>(a.get())->value
+                             < static_cast<Integer*>(b.get())->value;
+                  }
+                  if (a->type == ObjectType::FLOAT && b->type == ObjectType::FLOAT) {
+                      return static_cast<Float*>(a.get())->value
+                             < static_cast<Float*>(b.get())->value;
+                  }
                   return a->ToString() < b->ToString();
               });
     return result;
