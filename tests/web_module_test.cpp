@@ -7,6 +7,7 @@
 #include "../io/io_interface.h"
 #include "../lexer/lexer.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../web/wasm_interface.h"
 
 // ===== ExecutionLimiter Tests =====
 
@@ -391,4 +392,110 @@ TEST_F(LexerColumnTest, NumberColumn) {
     EXPECT_EQ(tokens[0]->endColumn, 3);
     EXPECT_EQ(tokens[1]->column, 4);
     EXPECT_EQ(tokens[1]->endColumn, 6);
+}
+
+// ===== WasmInterface backend parity (S3 of VM unification) =====
+// WasmInterface가 evaluator/VM 양쪽 백엔드를 지원하는지, 둘이 동일 JSON을 내는지 검증한다.
+// S3.3에서 기본 백엔드가 VM으로 flip될 때 회귀를 막는 가드 역할.
+
+class WasmInterfaceBackendTest : public ::testing::Test {};
+
+namespace {
+// "result"와 "output" 부분을 단순 비교 가능한 형태로 추출. 두 모드가 동일 출력을
+// 내는지 검증할 때 JSON 전체 구조까지 비교할 필요는 없다.
+std::string extractField(const std::string& json, const std::string& field) {
+    std::string key = "\"" + field + "\":";
+    auto pos = json.find(key);
+    if (pos == std::string::npos) return "<missing:" + field + ">";
+    pos += key.size();
+    // 값이 "..."로 시작하면 quoted, 아니면 다음 콤마/}까지.
+    if (pos < json.size() && json[pos] == '"') {
+        auto end = json.find('"', pos + 1);
+        while (end != std::string::npos && json[end - 1] == '\\') {
+            end = json.find('"', end + 1);
+        }
+        return json.substr(pos, end - pos + 1);
+    }
+    auto end = json.find_first_of(",}", pos);
+    return json.substr(pos, end - pos);
+}
+} // namespace
+
+TEST_F(WasmInterfaceBackendTest, DefaultBackendIsEvaluator) {
+    // S3.1 시점에서는 default가 evaluator. S3.3에서 vm으로 flip 예정.
+    WasmInterface w;
+    EXPECT_EQ(w.GetBackend(), "evaluator");
+}
+
+TEST_F(WasmInterfaceBackendTest, SetBackendToVMAndBack) {
+    WasmInterface w;
+    w.SetBackend("vm");
+    EXPECT_EQ(w.GetBackend(), "vm");
+    w.SetBackend("evaluator");
+    EXPECT_EQ(w.GetBackend(), "evaluator");
+    // 알 수 없는 이름은 무시 (silent flip 방지)
+    w.SetBackend("?");
+    EXPECT_EQ(w.GetBackend(), "evaluator");
+}
+
+TEST_F(WasmInterfaceBackendTest, ArithProducesSameOutputAcrossBackends) {
+    const std::string code = "출력(1 + 2)\n출력(10 * 3)\n";
+    WasmInterface evalW;
+    auto evalJson = evalW.Execute(code);
+    WasmInterface vmW;
+    vmW.SetBackend("vm");
+    auto vmJson = vmW.Execute(code);
+    EXPECT_EQ(extractField(evalJson, "output"), extractField(vmJson, "output"));
+    EXPECT_EQ(extractField(evalJson, "success"), extractField(vmJson, "success"));
+}
+
+TEST_F(WasmInterfaceBackendTest, ClassesProduceSameOutputAcrossBackends) {
+    const std::string code =
+        "클래스 점:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 두배() -> 정수:\n"
+        "        리턴 자기.x * 2\n"
+        "점 p = 점(7)\n"
+        "출력(p.x)\n"
+        "출력(p.두배())\n";
+    WasmInterface evalW;
+    auto evalJson = evalW.Execute(code);
+    WasmInterface vmW;
+    vmW.SetBackend("vm");
+    auto vmJson = vmW.Execute(code);
+    EXPECT_EQ(extractField(evalJson, "output"), extractField(vmJson, "output"));
+}
+
+TEST_F(WasmInterfaceBackendTest, VMBackendCapturesOutputViaIOContext) {
+    // S4의 IOContext 와이어업이 WasmInterface 표면에서도 작동하는지 확인.
+    // 이전(S4 이전)에는 VM이 ioCtx를 안 받아 출력이 stdout 직행하고 outputBuffer가 비어 있었다.
+    WasmInterface w;
+    w.SetBackend("vm");
+    auto json = w.Execute("출력(\"hello\")\n");
+    auto output = extractField(json, "output");
+    EXPECT_NE(output.find("hello"), std::string::npos)
+        << "VM mode should capture output via IOContext, got: " << output;
+}
+
+TEST_F(WasmInterfaceBackendTest, VMBackendRespectsExecutionLimiter) {
+    // S1의 limiter wiring이 WasmInterface 경로에서도 작동.
+    WasmInterface w;
+    w.SetBackend("vm");
+    // 1ms 타임아웃 + 무한 루프 → success:false 반환되어야 한다.
+    auto json = w.Execute("정수 i = 0\n반복 true 동안:\n    i = i + 1\n", /*timeoutMs=*/1);
+    EXPECT_EQ(extractField(json, "success"), "false")
+        << "VM timeout should bubble up to JSON; got: " << json.substr(0, 200);
+}
+
+TEST_F(WasmInterfaceBackendTest, ParseErrorSurfacesInBothBackends) {
+    const std::string code = "정수 = 5\n";  // 변수 이름 누락
+    WasmInterface evalW;
+    auto evalJson = evalW.Execute(code);
+    WasmInterface vmW;
+    vmW.SetBackend("vm");
+    auto vmJson = vmW.Execute(code);
+    EXPECT_EQ(extractField(evalJson, "success"), "false");
+    EXPECT_EQ(extractField(vmJson, "success"), "false");
 }
