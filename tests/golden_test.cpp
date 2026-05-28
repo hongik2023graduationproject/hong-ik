@@ -64,7 +64,13 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"func_recursion"},
         GoldenCase{"builtins"},
         GoldenCase{"utf8_strings"},
-        GoldenCase{"error_undefined"}
+        GoldenCase{"error_undefined"},
+        // S2 — VM unification parity coverage
+        GoldenCase{"classes_basic"},
+        GoldenCase{"closures"},
+        GoldenCase{"for_each"},
+        GoldenCase{"try_catch"},
+        GoldenCase{"ops_misc"}
     ),
     [](const ::testing::TestParamInfo<GoldenCase>& info) {
         return info.param.name;
