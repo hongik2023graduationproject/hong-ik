@@ -1,5 +1,6 @@
 #include "lexer/lexer.h"
 #include "parser/parser.h"
+#include "sandbox/execution_limiter.h"
 #include "vm/compiler.h"
 #include "vm/vm.h"
 #include "utf8_converter/utf8_converter.h"
@@ -8,6 +9,7 @@
 #include <fstream>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 
 using namespace std;
 
@@ -909,4 +911,95 @@ TEST_F(VMTest, ErrorMessageIncludesUncallableType) {
         EXPECT_TRUE(msg.find("정수") != string::npos || msg.find("호출") != string::npos)
             << "Error message should contain type or call info: " << msg;
     }
+}
+
+// ===== ExecutionLimiter wiring (S1 of VM unification) =====
+// 헬퍼: limiter를 받는 VM 실행 경로. runVM과 동일하게 lex→parse→compile→execute한다.
+namespace {
+std::shared_ptr<Object> runVMWithLimiter(const std::string& source, ExecutionLimiter* limiter) {
+    Lexer lexer;
+    std::vector<std::shared_ptr<Token>> allTokens;
+    std::istringstream stream(source);
+    std::string line;
+    int indent = 0;
+    while (std::getline(stream, line)) {
+        line += "\n";
+        auto utf8 = Utf8Converter::Convert(line);
+        auto tokens = lexer.Tokenize(utf8);
+        allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
+        for (auto& t : tokens) {
+            if (t->type == TokenType::START_BLOCK) indent++;
+            if (t->type == TokenType::END_BLOCK) indent--;
+        }
+    }
+    for (int i = 0; i < indent; i++) {
+        allTokens.push_back(std::make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
+    }
+    Parser parser;
+    auto program = parser.Parsing(allTokens);
+    Compiler compiler;
+    auto bytecode = compiler.Compile(program);
+    VM vm(limiter);
+    return vm.Execute(bytecode);
+}
+} // namespace
+
+TEST_F(VMTest, LimiterAbsentIsNoOp) {
+    // limiter 미전달 시(=nullptr) 기존 동작 그대로. 큰 루프도 그냥 돈다.
+    auto result = runVM(
+        "정수 sum = 0\n"
+        "정수 i = 1\n"
+        "반복 i <= 1000 동안:\n"
+        "    sum = sum + i\n"
+        "    i = i + 1\n"
+        "sum\n"
+    );
+    auto* integer = dynamic_cast<Integer*>(result.get());
+    ASSERT_NE(integer, nullptr);
+    EXPECT_EQ(integer->value, 500500);
+}
+
+TEST_F(VMTest, WhileLoopHitsIterationCap) {
+    // 무한 루프가 maxLoopIterations 초과 시점에 중단되는지 확인.
+    // ExecutionLimiter는 std::runtime_error를 throw하지만, VM의 dispatch
+    // try/catch가 이를 RuntimeException으로 wrap한다(vm.cpp:401-411).
+    // 그 결과 최종적으로 RuntimeException으로 surface된다.
+    ExecutionLimiter limiter(60000, /*maxLoopIterations=*/100);
+    EXPECT_THROW({
+        runVMWithLimiter(
+            "정수 i = 0\n"
+            "반복 true 동안:\n"
+            "    i = i + 1\n",
+            &limiter);
+    }, RuntimeException);
+    EXPECT_GE(limiter.getLoopIterationCount(), 100);
+}
+
+TEST_F(VMTest, ForEachHitsIterationCap) {
+    // for-each는 OP_ITER_NEXT 경로를 거치므로 별도로 검증한다.
+    // 10원소 배열을 한 번 돌리면 비-소진 iter 호출이 10번 발생한다.
+    // cap=9로 두면 10번째 호출에서 throw.
+    ExecutionLimiter limiter(60000, /*maxLoopIterations=*/9);
+    EXPECT_THROW({
+        runVMWithLimiter(
+            "정수 sum = 0\n"
+            "배열 a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n"
+            "각각 정수 x a 에서:\n"
+            "    sum = sum + x\n",
+            &limiter);
+    }, RuntimeException);
+    EXPECT_GE(limiter.getLoopIterationCount(), 9);
+}
+
+TEST_F(VMTest, TimeoutZeroFiresImmediatelyInLoop) {
+    // timeoutMs=0이면 첫 루프 cycle에서 RuntimeException으로 즉시 종료된다.
+    // (incrementLoopCounter 이후 checkLimits에서 throw)
+    ExecutionLimiter limiter(0, ExecutionLimiter::DEFAULT_MAX_LOOP_ITERATIONS);
+    EXPECT_THROW({
+        runVMWithLimiter(
+            "정수 i = 0\n"
+            "반복 true 동안:\n"
+            "    i = i + 1\n",
+            &limiter);
+    }, RuntimeException);
 }

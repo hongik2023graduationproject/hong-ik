@@ -3,6 +3,7 @@
 
 #include "../object/object.h"
 #include "../object/built_in.h"
+#include "../sandbox/execution_limiter.h"
 #include "chunk.h"
 #include "opcode.h"
 #include "vm_value.h"
@@ -45,7 +46,8 @@ struct IteratorState : public Object {
 
 class VM {
 public:
-    VM();
+    // limiter는 옵션이며 nullptr이면 모든 제한 검사는 no-op이다 (기존 호출부 호환).
+    explicit VM(ExecutionLimiter* limiter = nullptr);
 
     std::shared_ptr<Object> Execute(std::shared_ptr<CompiledFunction> topLevel);
 
@@ -72,9 +74,13 @@ private:
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
+    ExecutionLimiter* limiter = nullptr;
 
     // 실행 루프
     std::shared_ptr<Object> run();
+
+    // 실행 제한 검사 (limiter가 null이면 no-op)
+    void checkLimits();
 
     // 스택 연산
     void push(VMValue value);

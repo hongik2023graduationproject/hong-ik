@@ -42,7 +42,7 @@ const std::shared_ptr<Object>& checkedConstant(
 }
 } // namespace
 
-VM::VM() {
+VM::VM(ExecutionLimiter* limiterPtr) : limiter(limiterPtr) {
     stack.reserve(STACK_MAX);
     builtins = {
         {"길이", make_shared<Length>()},
@@ -112,6 +112,14 @@ VMValue& VM::peek(int distance) {
         throw RuntimeException("VM 스택 범위 밖 접근입니다.", 0);
     }
     return stack[stack.size() - 1 - distance];
+}
+
+void VM::checkLimits() {
+    // 타임아웃은 Evaluator와 동일하게 RuntimeException으로 throw하여 동작 일관성을 유지한다.
+    // (incrementLoopCounter는 std::runtime_error를 throw하므로 사용자 try/catch는 잡지 못한다.)
+    if (limiter && limiter->isTimeoutExceeded()) {
+        throw RuntimeException("실행 시간 제한을 초과했습니다.", currentLine());
+    }
 }
 
 CallFrame& VM::currentFrame() {
@@ -534,6 +542,11 @@ void VM::opJumpIfFalse() {
 void VM::opLoop() {
     uint16_t offset = readUint16();
     currentFrame().ip -= offset;
+    // OP_LOOP는 while/repeat류의 역방향 점프. 매 cycle마다 카운터/타임아웃 검사.
+    if (limiter) {
+        limiter->incrementLoopCounter();
+        checkLimits();
+    }
 }
 
 void VM::opCall() {
@@ -983,7 +996,13 @@ void VM::opIterNext() {
     } else {
         exhausted = true;
     }
-    if (exhausted) currentFrame().ip += exitOffset;
+    if (exhausted) {
+        currentFrame().ip += exitOffset;
+    } else if (limiter) {
+        // for-each는 OP_LOOP를 거치지 않으므로 여기서 카운터/타임아웃을 직접 검사한다.
+        limiter->incrementLoopCounter();
+        checkLimits();
+    }
 }
 
 void VM::opIterValue() {
