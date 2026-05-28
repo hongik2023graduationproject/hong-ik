@@ -12,9 +12,35 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 
 using namespace std;
+
+namespace {
+// 이식성 있는 signed long long 곱셈 오버플로 검사.
+// __builtin_mul_overflow는 GCC/Clang 전용이라 MSVC에서 컴파일이 깨진다.
+bool mulOverflowsLL(long long a, long long b) {
+    if (a == 0 || b == 0) return false;
+    constexpr long long kMax = std::numeric_limits<long long>::max();
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    // std::abs(kMin)은 UB이므로 별도 처리한다.
+    if (a == kMin || b == kMin) return true;
+    long long absA = a < 0 ? -a : a;
+    long long absB = b < 0 ? -b : b;
+    return absA > kMax / absB;
+}
+
+// 손상된 또는 외부에서 들어온 바이트코드가 상수 테이블 인덱스를 임의로 지정할 수 있으므로,
+// 매 접근마다 size 검사로 OOB UB를 차단한다.
+const std::shared_ptr<Object>& checkedConstant(
+    const std::vector<std::shared_ptr<Object>>& constants, uint16_t idx, long long line) {
+    if (idx >= constants.size()) {
+        throw RuntimeException("상수 인덱스가 범위 밖입니다: " + std::to_string(idx), line);
+    }
+    return constants[idx];
+}
+} // namespace
 
 VM::VM() {
     stack.reserve(STACK_MAX);
@@ -169,11 +195,10 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
             // 그대로 두면 signed integer overflow가 일어나 UB가 발생하고 잘못된 정수 결과가 반환된다.
             long long result = 1;
             for (long long i = 0; i < rv; i++) {
-                long long next;
-                if (__builtin_mul_overflow(result, lv, &next)) {
+                if (mulOverflowsLL(result, lv)) {
                     return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
                 }
-                result = next;
+                result *= lv;
             }
             return VMValue::Int(result);
         }
@@ -263,7 +288,7 @@ shared_ptr<Object> VM::run() {
             switch (instruction) {
             case OpCode::OP_CONSTANT: {
                 uint16_t idx = readUint16();
-                push(VMValue::fromObject(frame.function->constants[idx]));
+                push(VMValue::fromObject(checkedConstant(frame.function->constants, idx, currentLine())));
                 break;
             }
             case OpCode::OP_NULL: push(VMValue::Null()); break;
@@ -288,12 +313,20 @@ shared_ptr<Object> VM::run() {
 
             case OpCode::OP_GET_LOCAL: {
                 uint16_t slot = readUint16();
-                push(stack[frame.slotOffset + slot]);
+                size_t idx = frame.slotOffset + slot;
+                if (idx >= stack.size()) {
+                    throw RuntimeException("VM 로컬 슬롯이 범위 밖입니다.", currentLine());
+                }
+                push(stack[idx]);
                 break;
             }
             case OpCode::OP_SET_LOCAL: {
                 uint16_t slot = readUint16();
-                stack[frame.slotOffset + slot] = peek(0);
+                size_t idx = frame.slotOffset + slot;
+                if (idx >= stack.size()) {
+                    throw RuntimeException("VM 로컬 슬롯이 범위 밖입니다.", currentLine());
+                }
+                stack[idx] = peek(0);
                 break;
             }
             case OpCode::OP_GET_GLOBAL: opGetGlobal(); break;
@@ -414,8 +447,9 @@ void VM::opNot() {
 void VM::opGetGlobal() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* name = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
-    if (!name) throw RuntimeException("잘못된 전역 변수명입니다.", currentLine());
+    // 컴파일러는 이 위치에 항상 String 상수를 넣는다(이 invariant는 우리가 직접 만든다).
+    // dynamic_cast 비용은 매 전역 접근마다 발생하므로 static_cast로 줄인다.
+    auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     auto it = globals.find(name->value);
     if (it != globals.end()) { push(it->second); return; }
     auto bit = builtins.find(name->value);
@@ -426,14 +460,14 @@ void VM::opGetGlobal() {
 void VM::opSetGlobal() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* name = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+    auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     globals[name->value] = peek(0);
 }
 
 void VM::opDefineGlobal() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* name = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+    auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     auto val = pop();
     // 상속 해결: CompiledClassDef의 부모 참조 설정
     if (val.isObject()) {
@@ -695,9 +729,13 @@ void VM::opBuildHashMap() {
 void VM::opBuildTuple() {
     uint16_t count = readUint16();
     auto tuple = make_shared<Tuple>();
+    tuple->elements.reserve(count);
+    // 스택은 LIFO이므로 pop 순서가 역순이다. insert(begin(),...)는 O(N²)이므로
+    // push_back으로 채운 뒤 한 번에 reverse한다 (opBuildArray와 동일한 패턴).
     for (uint16_t i = 0; i < count; i++) {
-        tuple->elements.insert(tuple->elements.begin(), pop().toObject());
+        tuple->elements.push_back(pop().toObject());
     }
+    std::reverse(tuple->elements.begin(), tuple->elements.end());
     push(VMValue::Obj(tuple));
 }
 
@@ -830,7 +868,7 @@ void VM::opSlice() {
 void VM::opGetMember() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* memberName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+    auto* memberName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     auto obj = pop();
     if (obj.isObject()) {
         if (auto* inst = dynamic_cast<Instance*>(obj.asObject().get())) {
@@ -845,7 +883,7 @@ void VM::opGetMember() {
 void VM::opSetMember() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* memberName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+    auto* memberName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     auto instance = pop();
     auto& value = peek(0);
     if (instance.isObject()) {
@@ -861,7 +899,7 @@ void VM::opInvoke() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
     uint8_t argCount = readByte();
-    auto* methodName = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
+    auto* methodName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     auto& obj = peek(argCount);
 
     // 내장 타입에 대한 메서드 호출 지원
@@ -950,11 +988,23 @@ void VM::opIterNext() {
 
 void VM::opIterValue() {
     auto& iterVal = peek(0);
+    if (!iterVal.isObject()) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
     auto* iter = dynamic_cast<IteratorState*>(iterVal.asObject().get());
+    if (!iter) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+
     if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
+        if (iter->index >= arr->elements.size()) {
+            throw RuntimeException("이터레이터 인덱스가 범위 밖입니다.", currentLine());
+        }
         push(VMValue::fromObject(arr->elements[iter->index]));
     } else if (auto* str = dynamic_cast<String*>(iter->iterable.get())) {
+        if (iter->index >= iter->codePoints.size()) {
+            throw RuntimeException("이터레이터 인덱스가 범위 밖입니다.", currentLine());
+        }
         push(VMValue::Obj(make_shared<String>(iter->codePoints[iter->index])));
+    } else {
+        // 미지원 iterable에서 silent push 누락으로 스택이 영구 disalign되는 것을 막는다.
+        throw RuntimeException("지원되지 않는 이터러블 타입입니다.", currentLine());
     }
     iter->index++;
 }
@@ -962,7 +1012,8 @@ void VM::opIterValue() {
 void VM::opClosure() {
     auto& frame = currentFrame();
     uint16_t constIdx = readUint16();
-    auto fn = dynamic_pointer_cast<CompiledFunction>(frame.function->constants[constIdx]);
+    // 컴파일러는 OP_CLOSURE 위치에 항상 CompiledFunction 상수를 둔다.
+    auto fn = static_pointer_cast<CompiledFunction>(checkedConstant(frame.function->constants, constIdx, currentLine()));
     auto closure = make_shared<Closure>(fn);
 
     uint8_t upvalueCount = readByte();
@@ -1038,7 +1089,7 @@ void VM::opRangeCheck() {
 void VM::opTypeCheck() {
     uint16_t typeIdx = readUint16();
     auto subject = pop();
-    auto typeNameObj = currentFrame().function->constants[typeIdx];
+    auto typeNameObj = checkedConstant(currentFrame().function->constants, typeIdx, currentLine());
     string typeName = typeNameObj->ToString();
     bool result = false;
     // Map VMValue tag to ObjectType for comparison
@@ -1050,7 +1101,7 @@ void VM::opTypeCheck() {
     case ValueTag::NULL_V: subjectType = ObjectType::NULL_OBJ; break;
     case ValueTag::OBJECT: subjectType = subject.asObject()->type; break;
     }
-    static const map<string, ObjectType> typeMap = {
+    static const unordered_map<string, ObjectType> typeMap = {
         {"\xEC\xA0\x95\xEC\x88\x98", ObjectType::INTEGER},       // 정수
         {"\xEC\x8B\xA4\xEC\x88\x98", ObjectType::FLOAT},        // 실수
         {"\xEB\xAC\xB8\xEC\x9E\x90", ObjectType::STRING},       // 문자
@@ -1068,11 +1119,13 @@ void VM::opTypeCheck() {
 void VM::opImport() {
     auto& frame = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* filename = dynamic_cast<String*>(frame.function->constants[nameIdx].get());
-    if (!filename) throw RuntimeException("잘못된 파일명입니다.", currentLine());
+    auto* filename = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
 
     // 경로 탐색 방지 (FileRead/FileWrite와 동일한 정책; 완전한 샌드박스는 아님)
     const string& path = filename->value;
+    if (path.find('\0') != string::npos) {
+        throw RuntimeException("파일 경로에 null 바이트를 사용할 수 없습니다.", currentLine());
+    }
     if (path.find("..") != string::npos) {
         throw RuntimeException("파일 경로에 '..'을 사용할 수 없습니다.", currentLine());
     }
@@ -1127,6 +1180,9 @@ void VM::opImport() {
 
     Parser importParser;
     auto program = importParser.Parsing(allTokens);
+    if (!importParser.getErrors().empty()) {
+        throw RuntimeException("임포트 파싱 오류: " + importParser.getErrors().front(), currentLine());
+    }
 
     Compiler importCompiler;
     auto importedFn = importCompiler.Compile(program);
@@ -1151,9 +1207,12 @@ void VM::opYield() {
 void VM::opInterpolate() {
     uint16_t count = readUint16();
     vector<VMValue> segments;
+    segments.reserve(count);
+    // insert(begin(),...) O(N²) → push_back + reverse O(N)
     for (uint16_t i = 0; i < count; i++) {
-        segments.insert(segments.begin(), pop());
+        segments.push_back(pop());
     }
+    std::reverse(segments.begin(), segments.end());
     string result;
     for (auto& seg : segments) result += seg.toString();
     push(VMValue::Obj(make_shared<String>(result)));

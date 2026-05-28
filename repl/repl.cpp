@@ -66,6 +66,9 @@ void Repl::Run() {
             }
 
             auto program = parser->Parsing(tokens);
+            if (!parser->getErrors().empty()) {
+                throw RuntimeException(parser->getErrors().front());
+            }
 
             if (useVM) {
                 Compiler compiler;
@@ -118,6 +121,9 @@ void Repl::FileMode(const string& filename) {
 
         try {
             auto program = parser->Parsing(tokens);
+            if (!parser->getErrors().empty()) {
+                throw RuntimeException(parser->getErrors().front());
+            }
             Compiler compiler;
             auto bytecode = compiler.Compile(program);
             VM vm;
@@ -161,6 +167,9 @@ void Repl::FileMode(const string& filename) {
 
     try {
         auto program = parser->Parsing(tokens);
+        if (!parser->getErrors().empty()) {
+            throw RuntimeException(parser->getErrors().front());
+        }
         auto object = evaluator->Evaluate(program);
         // VM 모드와 일관되게: Null 객체는 출력하지 않는다 (builtin 부수효과 호출의 결과).
         if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
@@ -282,6 +291,9 @@ void Repl::TestParser() {
             }
 
             auto program = parser->Parsing(tokens);
+            if (!parser->getErrors().empty()) {
+                throw RuntimeException(parser->getErrors().front());
+            }
 
             cout << program->String() << endl;
             tokens.clear();

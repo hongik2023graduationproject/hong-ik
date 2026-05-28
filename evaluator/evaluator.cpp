@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
 
@@ -876,7 +877,23 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
         long long base = lv;
         long long exp = rv;
         if (exp < 0) return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
-        for (long long i = 0; i < exp; i++) result *= base;
+        // long long signed overflow는 UB이므로 곱셈 전에 오버플로 가능성을 검사하고,
+        // 가능성이 보이면 즉시 double 경로로 폴백한다. (VM::binaryOp의 mulOverflowsLL과 동일 정책)
+        constexpr long long kMax = std::numeric_limits<long long>::max();
+        constexpr long long kMin = std::numeric_limits<long long>::min();
+        for (long long i = 0; i < exp; i++) {
+            if (result != 0 && base != 0) {
+                if (result == kMin || base == kMin) {
+                    return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
+                }
+                long long absResult = result < 0 ? -result : result;
+                long long absBase = base < 0 ? -base : base;
+                if (absResult > kMax / absBase) {
+                    return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
+                }
+            }
+            result *= base;
+        }
         return make_shared<Integer>(result);
     }
     if (token->type == TokenType::BITWISE_AND) return make_shared<Integer>(lv & rv);
@@ -1309,6 +1326,21 @@ shared_ptr<Object> Evaluator::evalGeneratorBlockStatement(const vector<shared_pt
 }
 
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {
+    // 경로 탐색 방지: VM::opImport / FileRead·FileWrite와 동일한 정책을 적용해
+    // 트리워킹 경로(및 WASM 기본 경로)에서도 호스트 파일시스템에 임의 접근이 일어나지 않도록 한다.
+    if (filename.find('\0') != string::npos) {
+        throw RuntimeException("파일 경로에 null 바이트를 사용할 수 없습니다.", current_line);
+    }
+    if (filename.find("..") != string::npos) {
+        throw RuntimeException("파일 경로에 '..'을 사용할 수 없습니다.", current_line);
+    }
+    if (!filename.empty() && (filename[0] == '/' || filename[0] == '\\')) {
+        throw RuntimeException("절대 경로는 사용할 수 없습니다.", current_line);
+    }
+    if (filename.size() >= 2 && filename[1] == ':') {
+        throw RuntimeException("절대 경로는 사용할 수 없습니다.", current_line);
+    }
+
     if (importedFiles.contains(filename)) return nullptr;
     importedFiles.insert(filename);
 
@@ -1372,6 +1404,9 @@ shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* en
 
     Parser importParser;
     auto program = importParser.Parsing(allTokens);
+    if (!importParser.getErrors().empty()) {
+        throw RuntimeException("임포트 파싱 오류: " + importParser.getErrors().front(), current_line);
+    }
 
     shared_ptr<Object> result = nullptr;
     for (const auto& statement : program->statements) {

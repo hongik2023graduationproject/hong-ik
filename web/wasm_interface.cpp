@@ -1,4 +1,5 @@
 #include "wasm_interface.h"
+#include "../exception/exception.h"
 #include "../util/json_util.h"
 #include "../util/token_utils.h"
 #include <sstream>
@@ -47,6 +48,11 @@ std::string WasmInterface::Execute(const std::string& code, long long timeoutMs)
         token_utils::appendMissingBlockClosers(tokens);
 
         auto program = parser->Parsing(tokens);
+        // 파서가 에러를 errors{}에 모으기만 하고 그대로 진행하면, 깨진 AST가 silent하게 실행돼
+        // 사용자에게 진단이 전혀 노출되지 않는다. 첫 파싱 오류를 surface한다.
+        if (!parser->getErrors().empty()) {
+            throw RuntimeException(parser->getErrors().front());
+        }
         auto result = evaluator->Evaluate(program);
 
         json << "{\"success\":true";
