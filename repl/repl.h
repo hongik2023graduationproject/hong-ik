@@ -10,7 +10,8 @@
 
 class Repl {
 public:
-    Repl(bool useVM = false);
+    // 기본값 true: REPL은 VM 백엔드로 실행된다. 트리워킹 평가기는 명시적 false 전달 시에만.
+    Repl(bool useVM = true);
 
     void Run();
 
