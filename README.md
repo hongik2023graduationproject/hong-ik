@@ -37,6 +37,9 @@ ctest --test-dir cmake-build-debug
 
 # 바이트코드 VM 모드
 ./hong-ik --vm filename.hik
+
+# 정적 타입 검사 모드 (off|warn|strict, 기본 warn)
+./hong-ik --type-check=strict filename.hik
 ```
 
 ## 언어 문법

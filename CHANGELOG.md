@@ -2,7 +2,14 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다. [Keep a Changelog](https://keepachangelog.com/ko/1.0.0/) 형식을 따릅니다.
 
-## [Unreleased] - 2026-05-19
+## [Unreleased] - 2026-06-11
+
+### 추가 (Added)
+- **정적 타입 검사기 Phase A** (`--type-check=off|warn|strict`, 기본 `warn`) — 파서 직후 AST를 검사하는 별도 패스(`analyzer/type_checker`). 런타임(evaluator/VM) 동작 변경 없음.
+  - 진단 7종: `TC001`(선언 타입 불일치), `TC002`(재대입 타입 불일치), `TC006`(미선언 식별자), `TC101`(호출 인자 개수), `TC102`(호출 인자 타입), `TC103`(리턴 타입), `TC501`(Optional 미해제 사용).
+  - `warn`은 stderr 경고 후 실행 계속, `strict`는 파일 모드에서 진단 발생 시 실행 중단(종료 코드 1). REPL은 항상 warn (strict 요청 시 안내 1회).
+  - 빌트인 45종 시그니처 테이블(`object/builtin_signatures.h`) + 고차 함수(`매핑`/`걸러내기`/`줄이기`) 사전 등록.
+  - Phase A 범위: 클래스는 이름·생성자 인자 개수만 검사(본문 미진입), 컬렉션 원소 타입·좁히기(narrowing)·이항 연산자 일반 호환성은 Phase B 이후.
 
 ### 보안 (Security)
 - `opImport`(`가져오기`)의 경로 검증 추가 — `..`, 절대 경로, 드라이브 문자 차단. 인터프리터를 호스팅하는 백엔드의 임의 파일 읽기 위협까지 함께 차단.
