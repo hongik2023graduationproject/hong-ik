@@ -347,6 +347,68 @@ TEST(TypeCheckerTest, TC501_NoNarrowingInPhaseA) {
     expectSingleDiagnostic(result, "TC501");
 }
 
+// ---- plan Task 10: 클래스 처리 (spec D6) ----
+
+namespace {
+const char* kPointClass =
+    "클래스 점:\n"
+    "    정수 x\n"
+    "    정수 y\n"
+    "    생성(정수 a, 정수 b):\n"
+    "        자기.x = a\n"
+    "        자기.y = b\n"
+    "    함수 합() -> 정수:\n"
+    "        리턴 자기.x + 자기.y\n";
+} // namespace
+
+TEST(TypeCheckerTest, ClassConstructorOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(3, 4)\n출력(p.x)\n출력(p.합())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC101_ConstructorArity) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, std::string(kPointClass) + "점 p = 점(3)\n"), "TC101");
+}
+
+TEST(TypeCheckerTest, MethodBodyNotTraversed) {
+    TypeChecker tc;
+    // Phase A: 클래스 본문 미진입 — 메서드 내부의 타입 문제는 진단하지 않음 (spec D6)
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "    함수 인사() -> 정수:\n"
+        "        리턴 자기.이름 + 1\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC006_UndeclaredParentClass) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 강아지 < 모름:\n"
+        "    정수 나이\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, InheritanceDeclaredParentOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    정수 나이\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점? p = 없음\np.x\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함

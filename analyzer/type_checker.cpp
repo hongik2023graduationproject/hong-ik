@@ -196,7 +196,18 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
         return;
     }
 
-    // ClassStatement: Task 10.
+    if (auto* cls = dynamic_cast<ClassStatement*>(stmt.get())) {
+        // spec D6: 이름·생성자 arity만 등록, 본문(필드/생성자/메서드) 미진입 (Phase B)
+        auto classType = std::make_shared<ClassType>(
+            cls->name, static_cast<int>(cls->constructorParams.size()));
+        classTypes_[cls->name] = classType;
+        declare(cls->name, classType);
+        if (!cls->parentName.empty() && classTypes_.find(cls->parentName) == classTypes_.end()) {
+            warn(currentLine_, "TC006", "식별자 '" + cls->parentName + "'를 찾을 수 없습니다.");
+        }
+        return;
+    }
+
     // 그 외 (Import/Break/Continue 등): 검사 대상 없음.
 }
 
