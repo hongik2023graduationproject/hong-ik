@@ -1,0 +1,6 @@
+false
+true
+true
+거부1
+거부2
+false

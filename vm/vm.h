@@ -138,6 +138,7 @@ private:
     void opRangeCheck();
     void opTypeCheck();
     void opDeclCheck();
+    void opAssertBool();
     void opImport();
     void opYield();
     void opInterpolate();

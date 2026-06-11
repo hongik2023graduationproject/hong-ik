@@ -1,0 +1,12 @@
+출력(true && false)
+출력(false || true)
+출력(false && true || true)
+시도:
+    출력(false || 1)
+실패 오류:
+    출력("거부1")
+시도:
+    출력(1 && true)
+실패 오류:
+    출력("거부2")
+출력(false && 1)

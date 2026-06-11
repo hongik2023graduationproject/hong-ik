@@ -337,6 +337,7 @@ shared_ptr<Object> VM::run() {
             case OpCode::OP_RANGE_CHECK: opRangeCheck(); break;
             case OpCode::OP_TYPE_CHECK: opTypeCheck(); break;
             case OpCode::OP_DECL_CHECK: opDeclCheck(); break;
+            case OpCode::OP_ASSERT_BOOL: opAssertBool(); break;
             case OpCode::OP_IMPORT: opImport(); break;
             case OpCode::OP_YIELD: opYield(); break;
             case OpCode::OP_INTERPOLATE: opInterpolate(); break;
@@ -1091,6 +1092,14 @@ void VM::opTypeCheck() {
         result = (subjectType == it->second);
     }
     push(VMValue::Bool(result));
+}
+
+// 평가된 논리 연산자 피연산자는 논리여야 한다 (런타임 일관성 D4). peek — pop 안 함.
+// 단락 평가로 평가되지 않은 피연산자는 검사 대상이 아니다 (evaluator 시맨틱 합치).
+void VM::opAssertBool() {
+    if (!peek(0).isBool()) {
+        throw RuntimeException("논리 연산자(&&, ||)의 피연산자는 논리 타입이어야 합니다.", currentLine());
+    }
 }
 
 // 선언 타입 검사 (런타임 일관성 D1). 스택 최상단(선언 값)을 peek — pop하지 않는다

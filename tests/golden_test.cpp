@@ -74,6 +74,7 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"subtype_assign"},
         GoldenCase{"binary_strict"},
         GoldenCase{"string_compare"},
+        GoldenCase{"logical_bool"},
         GoldenCase{"try_catch"},
         GoldenCase{"ops_misc"}
     ),

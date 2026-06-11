@@ -588,10 +588,12 @@ void Compiler::compileInfix(InfixExpression* expr) {
     // 단축 평가(short-circuit): && 는 좌항이 false면 우항을 평가하지 않음
     if (expr->token->type == TokenType::LOGICAL_AND) {
         compileExpression(expr->left.get());
+        chunk().emitOp(OpCode::OP_ASSERT_BOOL, line);  // 논리 전용 (런타임 일관성 D4)
         // 좌항이 false이면 우항을 건너뛰고 false를 결과로 사용
         size_t jumpToEnd = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, line);
         // 좌항이 true인 경우: 우항을 평가하여 결과로 사용
         compileExpression(expr->right.get());
+        chunk().emitOp(OpCode::OP_ASSERT_BOOL, line);  // 평가된 우항도 논리 요구 (D4)
         size_t skipFalse = chunk().emitJump(OpCode::OP_JUMP, line);
         // 좌항이 false인 경우: false를 push
         chunk().patchJump(jumpToEnd);
@@ -603,6 +605,7 @@ void Compiler::compileInfix(InfixExpression* expr) {
     // 단축 평가(short-circuit): || 는 좌항이 true면 우항을 평가하지 않음
     if (expr->token->type == TokenType::LOGICAL_OR) {
         compileExpression(expr->left.get());
+        chunk().emitOp(OpCode::OP_ASSERT_BOOL, line);  // 논리 전용 (런타임 일관성 D4)
         // 좌항이 false이면 우항 평가로 진행
         size_t jumpToRight = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, line);
         // 좌항이 true인 경우: true를 결과로 사용
@@ -611,6 +614,7 @@ void Compiler::compileInfix(InfixExpression* expr) {
         // 좌항이 false인 경우: 우항을 평가하여 결과로 사용
         chunk().patchJump(jumpToRight);
         compileExpression(expr->right.get());
+        chunk().emitOp(OpCode::OP_ASSERT_BOOL, line);  // 평가된 우항도 논리 요구 (D4)
         chunk().patchJump(jumpToEnd);
         return;
     }
