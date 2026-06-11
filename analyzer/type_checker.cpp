@@ -84,6 +84,23 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     }
 
     if (auto* assign = dynamic_cast<AssignmentStatement*>(stmt.get())) {
+        // `자기.필드 = 값` (parser가 name="자기.필드"로 만듦) — 필드 검사/동적 등록 (spec D5)
+        static const std::string kSelfPrefix = "자기.";
+        if (assign->name.rfind(kSelfPrefix, 0) == 0 && !currentClassName_.empty()) {
+            std::string field = assign->name.substr(kSelfPrefix.size());
+            auto valueType = inferExpression(assign->value);
+            if (auto fieldType = lookupField(currentClassName_, field)) {
+                if (!fieldType->isAssignableFrom(*valueType)) {
+                    warn(currentLine_, "TC002",
+                         "'" + fieldType->toKorean() + "' 타입 변수 '" + assign->name + "'에 '"
+                             + valueType->toKorean() + "' 값을 대입할 수 없습니다.");
+                }
+            } else {
+                // 동적 필드 등록 (부록 C — 양 런타임 허용). 첫 대입 값으로 타입 추론.
+                classInfos_[currentClassName_].fields[field] = valueType;
+            }
+            return;
+        }
         // TC002: 기존 타입 vs 새 값 타입.
         // 재대입은 좁힘을 해제하고 원(선언) 타입 기준으로 검사 (spec D3)
         for (auto& overlay : narrowOverlays_) {
@@ -270,6 +287,8 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
             info.methods[method->name] = funcType;
         }
         classInfos_[cls->name] = std::move(info);
+
+        checkClassBody(*cls);  // 생성자/메서드 본문 검사 (spec D5)
         return;
     }
 
@@ -278,6 +297,10 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
 
 // spec 2.3: top-down 검사. 본문 진입 직전 declare로 재귀만 허용, hoisting 없음.
 void TypeChecker::checkFunctionStatement(FunctionStatement& fn) {
+    checkFunctionLike(fn, true);
+}
+
+void TypeChecker::checkFunctionLike(FunctionStatement& fn, bool declareName) {
     std::vector<std::shared_ptr<Type>> params;
     std::vector<bool> paramHasDefault;
     std::vector<std::string> paramNames;
@@ -292,7 +315,9 @@ void TypeChecker::checkFunctionStatement(FunctionStatement& fn) {
     auto funcType = std::make_shared<FunctionType>(params, ret, paramHasDefault);
     funcType->paramNames = paramNames;
 
-    declare(fn.name, funcType);
+    if (declareName) {
+        declare(fn.name, funcType);
+    }
 
     pushScope();
     for (size_t i = 0; i < paramNames.size(); i++) {
@@ -733,6 +758,52 @@ void TypeChecker::checkCallArguments(const FunctionType& func, const std::string
                      + "' 값이 전달되었습니다.");
         }
     }
+}
+
+// 클래스 본문 검사 (spec D5). 시그니처는 ClassStatement 처리에서 이미 classInfos_에 등록됨 —
+// 메서드 상호 참조가 자기. 경유로 가능 (부록 C 실측).
+void TypeChecker::checkClassBody(ClassStatement& cls) {
+    auto self = instanceTypeOf(cls.name);
+    auto prevClass = currentClassName_;
+    currentClassName_ = cls.name;
+
+    // `부모` 키워드는 부모 InstanceType으로 — 본문에서의 TC006 오탐 방지
+    std::shared_ptr<Type> parentType =
+        cls.parentName.empty() ? nullptr : instanceTypeOf(cls.parentName);
+
+    if (cls.constructorBody) {
+        pushScope();
+        declare("자기", self);
+        if (parentType) {
+            declare("부모", parentType);
+        }
+        for (size_t i = 0; i < cls.constructorParams.size(); i++) {
+            if (!cls.constructorParams[i]) {
+                continue;
+            }
+            declare(cls.constructorParams[i]->name,
+                    typeFromToken(i < cls.constructorParamTypes.size() ? cls.constructorParamTypes[i]
+                                                                       : nullptr,
+                                  false));
+        }
+        checkStatement(cls.constructorBody);
+        popScope();
+    }
+
+    for (const auto& method : cls.methods) {
+        if (!method) {
+            continue;
+        }
+        pushScope();
+        declare("자기", self);
+        if (parentType) {
+            declare("부모", parentType);
+        }
+        checkFunctionLike(*method, false);
+        popScope();
+    }
+
+    currentClassName_ = prevClass;
 }
 
 // ---- Phase B-2 클래스 헬퍼 (spec D5) ----

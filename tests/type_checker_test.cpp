@@ -436,9 +436,9 @@ TEST(TypeCheckerTest, TC101_ConstructorArity) {
     expectSingleDiagnostic(checkSource(tc, std::string(kPointClass) + "점 p = 점(3)\n"), "TC101");
 }
 
-TEST(TypeCheckerTest, MethodBodyNotTraversed) {
+TEST(TypeCheckerTest, MethodBodyNowTraversed) {
     TypeChecker tc;
-    // Phase A: 클래스 본문 미진입 — 메서드 내부의 타입 문제는 진단하지 않음 (spec D6)
+    // Phase B-2: 본문 진입 — `자기.이름 + 1`(문자+정수)은 TC601 (Phase A의 미진입 의도 반전)
     auto result = checkSource(tc,
         "클래스 동물:\n"
         "    문자 이름\n"
@@ -446,6 +446,74 @@ TEST(TypeCheckerTest, MethodBodyNotTraversed) {
         "        자기.이름 = 이름\n"
         "    함수 인사() -> 정수:\n"
         "        리턴 자기.이름 + 1\n");
+    ASSERT_FALSE(result.diagnostics.empty());
+    EXPECT_EQ(result.diagnostics[0].code, "TC601");
+}
+
+TEST(TypeCheckerTest, TC002_SelfFieldTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 점:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = \"문자\"\n");
+    expectSingleDiagnostic(result, "TC002");
+}
+
+TEST(TypeCheckerTest, TC103_MethodReturnMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 점:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 이름() -> 문자:\n"
+        "        리턴 자기.x\n");
+    expectSingleDiagnostic(result, "TC103");
+}
+
+TEST(TypeCheckerTest, DynamicFieldRegistered) {
+    TypeChecker tc;
+    // 부록 C: 동적 필드는 양 런타임 허용 — 진단 없이 등록되고 메서드에서 보임
+    auto result = checkSource(tc,
+        "클래스 동적:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "        자기.y = a + 1\n"
+        "    함수 와이() -> 정수:\n"
+        "        리턴 자기.y\n"
+        "동적 d = 동적(5)\n"
+        "출력(d.와이())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC006_DirectMethodCallInBody) {
+    TypeChecker tc;
+    // 자기 없는 메서드 직접 호출은 양 런타임 거부 (부록 C) — TC006 정당
+    auto result = checkSource(tc,
+        "클래스 직접:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 첫째() -> 정수:\n"
+        "        리턴 둘째()\n"
+        "    함수 둘째() -> 정수:\n"
+        "        리턴 9\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, MethodMutualReferenceViaSelf) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 상호:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 첫째() -> 정수:\n"
+        "        리턴 자기.둘째()\n"
+        "    함수 둘째() -> 정수:\n"
+        "        리턴 7\n");
     EXPECT_TRUE(result.diagnostics.empty());
 }
 
