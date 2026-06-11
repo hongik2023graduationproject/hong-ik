@@ -12,11 +12,26 @@
 
 using namespace std;
 
-Repl::Repl(bool useVM) : useVM(useVM) {
+namespace {
+
+// 타입 진단 출력 (spec 4). strict일 때만 'type-error' 표기.
+void printTypeDiagnostics(const vector<TypeDiagnostic>& diagnostics, bool strict) {
+    for (const auto& d : diagnostics) {
+        cerr << (strict ? "type-error" : "type-warning") << "[" << d.code << "]"
+             << " [줄 " << d.line << "] " << d.message << endl;
+    }
+}
+
+} // namespace
+
+Repl::Repl(bool useVM, TypeCheckMode typeCheckMode) : useVM(useVM), typeCheckMode(typeCheckMode) {
     lexer     = make_unique<Lexer>();
     parser    = make_unique<Parser>();
     if (!useVM) {
         evaluator = make_unique<Evaluator>();
+    }
+    if (typeCheckMode != TypeCheckMode::Off) {
+        typeChecker = make_unique<TypeChecker>();
     }
 }
 
@@ -25,6 +40,11 @@ void Repl::Run() {
     cout << "제작: ezeun, jh-lee-kor, tolelom" << endl;
     if (useVM) {
         cout << "[VM 모드]" << endl;
+    }
+    if (typeCheckMode == TypeCheckMode::Strict) {
+        // REPL은 항상 warn으로 동작 (spec D4)
+        cout << "[알림] REPL에서는 strict 모드가 warn으로 동작합니다." << endl;
+        typeCheckMode = TypeCheckMode::Warn;
     }
 
     vector<shared_ptr<Token>> tokens;
@@ -70,6 +90,12 @@ void Repl::Run() {
                 throw RuntimeException(parser->getErrors().front());
             }
 
+            if (typeCheckMode != TypeCheckMode::Off) {
+                // 단일 인스턴스 누적 check — 이전 입력의 글로벌/클래스 타입이 보임
+                auto result = typeChecker->check(program);
+                printTypeDiagnostics(result.diagnostics, false);
+            }
+
             if (useVM) {
                 Compiler compiler;
                 auto bytecode = compiler.Compile(program);
@@ -96,13 +122,13 @@ void Repl::Run() {
     }
 }
 
-void Repl::FileMode(const string& filename) {
+int Repl::FileMode(const string& filename) {
     vector<shared_ptr<Token>> tokens;
 
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cout << "Error: cannot open file: " << filename << std::endl;
-        return;
+        return 0;
     }
 
     if (useVM) {
@@ -117,12 +143,19 @@ void Repl::FileMode(const string& filename) {
             tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
         }
         token_utils::appendMissingBlockClosers(tokens);
-        if (tokens.empty()) return;
+        if (tokens.empty()) return 0;
 
         try {
             auto program = parser->Parsing(tokens);
             if (!parser->getErrors().empty()) {
                 throw RuntimeException(parser->getErrors().front());
+            }
+            if (typeCheckMode != TypeCheckMode::Off) {
+                auto result = typeChecker->check(program);
+                printTypeDiagnostics(result.diagnostics, typeCheckMode == TypeCheckMode::Strict);
+                if (typeCheckMode == TypeCheckMode::Strict && !result.diagnostics.empty()) {
+                    return 1;
+                }
             }
             Compiler compiler;
             auto bytecode = compiler.Compile(program);
@@ -149,7 +182,7 @@ void Repl::FileMode(const string& filename) {
         } catch (const exception& e) {
             cout << "Error: " << e.what() << endl;
         }
-        return;
+        return 0;
     }
 
     // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행
@@ -163,12 +196,19 @@ void Repl::FileMode(const string& filename) {
         tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
     }
     token_utils::appendMissingBlockClosers(tokens);
-    if (tokens.empty()) return;
+    if (tokens.empty()) return 0;
 
     try {
         auto program = parser->Parsing(tokens);
         if (!parser->getErrors().empty()) {
             throw RuntimeException(parser->getErrors().front());
+        }
+        if (typeCheckMode != TypeCheckMode::Off) {
+            auto result = typeChecker->check(program);
+            printTypeDiagnostics(result.diagnostics, typeCheckMode == TypeCheckMode::Strict);
+            if (typeCheckMode == TypeCheckMode::Strict && !result.diagnostics.empty()) {
+                return 1;
+            }
         }
         auto object = evaluator->Evaluate(program);
         // VM 모드와 일관되게: Null 객체는 출력하지 않는다 (builtin 부수효과 호출의 결과).
@@ -192,6 +232,7 @@ void Repl::FileMode(const string& filename) {
     } catch (const exception& e) {
         cout << "Error: " << e.what() << endl;
     }
+    return 0;
 }
 
 void Repl::TestLexer() {
