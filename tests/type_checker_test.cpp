@@ -499,6 +499,35 @@ TEST(TypeCheckerTest, OwnConstructorOverridesInherited) {
     expectSingleDiagnostic(result, "TC101");
 }
 
+// ---- plan B-2 Task 2: InstanceType 적용 + 서브타이핑 ----
+
+TEST(TypeCheckerTest, SubtypeAssignmentOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "동물 a = 강아지(\"뽀삐\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, SiblingAssignmentRejected) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    정수 나이\n"
+        "클래스 고양이 < 동물:\n"
+        "    정수 나이\n"
+        "강아지 d = 고양이()\n");
+    expectSingleDiagnostic(result, "TC001");
+}
+
 TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
     TypeChecker tc;
     auto result = checkSource(tc, std::string(kPointClass) + "점? p = 없음\np.x\n");

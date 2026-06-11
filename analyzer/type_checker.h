@@ -55,6 +55,17 @@ private:
     std::vector<Scope> scopes_;                                      // 함수/블록 스코프 push/pop
     std::map<std::string, std::shared_ptr<Type>> globalTypes_;       // 누적 보존
     std::map<std::string, std::shared_ptr<ClassType>> classTypes_;   // 누적 보존
+
+    // Phase B-2: 클래스 본문 정보 (spec D5). 필드/메서드는 자신 것만 — 부모는 lookup 시 체인 탐색.
+    struct ClassInfo {
+        std::string name;
+        std::string parentName;
+        int constructorArity = 0;
+        std::map<std::string, std::shared_ptr<Type>> fields;
+        std::map<std::string, std::shared_ptr<FunctionType>> methods;
+    };
+    std::map<std::string, ClassInfo> classInfos_;
+    std::string currentClassName_;  // 클래스 본문 검사 중인 클래스 (자기.필드 대입용)
     // 분기 좁힘 오버레이 (spec D3). 스코프를 push하지 않는 이유: evaluator는 if-블록
     // 선언을 바깥으로 누수시키므로(부록 B #2) 스코프 방식은 TC006 오탐을 만든다.
     std::vector<std::map<std::string, std::shared_ptr<Type>>> narrowOverlays_;
@@ -71,6 +82,14 @@ private:
     // `x != 없음`(then측) / `x == 없음`(else측) 패턴에서 좁힘 대상 수집. `&&`는 then측만 재귀.
     void collectNarrowings(const std::shared_ptr<Expression>& cond, bool forThen,
                            std::map<std::string, std::shared_ptr<Type>>& out);
+
+    // Phase B-2 클래스 헬퍼 (spec D5)
+    const ClassInfo* findClassInfo(const std::string& className) const;
+    std::vector<std::string> ancestorChainOf(const std::string& className) const;
+    std::shared_ptr<Type> instanceTypeOf(const std::string& className) const;
+    std::shared_ptr<Type> lookupField(const std::string& className, const std::string& field) const;
+    std::shared_ptr<FunctionType> lookupMethod(const std::string& className,
+                                               const std::string& method) const;
 
     void pushScope();
     void popScope();
