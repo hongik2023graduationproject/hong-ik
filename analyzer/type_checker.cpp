@@ -12,6 +12,7 @@ namespace {
 
 // 토큰을 보유한 노드에서 줄 번호 추출 (evaluator nodeLine 준용)
 long long nodeLine(Node* node) {
+    if (node && node->line > 0) return node->line;  // D1: 파서 스탬프 우선
     if (auto* e = dynamic_cast<InfixExpression*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<PrefixExpression*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<PostfixExpression*>(node)) return e->token ? e->token->line : 0;

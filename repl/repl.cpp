@@ -132,16 +132,19 @@ int Repl::FileMode(const string& filename) {
     }
 
     if (useVM) {
-        // VM 모드: 파일 전체를 한 번에 파싱 후 컴파일/실행
+        // VM 모드: 파일 전체를 한 번에 토크나이즈/파싱 후 컴파일/실행.
+        // (Tokenize는 호출마다 line을 리셋하는 REPL 지향 동작이라, 줄 단위 호출은
+        //  톱레벨 문장의 줄 번호를 전부 1로 만든다 — 진단/에러 줄 번호 보존 목적)
         string code;
         vector<string> sourceLines;
-        while (getline(file, code)) {
-            sourceLines.push_back(code);
+        string fileLine;
+        while (getline(file, fileLine)) {
+            sourceLines.push_back(fileLine);
+            code += fileLine;
             code += "\n";
-            auto utf8 = Utf8Converter::Convert(code);
-            auto newTokens = lexer->Tokenize(utf8);
-            tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
         }
+        auto utf8 = Utf8Converter::Convert(code);
+        tokens = lexer->Tokenize(utf8);
         token_utils::appendMissingBlockClosers(tokens);
         if (tokens.empty()) return 0;
 
@@ -185,16 +188,17 @@ int Repl::FileMode(const string& filename) {
         return 0;
     }
 
-    // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행
+    // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행 (줄 번호 보존 — 위 VM 모드 주석 참조)
     string code;
     vector<string> sourceLines;
-    while (getline(file, code)) {
-        sourceLines.push_back(code);
+    string fileLine;
+    while (getline(file, fileLine)) {
+        sourceLines.push_back(fileLine);
+        code += fileLine;
         code += "\n";
-        auto utf8 = Utf8Converter::Convert(code);
-        auto newTokens = lexer->Tokenize(utf8);
-        tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
     }
+    auto utf8 = Utf8Converter::Convert(code);
+    tokens = lexer->Tokenize(utf8);
     token_utils::appendMissingBlockClosers(tokens);
     if (tokens.empty()) return 0;
 

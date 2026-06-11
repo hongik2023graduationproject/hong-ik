@@ -13,19 +13,13 @@
 
 namespace {
 
-// 소스 문자열 → AST → TypeChecker 진단. 파일 모드와 동일하게 줄 단위 토크나이즈
+// 소스 문자열 → AST → TypeChecker 진단. 파일 모드와 동일하게 전체를 한 번에
+// 토크나이즈 (Tokenize는 호출마다 line을 리셋하므로 줄 단위 호출은 줄 번호를 잃는다)
 // 후 블록 클로저 보정 (repl.cpp FileMode 파이프라인 준용).
 TypeChecker::Result checkSource(TypeChecker& tc, const std::string& source) {
     Lexer lexer;
-    std::vector<std::shared_ptr<Token>> tokens;
-    std::istringstream in(source);
-    std::string line;
-    while (std::getline(in, line)) {
-        line += "\n";
-        auto utf8 = Utf8Converter::Convert(line);
-        auto newTokens = lexer.Tokenize(utf8);
-        tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
-    }
+    auto utf8 = Utf8Converter::Convert(source);
+    auto tokens = lexer.Tokenize(utf8);
     token_utils::appendMissingBlockClosers(tokens);
     Parser parser;
     auto program = parser.Parsing(tokens);
@@ -452,6 +446,24 @@ TEST(TypeCheckerTest, ReplAccumulatesGlobalsAcrossChecks) {
     // REPL 시나리오: 같은 인스턴스로 두 번 check — 첫 입력의 선언이 둘째에 보임
     EXPECT_TRUE(checkSource(tc, "정수 x = 1\n").diagnostics.empty());
     expectSingleDiagnostic(checkSource(tc, "x = \"a\"\n"), "TC002");
+}
+
+// ---- plan B-1 Task 1: AST 줄 번호 (spec D1) ----
+
+TEST(TypeCheckerTest, DiagnosticLineNumberIdentifier) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "출력(1)\n출력(미선언변수)\n");
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, "TC006");
+    EXPECT_EQ(result.diagnostics[0].line, 2);
+}
+
+TEST(TypeCheckerTest, DiagnosticLineNumberAssignment) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "정수 x = 1\n출력(x)\nx = \"a\"\n");
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, "TC002");
+    EXPECT_EQ(result.diagnostics[0].line, 3);
 }
 
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
