@@ -18,6 +18,13 @@ enum class Severity {
     ERROR,
 };
 
+// CLI `--type-check=` 모드 (spec D4)
+enum class TypeCheckMode {
+    Off,
+    Warn,    // 진단 출력 후 실행 계속 (Phase A 기본값)
+    Strict,  // 파일 모드에서 진단 발생 시 실행 중단. REPL에서는 Warn으로 강등.
+};
+
 // 진단 위치·코드 (spec D5)
 struct TypeDiagnostic {
     long long line;
@@ -50,6 +57,7 @@ private:
     std::map<std::string, std::shared_ptr<ClassType>> classTypes_;   // 누적 보존
     std::vector<TypeDiagnostic> diagnostics_;
     std::shared_ptr<Type> currentReturnType_;
+    long long currentLine_ = 0;  // 토큰 보유 노드 방문 시 갱신 (evaluator current_line 준용)
 
     void checkStatement(const std::shared_ptr<Statement>& stmt);
     std::shared_ptr<Type> inferExpression(const std::shared_ptr<Expression>& expr);

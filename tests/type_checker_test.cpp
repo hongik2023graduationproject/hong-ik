@@ -29,7 +29,16 @@ TypeChecker::Result checkSource(TypeChecker& tc, const std::string& source) {
     token_utils::appendMissingBlockClosers(tokens);
     Parser parser;
     auto program = parser.Parsing(tokens);
+    if (!parser.getErrors().empty()) {
+        ADD_FAILURE() << "parse error: " << parser.getErrors().front();
+    }
     return tc.check(program);
+}
+
+// 단일 진단 검증 헬퍼
+void expectSingleDiagnostic(const TypeChecker::Result& result, const std::string& code) {
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, code);
 }
 
 } // namespace
@@ -110,4 +119,104 @@ TEST(TypeCheckerTest, BuiltinResolved) {
     TypeChecker tc;
     auto result = checkSource(tc, "출력(\"안녕\")\n");
     EXPECT_TRUE(result.diagnostics.empty());  // 빌트인 prepopulate로 TC006 미발화
+}
+
+// ---- plan Task 6: TC001/TC002 + Z2 AST 노드 6종 ----
+
+TEST(TypeCheckerTest, TC001_DeclTypeMismatch) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = \"hello\"\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC001_DeclTypeMatch) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 10\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_OptionalAcceptsNull) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수? z = 없음\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_NonNullRejectsNull) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 y = 없음\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC001_EmptyArray) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "배열 a = []\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_MixedArrayFlat) {
+    TypeChecker tc;
+    // Phase A: 원소 타입 무시, 평면 ARRAY 처리 (spec D2.2)
+    EXPECT_TRUE(checkSource(tc, "배열 a = [1, \"x\"]\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_ReassignMismatch) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1\nx = \"a\"\n"), "TC002");
+}
+
+TEST(TypeCheckerTest, TC002_ReassignMatch) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\nx = 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_ForEachNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "각각 정수 원소 [1, 2, 3] 에서:\n"
+        "    출력(원소)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_ForRangeNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = 0 부터 10 까지:\n"
+        "    출력(i)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_TryCatchNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "시도:\n"
+        "    정수 x = 1 / 0\n"
+        "실패 오류:\n"
+        "    출력(오류)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_MatchNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수 x = 1\n"
+        "비교 x:\n"
+        "    경우 1:\n"
+        "        출력(\"일\")\n"
+        "    기본:\n"
+        "        출력(\"기타\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_IndexAssignmentNoCheck) {
+    TypeChecker tc;
+    // IndexAssignment는 타입 일치 검사 안 함 (spec D6.5)
+    auto result = checkSource(tc,
+        "배열 a = [1, 2, 3]\n"
+        "a[0] = \"x\"\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ScopePopAfterForEach) {
+    TypeChecker tc;
+    // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함
+    auto result = checkSource(tc,
+        "각각 정수 원소 [1, 2, 3] 에서:\n"
+        "    출력(원소)\n"
+        "문자 원소 = \"바깥\"\n");
+    EXPECT_TRUE(result.diagnostics.empty());
 }
