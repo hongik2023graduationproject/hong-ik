@@ -363,12 +363,23 @@ std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) 
     const bool intPair = isPrimKind(*left, ObjectType::INTEGER) && isPrimKind(*right, ObjectType::INTEGER);
     const bool strPair = isPrimKind(*left, ObjectType::STRING) && isPrimKind(*right, ObjectType::STRING);
     const bool boolPair = isPrimKind(*left, ObjectType::BOOLEAN) && isPrimKind(*right, ObjectType::BOOLEAN);
+    // TC601은 실측 범위(PrimType 쌍)에서만 발화 — Function/Class/Builtin 등은 면제 (부록 A.1)
+    const bool bothPrim = dynamic_cast<PrimType*>(left.get()) && dynamic_cast<PrimType*>(right.get());
+    const std::string opText = infix.token ? infix.token->text : "?";
 
-    // ==/!=: 항상 논리, TC501 면제 (null 체크 패턴 — spec 3)
+    // ==/!=: 항상 논리, TC501 면제 (null 체크 패턴 — spec 3).
+    // 허용: 숫자쌍, 문자쌍, 논리쌍, 한쪽이 없음. 그 외 PrimType 쌍은 TC601 (예: 배열 == 배열).
     if (op == TokenType::EQUAL || op == TokenType::NOT_EQUAL) {
+        if (bothPrim) {
+            const bool nullSide = isPrimKind(*left, ObjectType::NULL_OBJ)
+                                  || isPrimKind(*right, ObjectType::NULL_OBJ);
+            if (!nullSide && !numPair && !strPair && !boolPair) {
+                warnBinaryIncompatible(opText, *left, *right);
+            }
+        }
         return makePrim(ObjectType::BOOLEAN);
     }
-    // Optional 피연산자: TC501 우선, 결과 Any (Phase A 유지)
+    // Optional 피연산자: TC501 우선 (TC601 미발화), 결과 Any (Phase A 유지)
     if (auto* opt = dynamic_cast<OptionalType*>(left.get())) {
         warnUnresolvedOptional(*opt);
         return makeAny();
@@ -383,6 +394,7 @@ std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) 
         if (intPair) return makePrim(ObjectType::INTEGER);
         if (numPair) return makePrim(ObjectType::FLOAT);
         if (strPair) return makePrim(ObjectType::STRING);
+        if (bothPrim) warnBinaryIncompatible(opText, *left, *right);
         return makeAny();
     case TokenType::MINUS:
     case TokenType::ASTERISK:
@@ -390,20 +402,28 @@ std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) 
     case TokenType::POWER:
         if (intPair) return makePrim(ObjectType::INTEGER);
         if (numPair) return makePrim(ObjectType::FLOAT);
+        if (bothPrim) warnBinaryIncompatible(opText, *left, *right);
         return makeAny();
     case TokenType::PERCENT:
     case TokenType::BITWISE_AND:
     case TokenType::BITWISE_OR:
         if (intPair) return makePrim(ObjectType::INTEGER);
+        if (bothPrim) warnBinaryIncompatible(opText, *left, *right);
         return makeAny();
     case TokenType::LESS_THAN:
     case TokenType::GREATER_THAN:
     case TokenType::LESS_EQUAL:
     case TokenType::GREATER_EQUAL:
         if (numPair) return makePrim(ObjectType::BOOLEAN);
-        return makeAny();  // 문자쌍 등 — 런타임 불일치 (부록 B #3)
+        // 문자쌍은 런타임 불일치 (부록 B #3) — 진단 면제
+        if (bothPrim && !strPair) warnBinaryIncompatible(opText, *left, *right);
+        return makeAny();
     case TokenType::LOGICAL_AND:
     case TokenType::LOGICAL_OR:
+        // 좌항만 검사 — 우항은 단락 평가로 값 의존 (부록 A.1, B #4)
+        if (dynamic_cast<PrimType*>(left.get()) && !isPrimKind(*left, ObjectType::BOOLEAN)) {
+            warnBinaryIncompatible(opText, *left, *right);
+        }
         if (boolPair) return makePrim(ObjectType::BOOLEAN);
         return makeAny();  // 혼합은 VM이 우항 값을 그대로 반환 (부록 B #4)
     default:
@@ -539,6 +559,13 @@ void TypeChecker::warnUnresolvedOptional(const OptionalType& opt) {
     warn(currentLine_, "TC501",
          "Optional 타입 '" + opt.toKorean()
              + "' 값에 대해 직접 연산할 수 없습니다. null 검사 후 사용하세요.");
+}
+
+void TypeChecker::warnBinaryIncompatible(const std::string& opText, const Type& left,
+                                         const Type& right) {
+    warn(currentLine_, "TC601",
+         "연산자 '" + opText + "'를 '" + left.toKorean() + "'과(와) '" + right.toKorean()
+             + "' 타입에 적용할 수 없습니다.");
 }
 
 std::shared_ptr<Type> TypeChecker::typeFromToken(const std::shared_ptr<Token>& tok, bool optional) {

@@ -503,6 +503,50 @@ TEST(TypeCheckerTest, BinaryResultLogicalAndIsBool) {
     EXPECT_TRUE(checkSource(tc, "논리 b = true && false\n").diagnostics.empty());
 }
 
+// ---- plan B-1 Task 3: TC601 (spec 부록 A.1) ----
+
+TEST(TypeCheckerTest, TC601_IntPlusString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "1 + \"a\"\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_StringMinusString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "\"a\" - \"b\"\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_EqualityIntString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(1 == \"a\")\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_EqualityNullAlwaysOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "출력([1] == 없음)\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC601_LogicalLeftNonBool) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(1 && true)\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_LogicalRightUnchecked) {
+    TypeChecker tc;
+    // 단락 평가로 우항은 값 의존 (부록 A.1) — 진단 안 함
+    EXPECT_TRUE(checkSource(tc, "출력(true && 1)\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC601_StringComparisonExempt) {
+    TypeChecker tc;
+    // 문자쌍 비교는 런타임 불일치 (부록 B #3) — 진단 면제
+    EXPECT_TRUE(checkSource(tc, "출력(\"a\" < \"b\")\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC601_BoolComparisonRejected) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(true < false)\n"), "TC601");
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함
