@@ -5,6 +5,7 @@
 ## [Unreleased] - 2026-06-11
 
 ### 추가 (Added)
+- **정적 타입 검사기 Phase B-1 (표현식 정밀화)** — 진단에 정확한 줄 번호(AST `line` 스탬프), 이항 연산자 피연산자 검사(`TC601`)와 결과 타입 정밀 추론, `반복-부터-까지` 범위 타입 검사(`TC301`), `만약 x != 없음 라면:` 분기 내 Optional 좁히기(`&&` 결합·재대입 해제 포함). 진단은 두 런타임(evaluator·VM)이 **모두 거부하는 조합만** 발화하며, 실측에서 발견된 백엔드 불일치 5건은 spec 부록 B에 기록.
 - **정적 타입 검사기 Phase A** (`--type-check=off|warn|strict`, 기본 `warn`) — 파서 직후 AST를 검사하는 별도 패스(`analyzer/type_checker`). 런타임(evaluator/VM) 동작 변경 없음.
   - 진단 7종: `TC001`(선언 타입 불일치), `TC002`(재대입 타입 불일치), `TC006`(미선언 식별자), `TC101`(호출 인자 개수), `TC102`(호출 인자 타입), `TC103`(리턴 타입), `TC501`(Optional 미해제 사용).
   - `warn`은 stderr 경고 후 실행 계속, `strict`는 파일 모드에서 진단 발생 시 실행 중단(종료 코드 1). REPL은 항상 warn (strict 요청 시 안내 1회).
@@ -16,6 +17,7 @@
 - `currentFrame()`의 빈 vector UB 가드 — 손상된 바이트코드 등으로 호출 프레임이 비면 명시적 `RuntimeException`을 던진다.
 
 ### 수정 (Fixed)
+- **파일 모드 줄 번호 버그** — `Lexer::Tokenize`가 호출마다 줄 번호를 리셋해(REPL 지향 동작) 파일을 줄 단위로 토크나이즈하던 FileMode에서 톱레벨 문장의 줄 번호가 전부 1로 나오던 문제. 파일 전체를 한 번에 토크나이즈하도록 변경 — 런타임 에러의 `[줄 N]` 표기도 이제 정확하다.
 - `OP_POW` 정수 오버플로 — `__builtin_mul_overflow` 감지 후 double 경로로 폴백 (signed integer overflow UB 제거).
 - void 빌트인의 nullptr 반환을 `Null` 객체로 통일. 호출자(VM, evaluator)의 redundant 삼항 분기 제거.
 
