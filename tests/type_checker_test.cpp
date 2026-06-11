@@ -409,6 +409,51 @@ TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
     expectSingleDiagnostic(result, "TC501");
 }
 
+// ---- plan Task 12: 종합 보강 ----
+
+TEST(TypeCheckerTest, TC102_ArgTypeMatchOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "정수 x = f(10)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_OptionalReassignNullOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수? x = 10\nx = 없음\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_NonNullReassignNullRejected) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 10\nx = 없음\n"), "TC002");
+}
+
+TEST(TypeCheckerTest, Z2_YieldNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 숫자들() -> 정수:\n"
+        "    생산 1\n"
+        "    생산 2\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC103_ReturnOkSecondCase) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 g(실수 v) -> 실수:\n"
+        "    리턴 v\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ReplAccumulatesGlobalsAcrossChecks) {
+    TypeChecker tc;
+    // REPL 시나리오: 같은 인스턴스로 두 번 check — 첫 입력의 선언이 둘째에 보임
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\n").diagnostics.empty());
+    expectSingleDiagnostic(checkSource(tc, "x = \"a\"\n"), "TC002");
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함
