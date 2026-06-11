@@ -84,7 +84,11 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     }
 
     if (auto* assign = dynamic_cast<AssignmentStatement*>(stmt.get())) {
-        // TC002: 기존 타입 vs 새 값 타입
+        // TC002: 기존 타입 vs 새 값 타입.
+        // 재대입은 좁힘을 해제하고 원(선언) 타입 기준으로 검사 (spec D3)
+        for (auto& overlay : narrowOverlays_) {
+            overlay.erase(assign->name);
+        }
         auto valueType = inferExpression(assign->value);
         auto existing = lookup(assign->name);
         if (!existing) {
@@ -121,8 +125,16 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
 
     if (auto* ifStmt = dynamic_cast<IfStatement*>(stmt.get())) {
         inferExpression(ifStmt->condition);
+        std::map<std::string, std::shared_ptr<Type>> thenNarrow;
+        std::map<std::string, std::shared_ptr<Type>> elseNarrow;
+        collectNarrowings(ifStmt->condition, true, thenNarrow);
+        collectNarrowings(ifStmt->condition, false, elseNarrow);
+        narrowOverlays_.push_back(std::move(thenNarrow));
         checkStatement(ifStmt->consequence);
+        narrowOverlays_.pop_back();
+        narrowOverlays_.push_back(std::move(elseNarrow));
         checkStatement(ifStmt->then);
+        narrowOverlays_.pop_back();
         return;
     }
 
@@ -531,6 +543,10 @@ void TypeChecker::popScope() {
 }
 
 void TypeChecker::declare(const std::string& name, std::shared_ptr<Type> type) {
+    // 같은 이름의 재선언은 좁힘 무효화 (spec D3)
+    for (auto& overlay : narrowOverlays_) {
+        overlay.erase(name);
+    }
     if (scopes_.empty()) {
         globalTypes_[name] = std::move(type);  // REPL 재선언은 덮어쓰기 허용 (spec Z13)
     } else {
@@ -539,6 +555,13 @@ void TypeChecker::declare(const std::string& name, std::shared_ptr<Type> type) {
 }
 
 std::shared_ptr<Type> TypeChecker::lookup(const std::string& name) {
+    // 분기 좁힘 오버레이 우선 (spec D3)
+    for (auto it = narrowOverlays_.rbegin(); it != narrowOverlays_.rend(); ++it) {
+        auto found = it->find(name);
+        if (found != it->end()) {
+            return found->second;
+        }
+    }
     for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
         auto found = it->vars.find(name);
         if (found != it->vars.end()) {
@@ -558,6 +581,46 @@ void TypeChecker::error(long long line, const std::string& code, const std::stri
 
 void TypeChecker::warn(long long line, const std::string& code, const std::string& msg) {
     diagnostics_.push_back(TypeDiagnostic{line, 0, Severity::WARNING, code, msg});
+}
+
+// spec D3: 단순 IdentifierExpression과 NullLiteral의 ==/!= 비교만 인식. `&&`는 then측만
+// 재귀 (else측은 부정이 분배되지 않으므로 단일 비교일 때만 좁힘). `||`/멤버 접근은 미지원.
+void TypeChecker::collectNarrowings(const std::shared_ptr<Expression>& cond, bool forThen,
+                                    std::map<std::string, std::shared_ptr<Type>>& out) {
+    auto* infix = dynamic_cast<InfixExpression*>(cond.get());
+    if (!infix || !infix->token) {
+        return;
+    }
+    if (infix->token->type == TokenType::LOGICAL_AND) {
+        if (forThen) {
+            collectNarrowings(infix->left, true, out);
+            collectNarrowings(infix->right, true, out);
+        }
+        return;
+    }
+    const bool isNeq = infix->token->type == TokenType::NOT_EQUAL;
+    const bool isEq = infix->token->type == TokenType::EQUAL;
+    if (!((forThen && isNeq) || (!forThen && isEq))) {
+        return;
+    }
+
+    auto* identLeft = dynamic_cast<IdentifierExpression*>(infix->left.get());
+    auto* identRight = dynamic_cast<IdentifierExpression*>(infix->right.get());
+    auto* nullLeft = dynamic_cast<NullLiteral*>(infix->left.get());
+    auto* nullRight = dynamic_cast<NullLiteral*>(infix->right.get());
+    IdentifierExpression* ident = (identLeft && nullRight) ? identLeft
+                                : (identRight && nullLeft) ? identRight
+                                                           : nullptr;
+    if (!ident) {
+        return;
+    }
+    auto type = lookup(ident->name);
+    if (!type) {
+        return;
+    }
+    if (auto* opt = dynamic_cast<OptionalType*>(type.get())) {
+        out[ident->name] = opt->inner;
+    }
 }
 
 void TypeChecker::warnUnresolvedOptional(const OptionalType& opt) {

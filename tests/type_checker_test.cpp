@@ -331,13 +331,66 @@ TEST(TypeCheckerTest, TC501_OptionalToNonNullIsTC001) {
     expectSingleDiagnostic(checkSource(tc, "정수? x = 10\n정수 y = x\n"), "TC001");
 }
 
-TEST(TypeCheckerTest, TC501_NoNarrowingInPhaseA) {
+TEST(TypeCheckerTest, NarrowingInThenBranch) {
     TypeChecker tc;
-    // 좁히기 미구현 (Phase B) — null 검사 분기 안에서도 TC501 발화
+    // Phase B-1: x != 없음 분기 안에서 inner 타입으로 좁힘 (spec D3)
     auto result = checkSource(tc,
         "정수? x = 10\n"
         "만약 x != 없음 라면:\n"
         "    정수 y = x + 1\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingEqNullInElseBranch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x == 없음 라면:\n"
+        "    출력(\"널\")\n"
+        "아니면:\n"
+        "    정수 y = x + 1\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingAndCombination) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? a = 1\n"
+        "정수? b = 2\n"
+        "만약 a != 없음 && b != 없음 라면:\n"
+        "    정수 c = a + b\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingCanceledByReassign) {
+    TypeChecker tc;
+    // 분기 내 재대입은 원(Optional) 타입 기준 + 좁힘 해제 (spec D3)
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    x = 없음\n"
+        "    x + 1\n");
+    expectSingleDiagnostic(result, "TC501");  // 재대입 자체는 TC002 아님 (원타입 Optional)
+}
+
+TEST(TypeCheckerTest, NoNarrowingOutsideBranch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    출력(\"ok\")\n"
+        "x + 1\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
+TEST(TypeCheckerTest, NoNarrowingInElseOfNeq) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    출력(\"ok\")\n"
+        "아니면:\n"
+        "    x + 1\n");
     expectSingleDiagnostic(result, "TC501");
 }
 
