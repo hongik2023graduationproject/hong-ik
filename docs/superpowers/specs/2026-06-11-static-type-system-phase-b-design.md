@@ -205,7 +205,7 @@ NeverType cascade(한쪽 Never → Never, 진단 차단)는 모든 규칙에 우
 
 ## 부록 B. 런타임 일관성 이슈 목록 (2026-06-11 갱신)
 
-> 정적 검사기가 진단할 수 없는 evaluator/VM 동작 불일치. 별도 "런타임 일관성" spec의 입력.
+> **✅ #1~#6 해소됨 (2026-06-12, `2026-06-12-runtime-consistency-design.md` 구현 완료)** — 이항 784조합·선언 42조합 재검증 불일치 0건. 잔여: **#7 (신규)** VM이 제너레이터 iterable을 침묵 0회 순회 (evaluator는 지원) — 별도 작업 필요.
 
 1. `실수 b = 1` — evaluator 거부 / VM 통과 (Phase A Task 0 발견)
 2. **if-블록 스코프 정반대** — evaluator는 블록 내 선언이 바깥으로 누수(통과), VM은 블록 스코프(거부). `만약 true 라면: 정수 x = 1` 후 `출력(x)`: eval=1, VM=식별자 에러.

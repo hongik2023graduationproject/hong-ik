@@ -832,6 +832,27 @@ TEST(TypeCheckerTest, TC301_StringBound) {
     expectSingleDiagnostic(result, "TC301");
 }
 
+TEST(TypeCheckerTest, TC006_IfBlockScopedDeclaration) {
+    TypeChecker tc;
+    // 런타임 블록 스코프 통일(D2)로 체커도 블록 스코프 모델 — 블록 밖 사용은 TC006
+    auto result = checkSource(tc,
+        "만약 true 라면:\n"
+        "    정수 안쪽 = 1\n"
+        "출력(안쪽)\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, TC006_TryBlockScopedDeclaration) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "시도:\n"
+        "    정수 티 = 1\n"
+        "실패 오류:\n"
+        "    출력(오류)\n"
+        "출력(티)\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
 TEST(TypeCheckerTest, TC301_FloatBoundNowChecked) {
     TypeChecker tc;
     // 런타임 통일(2026-06-12, range_strict 골든)로 실수 경계도 양 백엔드 거부 — 면제 해제

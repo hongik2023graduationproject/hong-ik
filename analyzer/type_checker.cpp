@@ -113,23 +113,30 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     }
 
     if (auto* ifStmt = dynamic_cast<IfStatement*>(stmt.get())) {
+        // 블록 스코프 (런타임 일관성 D2 통일 이후 — 분기 내 선언은 밖에서 안 보임)
         inferExpression(ifStmt->condition);
         std::map<std::string, std::shared_ptr<Type>> thenNarrow;
         std::map<std::string, std::shared_ptr<Type>> elseNarrow;
         collectNarrowings(ifStmt->condition, true, thenNarrow);
         collectNarrowings(ifStmt->condition, false, elseNarrow);
         narrowOverlays_.push_back(std::move(thenNarrow));
+        pushScope();
         checkStatement(ifStmt->consequence);
+        popScope();
         narrowOverlays_.pop_back();
         narrowOverlays_.push_back(std::move(elseNarrow));
+        pushScope();
         checkStatement(ifStmt->then);
+        popScope();
         narrowOverlays_.pop_back();
         return;
     }
 
     if (auto* whileStmt = dynamic_cast<WhileStatement*>(stmt.get())) {
         inferExpression(whileStmt->condition);
+        pushScope();  // 런타임은 반복마다 새 env — 체커는 단일 블록 스코프로 근사
         checkStatement(whileStmt->body);
+        popScope();
         return;
     }
 
@@ -171,7 +178,9 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     }
 
     if (auto* tryCatch = dynamic_cast<TryCatchStatement*>(stmt.get())) {
+        pushScope();  // 블록 스코프 (런타임 일관성 D2 통일 이후)
         checkStatement(tryCatch->tryBody);
+        popScope();
         pushScope();
         declare(tryCatch->errorName, makeAny());
         checkStatement(tryCatch->catchBody);
