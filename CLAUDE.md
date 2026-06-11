@@ -44,6 +44,8 @@ cmake-build-debug/HongIkTests --gtest_filter="LexerTest.*"
 
 | 디렉토리 | 역할 |
 |----------|------|
+| `analyzer/` | 신택스 하이라이팅 + 정적 타입 검사기(`type_checker*` — `--type-check=off\|warn\|strict`, 기본 warn) |
+| `vm/` | 바이트코드 컴파일러 + VM — **기본 실행 백엔드** (트리워킹은 `--eval`) |
 | `lexer/` | 소스코드를 토큰으로 변환 |
 | `token/` | 토큰 타입 정의 (`token_type.h`) |
 | `parser/` | 토큰 → AST 변환 |
@@ -59,26 +61,31 @@ cmake-build-debug/HongIkTests --gtest_filter="LexerTest.*"
 ### 언어 문법 요약
 
 ```
-// 변수 선언
-[정수] 변수명 = 값
-[실수] 변수명 = 값
-[문자] 변수명 = "값"
+// 변수 선언 (선언 타입 검사 — 암묵 승격 없음, Optional은 타입?)
+정수 x = 10
+실수? r = 없음
 
-// 조건문
+// 조건문 (블록 스코프 — 블록 내 선언은 밖에서 안 보임)
 만약 조건 라면:
     ...
 아니면:
     ...
 
-// 함수 선언
-함수: [정수]파라미터1, [정수]파라미터2 함수명 -> [정수]:
-    리턴 값
+// 함수 선언/호출
+함수 더하기(정수 a, 정수 b) -> 정수:
+    리턴 a + b
+더하기(1, 2)
 
-// 함수 호출
-:(인자1, 인자2)함수명
+// 클래스 (상속: 클래스 자식 < 부모)
+클래스 점:
+    정수 x
+    생성(정수 a):
+        자기.x = a
+    함수 값() -> 정수:
+        리턴 자기.x
 ```
 
-내장 함수: `출력` (print), `길이` (length), `추가` (push)
+내장 함수 45종 — 단일 진실의 원천은 `object/builtin_registry.cpp` (정적 검사용 시그니처는 `object/builtin_signatures.h`).
 
 ### 핵심 데이터 흐름
 
