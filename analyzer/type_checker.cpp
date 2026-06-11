@@ -27,6 +27,15 @@ long long nodeLine(Node* node) {
     return 0;
 }
 
+bool isPrimKind(const Type& t, ObjectType k) {
+    auto* p = dynamic_cast<const PrimType*>(&t);
+    return p && p->kind == k;
+}
+
+bool isNumeric(const Type& t) {
+    return isPrimKind(t, ObjectType::INTEGER) || isPrimKind(t, ObjectType::FLOAT);
+}
+
 } // namespace
 
 bool TypeChecker::Result::hasErrors() const {
@@ -137,8 +146,17 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     if (auto* forRange = dynamic_cast<ForRangeStatement*>(stmt.get())) {
         pushScope();
         declare(forRange->varName, typeFromToken(forRange->varType, false));
-        inferExpression(forRange->startExpr);
-        inferExpression(forRange->endExpr);
+        // TC301: 두 런타임 모두 거부하는 경계 타입만 (spec D4 — 실수는 불일치라 면제)
+        auto checkBound = [this](const std::shared_ptr<Type>& t) {
+            if (isPrimKind(*t, ObjectType::STRING) || isPrimKind(*t, ObjectType::BOOLEAN)
+                || isPrimKind(*t, ObjectType::NULL_OBJ) || isPrimKind(*t, ObjectType::ARRAY)
+                || isPrimKind(*t, ObjectType::HASH_MAP)) {
+                warn(currentLine_, "TC301",
+                     "반복 범위는 정수여야 합니다. '" + t->toKorean() + "' 타입은 사용할 수 없습니다.");
+            }
+        };
+        checkBound(inferExpression(forRange->startExpr));
+        checkBound(inferExpression(forRange->endExpr));
         checkStatement(forRange->body);
         popScope();
         return;
@@ -336,19 +354,6 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
     // Lambda/패턴 표현식 등: 분석 불가 처리
     return makeAny();
 }
-
-namespace {
-
-bool isPrimKind(const Type& t, ObjectType k) {
-    auto* p = dynamic_cast<const PrimType*>(&t);
-    return p && p->kind == k;
-}
-
-bool isNumeric(const Type& t) {
-    return isPrimKind(t, ObjectType::INTEGER) || isPrimKind(t, ObjectType::FLOAT);
-}
-
-} // namespace
 
 // spec 부록 A.2 — 실측(2026-06-11) 기반 결과 타입 추론. 진단(TC601)은 부록 A.1 규칙.
 std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) {

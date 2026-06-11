@@ -547,6 +547,33 @@ TEST(TypeCheckerTest, TC601_BoolComparisonRejected) {
     expectSingleDiagnostic(checkSource(tc, "출력(true < false)\n"), "TC601");
 }
 
+// ---- plan B-1 Task 4: TC301 (spec D4) ----
+
+TEST(TypeCheckerTest, TC301_StringBound) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = \"a\" 부터 3 까지:\n"
+        "    출력(i)\n");
+    expectSingleDiagnostic(result, "TC301");
+}
+
+TEST(TypeCheckerTest, TC301_FloatBoundExempt) {
+    TypeChecker tc;
+    // 실수 경계는 런타임 불일치 (부록 B #4) — 진단 면제
+    auto result = checkSource(tc,
+        "반복 정수 i = 0.5 부터 3 까지:\n"
+        "    출력(i)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC301_IntBoundsOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = 0 부터 10 까지:\n"
+        "    출력(i)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함
