@@ -369,16 +369,46 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return inferCallExpression(*call);
     }
     if (auto* methodCall = dynamic_cast<MethodCallExpression*>(expr.get())) {
-        inferExpression(methodCall->object);
+        auto objectType = inferExpression(methodCall->object);
+        std::vector<std::shared_ptr<Type>> argTypes;
+        argTypes.reserve(methodCall->arguments.size());
         for (const auto& arg : methodCall->arguments) {
-            inferExpression(arg);
+            argTypes.push_back(inferExpression(arg));
         }
-        return makeAny();
+        if (auto* opt = dynamic_cast<OptionalType*>(objectType.get())) {
+            warnUnresolvedOptional(*opt);  // TC501: 멤버 접근 좌항
+            return makeAny();
+        }
+        auto* inst = dynamic_cast<InstanceType*>(objectType.get());
+        if (!inst || !findClassInfo(inst->className)) {
+            // Any/내장 타입 메서드 체이닝(evaluator methodMap) 등 — Phase B-2 침묵
+            return makeAny();
+        }
+        auto method = lookupMethod(inst->className, methodCall->method);
+        if (!method) {
+            warnUnknownMember(inst->className, methodCall->method);
+            return makeNever();
+        }
+        checkCallArguments(*method, methodCall->method, argTypes);
+        return method->ret;
     }
     if (auto* member = dynamic_cast<MemberAccessExpression*>(expr.get())) {
         auto objectType = inferExpression(member->object);
         if (auto* opt = dynamic_cast<OptionalType*>(objectType.get())) {
             warnUnresolvedOptional(*opt);  // TC501: 멤버 접근 좌항 (inner로 진행)
+            return makeAny();
+        }
+        if (auto* inst = dynamic_cast<InstanceType*>(objectType.get())) {
+            if (auto fieldType = lookupField(inst->className, member->member)) {
+                return fieldType;
+            }
+            if (lookupMethod(inst->className, member->member)) {
+                return makeAny();  // 호출 없는 메서드 참조 — Phase B-2는 Any
+            }
+            if (findClassInfo(inst->className)) {  // 정보 없는 클래스는 침묵
+                warnUnknownMember(inst->className, member->member);
+                return makeNever();
+            }
         }
         return makeAny();
     }
@@ -522,34 +552,7 @@ std::shared_ptr<Type> TypeChecker::inferCallExpression(CallExpression& call) {
     }
 
     if (auto* func = dynamic_cast<FunctionType*>(calleeType.get())) {
-        long long required = 0;
-        for (size_t i = 0; i < func->params.size(); i++) {
-            if (i >= func->paramHasDefault.size() || !func->paramHasDefault[i]) {
-                required++;
-            }
-        }
-        const auto maxParams = static_cast<long long>(func->params.size());
-        if (argCount < required || argCount > maxParams) {
-            std::string expected = required == maxParams
-                                       ? std::to_string(maxParams) + "개의"
-                                       : std::to_string(required) + "~" + std::to_string(maxParams)
-                                             + "개의";
-            warn(currentLine_, "TC101",
-                 "함수 '" + calleeName + "'는 " + expected + " 매개변수를 받지만 "
-                     + std::to_string(argCount) + "개가 전달되었습니다.");
-        } else {
-            for (long long i = 0; i < argCount; i++) {
-                if (!func->params[i]->isAssignableFrom(*argTypes[i])) {
-                    std::string paramName = i < static_cast<long long>(func->paramNames.size())
-                                                ? func->paramNames[i]
-                                                : std::to_string(i + 1) + "번째";
-                    warn(currentLine_, "TC102",
-                         "함수 '" + calleeName + "'의 매개변수 '" + paramName + "'는 '"
-                             + func->params[i]->toKorean() + "' 타입이지만 '"
-                             + argTypes[i]->toKorean() + "' 값이 전달되었습니다.");
-                }
-            }
-        }
+        checkCallArguments(*func, calleeName, argTypes);
         return func->ret;
     }
 
@@ -670,6 +673,10 @@ void TypeChecker::warnBinaryIncompatible(const std::string& opText, const Type& 
              + "' 타입에 적용할 수 없습니다.");
 }
 
+void TypeChecker::warnUnknownMember(const std::string& className, const std::string& member) {
+    warn(currentLine_, "TC201", "클래스 '" + className + "'에 '" + member + "' 멤버가 없습니다.");
+}
+
 std::shared_ptr<Type> TypeChecker::typeFromToken(const std::shared_ptr<Token>& tok, bool optional) {
     std::shared_ptr<Type> base;
     if (!tok) {
@@ -692,6 +699,40 @@ std::shared_ptr<Type> TypeChecker::typeFromToken(const std::shared_ptr<Token>& t
         }
     }
     return optional ? makeOptional(std::move(base)) : base;
+}
+
+// 사용자 함수/메서드 공용 인자 검사 (TC101/TC102) — spec 1.3 의사코드의 FunctionType 분기
+void TypeChecker::checkCallArguments(const FunctionType& func, const std::string& calleeName,
+                                     const std::vector<std::shared_ptr<Type>>& argTypes) {
+    const auto argCount = static_cast<long long>(argTypes.size());
+    long long required = 0;
+    for (size_t i = 0; i < func.params.size(); i++) {
+        if (i >= func.paramHasDefault.size() || !func.paramHasDefault[i]) {
+            required++;
+        }
+    }
+    const auto maxParams = static_cast<long long>(func.params.size());
+    if (argCount < required || argCount > maxParams) {
+        std::string expected = required == maxParams
+                                   ? std::to_string(maxParams) + "개의"
+                                   : std::to_string(required) + "~" + std::to_string(maxParams)
+                                         + "개의";
+        warn(currentLine_, "TC101",
+             "함수 '" + calleeName + "'는 " + expected + " 매개변수를 받지만 "
+                 + std::to_string(argCount) + "개가 전달되었습니다.");
+        return;
+    }
+    for (long long i = 0; i < argCount; i++) {
+        if (!func.params[i]->isAssignableFrom(*argTypes[i])) {
+            std::string paramName = i < static_cast<long long>(func.paramNames.size())
+                                        ? func.paramNames[i]
+                                        : std::to_string(i + 1) + "번째";
+            warn(currentLine_, "TC102",
+                 "함수 '" + calleeName + "'의 매개변수 '" + paramName + "'는 '"
+                     + func.params[i]->toKorean() + "' 타입이지만 '" + argTypes[i]->toKorean()
+                     + "' 값이 전달되었습니다.");
+        }
+    }
 }
 
 // ---- Phase B-2 클래스 헬퍼 (spec D5) ----

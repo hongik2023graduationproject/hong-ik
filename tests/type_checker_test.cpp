@@ -528,6 +528,63 @@ TEST(TypeCheckerTest, SiblingAssignmentRejected) {
     expectSingleDiagnostic(result, "TC001");
 }
 
+// ---- plan B-2 Task 3: TC201 미지 멤버 + 멤버 타입 추론 ----
+
+TEST(TypeCheckerTest, TC201_UnknownField) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n출력(p.없는것)\n");
+    expectSingleDiagnostic(result, "TC201");
+}
+
+TEST(TypeCheckerTest, TC201_UnknownMethod) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\np.없는것()\n");
+    expectSingleDiagnostic(result, "TC201");
+}
+
+TEST(TypeCheckerTest, FieldTypeInferred) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n문자 s = p.x\n");
+    expectSingleDiagnostic(result, "TC001");  // x는 정수 필드
+}
+
+TEST(TypeCheckerTest, MethodReturnTypeInferred) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n문자 s = p.합()\n");
+    expectSingleDiagnostic(result, "TC001");  // 합() -> 정수
+}
+
+TEST(TypeCheckerTest, TC101_MethodArity) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\np.합(1)\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
+TEST(TypeCheckerTest, InheritedMemberOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "    함수 소개() -> 문자:\n"
+        "        리턴 자기.이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "강아지 d = 강아지(\"뽀삐\")\n"
+        "문자 n = d.이름\n"
+        "문자 s = d.소개()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BuiltinMethodChainingSilent) {
+    TypeChecker tc;
+    // 내장 타입 메서드 체이닝 (evaluator methodMap) — 좌항이 InstanceType이 아니므로 침묵
+    auto result = checkSource(tc, "문자 s = \"가나\"\n출력(s.길이())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
 TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
     TypeChecker tc;
     auto result = checkSource(tc, std::string(kPointClass) + "점? p = 없음\np.x\n");

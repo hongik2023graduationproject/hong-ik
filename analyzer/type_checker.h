@@ -100,6 +100,10 @@ private:
     void warn(long long line, const std::string& code, const std::string& msg);
     void warnUnresolvedOptional(const OptionalType& opt);  // TC501 공통 발화
     void warnBinaryIncompatible(const std::string& opText, const Type& left, const Type& right);  // TC601
+    void warnUnknownMember(const std::string& className, const std::string& member);  // TC201
+    // 사용자 함수/메서드 공용 인자 검사 (TC101/TC102)
+    void checkCallArguments(const FunctionType& func, const std::string& calleeName,
+                            const std::vector<std::shared_ptr<Type>>& argTypes);
 
     // 타입 표기 토큰 → Type. 기본 키워드는 PrimType, IDENTIFIER는 classTypes_ lookup
     // (미등록 클래스 이름은 AnyType — Task 10에서 진단 처리).
