@@ -839,6 +839,11 @@ void Compiler::compileForEach(ForEachStatement* stmt) {
     size_t exitJump = chunk().emitJump(OpCode::OP_ITER_NEXT, 0);
 
     chunk().emitOp(OpCode::OP_ITER_VALUE, 0);
+    // 원소 타입 검사 (런타임 일관성 D5 — evaluator의 per-element typeCheck와 합치)
+    if (stmt->elementType) {
+        chunk().emitOpAndUint16(OpCode::OP_DECL_CHECK, identifierConstant(stmt->elementType->text),
+                                stmt->elementType->line);
+    }
     uint16_t elemSlot = declareLocal(stmt->elementName);
     (void)elemSlot;
 

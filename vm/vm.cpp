@@ -931,6 +931,12 @@ void VM::opTryEnd() {
 
 void VM::opIterInit() {
     auto iterable = pop().toObject();
+    // 비순회형은 침묵 0회 순회 대신 에러 (런타임 일관성 D5 — evaluator와 동일 메시지).
+    // GeneratorObject는 기존 동작 유지 (VM 제너레이터 순회 부재는 별도 이슈 — spec 부록 B #7).
+    if (!dynamic_cast<Array*>(iterable.get()) && !dynamic_cast<String*>(iterable.get())
+        && !dynamic_cast<GeneratorObject*>(iterable.get())) {
+        throw RuntimeException("각각 반복문은 배열, 문자열 또는 제너레이터만 지원합니다.", currentLine());
+    }
     auto iter = make_shared<IteratorState>();
     iter->iterable = iterable;
     iter->index = 0;
