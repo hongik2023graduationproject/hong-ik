@@ -229,11 +229,16 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
 
     if (auto* cls = dynamic_cast<ClassStatement*>(stmt.get())) {
         // spec D6: 이름·생성자 arity만 등록, 본문(필드/생성자/메서드) 미진입 (Phase B)
-        auto classType = std::make_shared<ClassType>(
-            cls->name, static_cast<int>(cls->constructorParams.size()));
+        // 생성자 미정의(constructorBody 없음) 시 부모 생성자 arity 상속 (런타임 실측 2026-06-11)
+        int constructorArity = static_cast<int>(cls->constructorParams.size());
+        auto parent = cls->parentName.empty() ? classTypes_.end() : classTypes_.find(cls->parentName);
+        if (!cls->constructorBody && parent != classTypes_.end()) {
+            constructorArity = parent->second->constructorArity;
+        }
+        auto classType = std::make_shared<ClassType>(cls->name, constructorArity);
         classTypes_[cls->name] = classType;
         declare(cls->name, classType);
-        if (!cls->parentName.empty() && classTypes_.find(cls->parentName) == classTypes_.end()) {
+        if (!cls->parentName.empty() && parent == classTypes_.end()) {
             warn(currentLine_, "TC006", "식별자 '" + cls->parentName + "'를 찾을 수 없습니다.");
         }
         return;

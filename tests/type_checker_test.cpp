@@ -450,6 +450,38 @@ TEST(TypeCheckerTest, InheritanceDeclaredParentOk) {
     EXPECT_TRUE(result.diagnostics.empty());
 }
 
+TEST(TypeCheckerTest, InheritedConstructorArity) {
+    TypeChecker tc;
+    // 자식이 생성자를 정의하지 않으면 부모 생성자를 상속 (런타임 실측 2026-06-11)
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "강아지 뽀삐 = 강아지(\"뽀삐\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, OwnConstructorOverridesInherited) {
+    TypeChecker tc;
+    // 자식이 자체 생성자를 정의하면 그 arity 사용
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 로봇개 < 동물:\n"
+        "    정수 버전\n"
+        "    생성(문자 이름, 정수 버전):\n"
+        "        자기.이름 = 이름\n"
+        "        자기.버전 = 버전\n"
+        "로봇개 r = 로봇개(\"알파\")\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
 TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
     TypeChecker tc;
     auto result = checkSource(tc, std::string(kPointClass) + "점? p = 없음\np.x\n");
