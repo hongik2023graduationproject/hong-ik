@@ -284,10 +284,13 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         auto condition = eval(if_statement->condition.get(), environment);
 
         if (auto* boolean = dynamic_cast<Boolean*>(condition.get())) {
+            // 블록 스코프 (런타임 일관성 D2 — VM 시맨틱 합치): 분기 내 선언은 밖에서 안 보임
             if (boolean->value) {
-                return eval(if_statement->consequence.get(), environment);
+                auto blockEnv = make_shared<Environment>(environment->shared_from_this());
+                return eval(if_statement->consequence.get(), blockEnv.get());
             } else if (if_statement->then != nullptr) {
-                return eval(if_statement->then.get(), environment);
+                auto blockEnv = make_shared<Environment>(environment->shared_from_this());
+                return eval(if_statement->then.get(), blockEnv.get());
             }
         }
         return nullptr;
@@ -386,7 +389,9 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     }
     if (auto* trycatch = dynamic_cast<TryCatchStatement*>(node)) {
         try {
-            return eval(trycatch->tryBody.get(), environment);
+            // 블록 스코프 (런타임 일관성 D2): 시도 블록 내 선언은 밖에서 안 보임
+            auto tryEnv = make_shared<Environment>(environment->shared_from_this());
+            return eval(trycatch->tryBody.get(), tryEnv.get());
         } catch (const std::exception& e) {
             auto catchEnv = make_shared<Environment>(environment->shared_from_this());
             catchEnv->Set(trycatch->errorName, make_shared<String>(string(e.what())));

@@ -76,6 +76,7 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"string_compare"},
         GoldenCase{"logical_bool"},
         GoldenCase{"foreach_strict"},
+        GoldenCase{"block_scope"},
         GoldenCase{"try_catch"},
         GoldenCase{"ops_misc"}
     ),
