@@ -158,7 +158,17 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             auto classDef = environment->Get(initialization_statement->type->text);
             if (classDef && dynamic_cast<ClassDef*>(classDef.get())) {
                 auto* inst = dynamic_cast<Instance*>(value.get());
-                if (!inst || inst->classDef->name != initialization_statement->type->text) {
+                // 자손 클래스 인스턴스 허용 (런타임 일관성 D1/#6 — VM opDeclCheck와 동일 규칙)
+                bool matched = false;
+                if (inst) {
+                    for (auto def = inst->classDef; def; def = def->parent) {
+                        if (def->name == initialization_statement->type->text) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matched) {
                     throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", current_line);
                 }
                 environment->Set(initialization_statement->name, value);
