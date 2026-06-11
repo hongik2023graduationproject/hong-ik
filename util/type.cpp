@@ -2,6 +2,7 @@
 
 #include "type_utils.h"
 
+#include <algorithm>
 #include <climits>
 #include <sstream>
 
@@ -120,6 +121,28 @@ bool ClassType::equals(const Type& other) const {
     return c && name == c->name;
 }
 
+// ---- InstanceType ----
+
+bool InstanceType::isAssignableFrom(const Type& other) const {
+    if (dynamic_cast<const NeverType*>(&other)) return true;
+    if (dynamic_cast<const AnyType*>(&other)) return true;
+    auto* inst = dynamic_cast<const InstanceType*>(&other);
+    if (!inst) return false;
+    if (className == inst->className) return true;
+    // 부모 <- 자식: other의 조상 체인에 자신이 있으면 허용 (spec D5, VM 시맨틱 — 부록 B #6)
+    return std::find(inst->ancestors.begin(), inst->ancestors.end(), className)
+           != inst->ancestors.end();
+}
+
+std::string InstanceType::toKorean() const {
+    return className;
+}
+
+bool InstanceType::equals(const Type& other) const {
+    auto* inst = dynamic_cast<const InstanceType*>(&other);
+    return inst && className == inst->className;
+}
+
 // ---- AnyType ----
 
 bool AnyType::isAssignableFrom(const Type&) const { return true; }
@@ -160,6 +183,10 @@ std::shared_ptr<Type> makeBuiltin(std::string name, int minArity, int maxArity,
 
 std::shared_ptr<Type> makeClass(std::string name, int constructorArity) {
     return std::make_shared<ClassType>(std::move(name), constructorArity);
+}
+
+std::shared_ptr<Type> makeInstance(std::string className, std::vector<std::string> ancestors) {
+    return std::make_shared<InstanceType>(std::move(className), std::move(ancestors));
 }
 
 std::shared_ptr<Type> makeAny() {

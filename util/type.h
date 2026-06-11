@@ -101,6 +101,21 @@ public:
     bool equals(const Type& other) const override;
 };
 
+// 클래스 인스턴스 값. ClassType(클래스 자체·호출 대상)과 구분된다 (Phase B spec D5).
+// ancestors는 생성 시점의 부모 체인 스냅샷 — Type 계층이 TypeChecker 상태를 참조하지 않게 한다.
+class InstanceType final : public Type {
+public:
+    std::string className;
+    std::vector<std::string> ancestors;
+
+    InstanceType(std::string name, std::vector<std::string> ancestors)
+        : className(std::move(name)), ancestors(std::move(ancestors)) {}
+
+    bool isAssignableFrom(const Type& other) const override;
+    std::string toKorean() const override;
+    bool equals(const Type& other) const override;
+};
+
 // 모든 타입과 양방향 호환. 분석 불가/escape hatch.
 class AnyType final : public Type {
 public:
@@ -127,6 +142,7 @@ std::shared_ptr<Type> makeFunction(std::vector<std::shared_ptr<Type>> params,
 std::shared_ptr<Type> makeBuiltin(std::string name, int minArity, int maxArity,
                                   bool skipArgTypeCheck, std::shared_ptr<Type> ret);
 std::shared_ptr<Type> makeClass(std::string name, int constructorArity);
+std::shared_ptr<Type> makeInstance(std::string className, std::vector<std::string> ancestors);
 std::shared_ptr<Type> makeAny();
 std::shared_ptr<Type> makeNever();
 

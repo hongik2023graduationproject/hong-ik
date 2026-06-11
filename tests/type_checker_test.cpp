@@ -79,6 +79,23 @@ TEST(TypeTest, AssignabilityRules) {
     EXPECT_TRUE(optInteger->isAssignableFrom(*never));
 }
 
+// plan B-2 Task 1: InstanceType 서브타이핑 (spec D5)
+TEST(TypeTest, InstanceSubtyping) {
+    auto animal = makeInstance("동물", {});
+    auto dog = makeInstance("강아지", {"동물"});
+    auto cat = makeInstance("고양이", {"동물"});
+
+    EXPECT_TRUE(animal->isAssignableFrom(*dog));   // 부모 <- 자식
+    EXPECT_FALSE(dog->isAssignableFrom(*animal));  // 자식 <- 부모 거부
+    EXPECT_FALSE(dog->isAssignableFrom(*cat));     // 형제 거부
+    EXPECT_TRUE(dog->isAssignableFrom(*dog));      // 동일
+    EXPECT_TRUE(makeAny()->isAssignableFrom(*dog));
+    EXPECT_TRUE(dog->isAssignableFrom(*makeNever()));
+    EXPECT_FALSE(dog->isAssignableFrom(*makePrim(ObjectType::INTEGER)));
+    // Optional 래핑: 동물? <- 강아지
+    EXPECT_TRUE(makeOptional(makeInstance("동물", {}))->isAssignableFrom(*dog));
+}
+
 // plan Task 3 게이트: 시그니처 테이블 ↔ BuiltinRegistry 1:1 매칭.
 // `반복`은 lexer 키워드 충돌로 호출 불가능한 dead builtin — 레지스트리에는
 // 있지만 시그니처 테이블에서는 의도적으로 제외 (spec D2.1).
