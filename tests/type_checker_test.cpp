@@ -466,6 +466,43 @@ TEST(TypeCheckerTest, DiagnosticLineNumberAssignment) {
     EXPECT_EQ(result.diagnostics[0].line, 3);
 }
 
+// ---- plan B-1 Task 2: 이항 연산자 결과 추론 (spec 부록 A.2) ----
+
+TEST(TypeCheckerTest, BinaryResultIntInt) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1 + 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultIntIntRejectedAsString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "문자 s = 1 + 2\n"), "TC001");  // 결과 정수
+}
+
+TEST(TypeCheckerTest, BinaryResultMixedNumericIsFloat) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1 + 1.5\n"), "TC001");  // 결과 실수
+}
+
+TEST(TypeCheckerTest, BinaryResultFloatOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "실수 x = 1 + 1.5\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultStringConcat) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "문자 s = \"a\" + \"b\"\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultComparisonIsBool) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "논리 b = 1 < 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultLogicalAndIsBool) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "논리 b = true && false\n").diagnostics.empty());
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함

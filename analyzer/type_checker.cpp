@@ -291,25 +291,7 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
 
     // ---- 연산자/접근 ----
     if (auto* infix = dynamic_cast<InfixExpression*>(expr.get())) {
-        auto left = inferExpression(infix->left);
-        auto right = inferExpression(infix->right);
-        // 한쪽이 NeverType이면 결과도 NeverType (spec 1.1.2)
-        if (dynamic_cast<NeverType*>(left.get()) || dynamic_cast<NeverType*>(right.get())) {
-            return makeNever();
-        }
-        // null 체크 패턴 `x == 없음` / `x != 없음`은 TC501 예외 (spec 3)
-        bool isEquality = infix->token
-            && (infix->token->type == TokenType::EQUAL || infix->token->type == TokenType::NOT_EQUAL);
-        if (isEquality) {
-            return makePrim(ObjectType::BOOLEAN);
-        }
-        if (auto* opt = dynamic_cast<OptionalType*>(left.get())) {
-            warnUnresolvedOptional(*opt);
-        } else if (auto* optRight = dynamic_cast<OptionalType*>(right.get())) {
-            warnUnresolvedOptional(*optRight);
-        }
-        // 이항 연산자의 일반 타입 호환성·결과 타입은 Phase B
-        return makeAny();
+        return inferInfixExpression(*infix);
     }
     if (auto* prefix = dynamic_cast<PrefixExpression*>(expr.get())) {
         inferExpression(prefix->right);
@@ -353,6 +335,80 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
 
     // Lambda/패턴 표현식 등: 분석 불가 처리
     return makeAny();
+}
+
+namespace {
+
+bool isPrimKind(const Type& t, ObjectType k) {
+    auto* p = dynamic_cast<const PrimType*>(&t);
+    return p && p->kind == k;
+}
+
+bool isNumeric(const Type& t) {
+    return isPrimKind(t, ObjectType::INTEGER) || isPrimKind(t, ObjectType::FLOAT);
+}
+
+} // namespace
+
+// spec 부록 A.2 — 실측(2026-06-11) 기반 결과 타입 추론. 진단(TC601)은 부록 A.1 규칙.
+std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) {
+    auto left = inferExpression(infix.left);
+    auto right = inferExpression(infix.right);
+    if (dynamic_cast<NeverType*>(left.get()) || dynamic_cast<NeverType*>(right.get())) {
+        return makeNever();  // cascade (spec 1.1.2)
+    }
+    const TokenType op = infix.token ? infix.token->type : TokenType::ILLEGAL;
+
+    const bool numPair = isNumeric(*left) && isNumeric(*right);
+    const bool intPair = isPrimKind(*left, ObjectType::INTEGER) && isPrimKind(*right, ObjectType::INTEGER);
+    const bool strPair = isPrimKind(*left, ObjectType::STRING) && isPrimKind(*right, ObjectType::STRING);
+    const bool boolPair = isPrimKind(*left, ObjectType::BOOLEAN) && isPrimKind(*right, ObjectType::BOOLEAN);
+
+    // ==/!=: 항상 논리, TC501 면제 (null 체크 패턴 — spec 3)
+    if (op == TokenType::EQUAL || op == TokenType::NOT_EQUAL) {
+        return makePrim(ObjectType::BOOLEAN);
+    }
+    // Optional 피연산자: TC501 우선, 결과 Any (Phase A 유지)
+    if (auto* opt = dynamic_cast<OptionalType*>(left.get())) {
+        warnUnresolvedOptional(*opt);
+        return makeAny();
+    }
+    if (auto* opt = dynamic_cast<OptionalType*>(right.get())) {
+        warnUnresolvedOptional(*opt);
+        return makeAny();
+    }
+
+    switch (op) {
+    case TokenType::PLUS:
+        if (intPair) return makePrim(ObjectType::INTEGER);
+        if (numPair) return makePrim(ObjectType::FLOAT);
+        if (strPair) return makePrim(ObjectType::STRING);
+        return makeAny();
+    case TokenType::MINUS:
+    case TokenType::ASTERISK:
+    case TokenType::SLASH:
+    case TokenType::POWER:
+        if (intPair) return makePrim(ObjectType::INTEGER);
+        if (numPair) return makePrim(ObjectType::FLOAT);
+        return makeAny();
+    case TokenType::PERCENT:
+    case TokenType::BITWISE_AND:
+    case TokenType::BITWISE_OR:
+        if (intPair) return makePrim(ObjectType::INTEGER);
+        return makeAny();
+    case TokenType::LESS_THAN:
+    case TokenType::GREATER_THAN:
+    case TokenType::LESS_EQUAL:
+    case TokenType::GREATER_EQUAL:
+        if (numPair) return makePrim(ObjectType::BOOLEAN);
+        return makeAny();  // 문자쌍 등 — 런타임 불일치 (부록 B #3)
+    case TokenType::LOGICAL_AND:
+    case TokenType::LOGICAL_OR:
+        if (boolPair) return makePrim(ObjectType::BOOLEAN);
+        return makeAny();  // 혼합은 VM이 우항 값을 그대로 반환 (부록 B #4)
+    default:
+        return makeAny();
+    }
 }
 
 // spec 1.3 + plan Task 8: 호출 검사 (TC101/TC102)

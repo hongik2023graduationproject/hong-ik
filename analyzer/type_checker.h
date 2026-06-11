@@ -64,6 +64,7 @@ private:
     void checkFunctionStatement(FunctionStatement& fn);
     std::shared_ptr<Type> inferExpression(const std::shared_ptr<Expression>& expr);
     std::shared_ptr<Type> inferCallExpression(CallExpression& call);
+    std::shared_ptr<Type> inferInfixExpression(InfixExpression& infix);
 
     void pushScope();
     void popScope();
