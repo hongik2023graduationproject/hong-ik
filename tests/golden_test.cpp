@@ -69,6 +69,8 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"classes_basic"},
         GoldenCase{"closures"},
         GoldenCase{"for_each"},
+        // 런타임 일관성 (2026-06-12 spec) — 시맨틱 통일 패리티
+        GoldenCase{"decl_check"},
         GoldenCase{"try_catch"},
         GoldenCase{"ops_misc"}
     ),

@@ -674,6 +674,12 @@ void Compiler::compileInitialization(InitializationStatement* stmt) {
     long long line = stmt->type ? stmt->type->line : 0;
     compileExpression(stmt->value.get());
 
+    // 선언 타입 검사 (런타임 일관성 D1) — 타입명 상수 + Optional 표기('?')
+    std::string typeName = stmt->type ? stmt->type->text : "";
+    if (stmt->isOptional) typeName += "?";
+    uint16_t typeIdx = identifierConstant(typeName);
+    chunk().emitOpAndUint16(OpCode::OP_DECL_CHECK, typeIdx, line);
+
     if (current->scopeDepth > 0) {
         declareLocal(stmt->name);
     } else {

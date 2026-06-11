@@ -91,6 +91,7 @@ enum class OpCode : uint8_t {
     // 패턴 매칭
     OP_RANGE_CHECK,     // pop end, pop start, pop subject → push bool (start <= subject <= end)
     OP_TYPE_CHECK,      // [uint16 typeIdx] pop subject → push bool (subject의 타입이 typeIdx와 일치)
+    OP_DECL_CHECK,      // [uint16 typeIdx] peek 값이 선언 타입과 호환되는지 검사, 불일치 시 예외 (런타임 일관성 D1)
 
     OP_IMPORT,          // [uint16 nameIdx] import and execute file
 
@@ -117,6 +118,7 @@ inline std::string opcodeName(OpCode op) {
     case OpCode::OP_GREATER: return "OP_GREATER";
     case OpCode::OP_LESS_EQUAL: return "OP_LESS_EQUAL";
     case OpCode::OP_GREATER_EQUAL: return "OP_GREATER_EQUAL";
+    case OpCode::OP_DECL_CHECK: return "OP_DECL_CHECK";
     case OpCode::OP_AND: return "OP_AND";
     case OpCode::OP_OR: return "OP_OR";
     case OpCode::OP_NEGATE: return "OP_NEGATE";

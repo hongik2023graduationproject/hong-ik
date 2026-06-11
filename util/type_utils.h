@@ -44,6 +44,20 @@ inline std::string typeToKorean(ObjectType ot) {
     return "알 수 없음";
 }
 
+// 선언 타입명(한글) ↔ 값 타입 호환 — 공통 선언 호환 규칙 (런타임 일관성 spec D1).
+// Optional/클래스 검사는 호출측에서 처리. 승격 없음 (정수↔실수 불일치).
+inline bool declTypeMatches(const std::string& typeName, ObjectType valueType) {
+    switch (valueType) {
+    case ObjectType::INTEGER: return typeName == "정수";
+    case ObjectType::FLOAT: return typeName == "실수";
+    case ObjectType::STRING: return typeName == "문자";
+    case ObjectType::BOOLEAN: return typeName == "논리";
+    case ObjectType::ARRAY: return typeName == "배열";
+    case ObjectType::HASH_MAP: return typeName == "사전";
+    default: return false;
+    }
+}
+
 // OpCode → 연산자 기호
 inline std::string opToSymbol(OpCode op) {
     switch (op) {

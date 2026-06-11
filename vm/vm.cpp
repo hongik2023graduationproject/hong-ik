@@ -334,6 +334,7 @@ shared_ptr<Object> VM::run() {
 
             case OpCode::OP_RANGE_CHECK: opRangeCheck(); break;
             case OpCode::OP_TYPE_CHECK: opTypeCheck(); break;
+            case OpCode::OP_DECL_CHECK: opDeclCheck(); break;
             case OpCode::OP_IMPORT: opImport(); break;
             case OpCode::OP_YIELD: opYield(); break;
             case OpCode::OP_INTERPOLATE: opInterpolate(); break;
@@ -1088,6 +1089,50 @@ void VM::opTypeCheck() {
         result = (subjectType == it->second);
     }
     push(VMValue::Bool(result));
+}
+
+// 선언 타입 검사 (런타임 일관성 D1). 스택 최상단(선언 값)을 peek — pop하지 않는다
+// (이후 OP_DEFINE_GLOBAL/declareLocal이 같은 값을 사용). evaluator와 동일 규칙·메시지.
+void VM::opDeclCheck() {
+    uint16_t typeIdx = readUint16();
+    auto typeNameObj = checkedConstant(currentFrame().function->constants, typeIdx, currentLine());
+    string typeName = typeNameObj->ToString();
+
+    bool optional = !typeName.empty() && typeName.back() == '?';
+    if (optional) typeName.pop_back();
+
+    const VMValue& value = peek(0);
+    if (value.isNull()) {
+        if (optional) return;  // 타입? <- 없음 허용
+        throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", currentLine());
+    }
+
+    ObjectType valueType;
+    switch (value.kind()) {
+    case ValueTag::INT: valueType = ObjectType::INTEGER; break;
+    case ValueTag::FLOAT: valueType = ObjectType::FLOAT; break;
+    case ValueTag::BOOL: valueType = ObjectType::BOOLEAN; break;
+    case ValueTag::NULL_V: valueType = ObjectType::NULL_OBJ; break;
+    case ValueTag::OBJECT: valueType = value.asObject()->type; break;
+    }
+
+    // 클래스 타입 표기: 인스턴스 + 부모 체인 (서브타입 허용 — spec D1/#6)
+    if (valueType == ObjectType::INSTANCE) {
+        auto* inst = static_cast<Instance*>(value.asObject().get());
+        for (auto def = inst->classDef; def; def = def->parent) {
+            if (def->name == typeName) return;
+        }
+        throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", currentLine());
+    }
+    // 함수/클래스/튜플 등 비기본형 값은 기존 관대 동작 유지 (실측 범위 밖 — 거짓 거부 방지)
+    if (valueType == ObjectType::FUNCTION || valueType == ObjectType::CLASS_DEF
+        || valueType == ObjectType::BUILTIN_FUNCTION || valueType == ObjectType::TUPLE
+        || valueType == ObjectType::GENERATOR || valueType == ObjectType::ITERATOR) {
+        return;
+    }
+    if (!declTypeMatches(typeName, valueType)) {
+        throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", currentLine());
+    }
 }
 
 void VM::opImport() {

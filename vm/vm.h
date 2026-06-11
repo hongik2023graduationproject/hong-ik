@@ -137,6 +137,7 @@ private:
     void opSetUpvalue();
     void opRangeCheck();
     void opTypeCheck();
+    void opDeclCheck();
     void opImport();
     void opYield();
     void opInterpolate();
