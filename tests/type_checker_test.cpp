@@ -1,9 +1,38 @@
+#include "analyzer/type_checker.h"
+#include "lexer/lexer.h"
 #include "object/builtin_registry.h"
 #include "object/builtin_signatures.h"
+#include "parser/parser.h"
+#include "utf8_converter/utf8_converter.h"
+#include "util/token_utils.h"
 #include "util/type.h"
 #include <gtest/gtest.h>
+#include <sstream>
 #include <string>
 #include <unordered_set>
+
+namespace {
+
+// 소스 문자열 → AST → TypeChecker 진단. 파일 모드와 동일하게 줄 단위 토크나이즈
+// 후 블록 클로저 보정 (repl.cpp FileMode 파이프라인 준용).
+TypeChecker::Result checkSource(TypeChecker& tc, const std::string& source) {
+    Lexer lexer;
+    std::vector<std::shared_ptr<Token>> tokens;
+    std::istringstream in(source);
+    std::string line;
+    while (std::getline(in, line)) {
+        line += "\n";
+        auto utf8 = Utf8Converter::Convert(line);
+        auto newTokens = lexer.Tokenize(utf8);
+        tokens.insert(tokens.end(), newTokens.begin(), newTokens.end());
+    }
+    token_utils::appendMissingBlockClosers(tokens);
+    Parser parser;
+    auto program = parser.Parsing(tokens);
+    return tc.check(program);
+}
+
+} // namespace
 
 // Phase A 정적 타입 시스템 — Type 계층 단위 테스트
 // spec: docs/superpowers/specs/2026-05-19-static-type-system-design.md (1.1)
@@ -67,4 +96,18 @@ TEST(BuiltinSignaturesTest, MatchesRegistry) {
     }
 
     EXPECT_EQ(tableNames.size(), registryNames.size() - 1);  // 반복 1건 제외
+}
+
+// plan Task 4 게이트
+TEST(TypeCheckerTest, EmptyProgram) {
+    TypeChecker tc;
+    auto result = tc.check(std::make_shared<Program>());
+    EXPECT_TRUE(result.diagnostics.empty());
+    EXPECT_FALSE(result.hasErrors());
+}
+
+TEST(TypeCheckerTest, BuiltinResolved) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "출력(\"안녕\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());  // 빌트인 prepopulate로 TC006 미발화
 }

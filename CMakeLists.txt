@@ -63,6 +63,7 @@ set(HONGIK_CORE_SOURCES
         io/io_interface.cpp
         error/hongik_error.cpp
         analyzer/analyzer.cpp
+        analyzer/type_checker.cpp
         util/type.cpp
 )
 
