@@ -64,6 +64,8 @@ set(HONGIK_CORE_SOURCES
         error/hongik_error.cpp
         analyzer/analyzer.cpp
         analyzer/type_checker.cpp
+        analyzer/type_checker_expr.cpp
+        analyzer/type_checker_class.cpp
         util/type.cpp
 )
 

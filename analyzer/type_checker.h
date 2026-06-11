@@ -78,6 +78,7 @@ private:
     void checkFunctionStatement(FunctionStatement& fn);
     // declareName=false: 클래스 메서드 — 이름을 스코프에 올리지 않는다 (직접 호출은 양 런타임 거부, 부록 C)
     void checkFunctionLike(FunctionStatement& fn, bool declareName);
+    void checkClassStatement(ClassStatement& cls);  // type_checker_class.cpp
     void checkClassBody(ClassStatement& cls);
     std::shared_ptr<Type> inferExpression(const std::shared_ptr<Expression>& expr);
     std::shared_ptr<Type> inferCallExpression(CallExpression& call);
