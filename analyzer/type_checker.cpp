@@ -138,7 +138,14 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     if (auto* forEach = dynamic_cast<ForEachStatement*>(stmt.get())) {
         pushScope();
         declare(forEach->elementName, typeFromToken(forEach->elementType, false));
-        inferExpression(forEach->iterable);
+        // TC302: 순회 불가 타입 (런타임 통일 D5로 양 백엔드 거부 — D7에서 부활)
+        auto iterableType = inferExpression(forEach->iterable);
+        if (dynamic_cast<PrimType*>(iterableType.get())
+            && !isPrimKind(*iterableType, ObjectType::ARRAY)
+            && !isPrimKind(*iterableType, ObjectType::STRING)) {
+            warn(currentLine_, "TC302",
+                 "'" + iterableType->toKorean() + "' 타입은 순회할 수 없습니다. 배열 또는 문자만 가능합니다.");
+        }
         checkStatement(forEach->body);
         popScope();
         return;
@@ -147,11 +154,11 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     if (auto* forRange = dynamic_cast<ForRangeStatement*>(stmt.get())) {
         pushScope();
         declare(forRange->varName, typeFromToken(forRange->varType, false));
-        // TC301: 두 런타임 모두 거부하는 경계 타입만 (spec D4 — 실수는 불일치라 면제)
+        // TC301: 정수 외 경계 거부 — 런타임 통일(2026-06-12)로 실수 경계도 양 백엔드 거부
         auto checkBound = [this](const std::shared_ptr<Type>& t) {
             if (isPrimKind(*t, ObjectType::STRING) || isPrimKind(*t, ObjectType::BOOLEAN)
                 || isPrimKind(*t, ObjectType::NULL_OBJ) || isPrimKind(*t, ObjectType::ARRAY)
-                || isPrimKind(*t, ObjectType::HASH_MAP)) {
+                || isPrimKind(*t, ObjectType::HASH_MAP) || isPrimKind(*t, ObjectType::FLOAT)) {
                 warn(currentLine_, "TC301",
                      "반복 범위는 정수여야 합니다. '" + t->toKorean() + "' 타입은 사용할 수 없습니다.");
             }

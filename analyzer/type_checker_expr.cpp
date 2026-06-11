@@ -192,18 +192,19 @@ std::shared_ptr<Type> TypeChecker::inferInfixExpression(InfixExpression& infix) 
     case TokenType::GREATER_THAN:
     case TokenType::LESS_EQUAL:
     case TokenType::GREATER_EQUAL:
-        if (numPair) return makePrim(ObjectType::BOOLEAN);
-        // 문자쌍은 런타임 불일치 (부록 B #3) — 진단 면제
-        if (bothPrim && !strPair) warnBinaryIncompatible(opText, *left, *right);
+        // 문자쌍 사전순 비교는 정식 허용 (런타임 일관성 D3 — 양 백엔드 지원), 결과 논리
+        if (numPair || strPair) return makePrim(ObjectType::BOOLEAN);
+        if (bothPrim) warnBinaryIncompatible(opText, *left, *right);
         return makeAny();
     case TokenType::LOGICAL_AND:
     case TokenType::LOGICAL_OR:
-        // 좌항만 검사 — 우항은 단락 평가로 값 의존 (부록 A.1, B #4)
+        // 런타임 통일(D4)로 평가되는 피연산자는 양쪽 모두 논리 강제 — 좌/우항 검사 (D7)
         if (dynamic_cast<PrimType*>(left.get()) && !isPrimKind(*left, ObjectType::BOOLEAN)) {
             warnBinaryIncompatible(opText, *left, *right);
+        } else if (dynamic_cast<PrimType*>(right.get()) && !isPrimKind(*right, ObjectType::BOOLEAN)) {
+            warnBinaryIncompatible(opText, *left, *right);
         }
-        if (boolPair) return makePrim(ObjectType::BOOLEAN);
-        return makeAny();  // 혼합은 VM이 우항 값을 그대로 반환 (부록 B #4)
+        return makePrim(ObjectType::BOOLEAN);  // 결과는 항상 논리 (D4)
     default:
         return makeAny();
     }

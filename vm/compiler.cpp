@@ -875,10 +875,15 @@ void Compiler::compileForRange(ForRangeStatement* stmt) {
 
     // 시작값을 로컬로 저장 (루프 변수)
     compileExpression(stmt->startExpr.get());
+    // 범위 경계는 정수만 (런타임 일관성 — evaluator "반복 범위의 시작과 끝은 정수이어야 합니다"와 합치)
+    chunk().emitOpAndUint16(OpCode::OP_DECL_CHECK, identifierConstant("정수"),
+                            stmt->varType ? stmt->varType->line : 0);
     uint16_t varSlot = declareLocal(stmt->varName);
 
     // 종료값을 로컬로 저장
     compileExpression(stmt->endExpr.get());
+    chunk().emitOpAndUint16(OpCode::OP_DECL_CHECK, identifierConstant("정수"),
+                            stmt->varType ? stmt->varType->line : 0);
     uint16_t endSlot = declareLocal("__end__");
     (void)endSlot;
 

@@ -786,16 +786,35 @@ TEST(TypeCheckerTest, TC601_LogicalLeftNonBool) {
     expectSingleDiagnostic(checkSource(tc, "출력(1 && true)\n"), "TC601");
 }
 
-TEST(TypeCheckerTest, TC601_LogicalRightUnchecked) {
+TEST(TypeCheckerTest, TC601_LogicalRightNowChecked) {
     TypeChecker tc;
-    // 단락 평가로 우항은 값 의존 (부록 A.1) — 진단 안 함
-    EXPECT_TRUE(checkSource(tc, "출력(true && 1)\n").diagnostics.empty());
+    // 런타임 통일(D4)로 평가되는 우항도 논리 강제 — 면제 해제 (런타임 일관성 D7)
+    expectSingleDiagnostic(checkSource(tc, "출력(true && 1)\n"), "TC601");
 }
 
-TEST(TypeCheckerTest, TC601_StringComparisonExempt) {
+TEST(TypeCheckerTest, StringComparisonAllowedAndBool) {
     TypeChecker tc;
-    // 문자쌍 비교는 런타임 불일치 (부록 B #3) — 진단 면제
-    EXPECT_TRUE(checkSource(tc, "출력(\"a\" < \"b\")\n").diagnostics.empty());
+    // 문자쌍 비교는 정식 허용 (양 런타임 지원) — 결과는 논리로 정밀 추론
+    EXPECT_TRUE(checkSource(tc, "논리 b = \"a\" < \"b\"\n").diagnostics.empty());
+    TypeChecker tc2;
+    expectSingleDiagnostic(checkSource(tc2, "정수 n = \"a\" < \"b\"\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC302_NonIterableForeach) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "각각 정수 n 5 에서:\n"
+        "    출력(n)\n");
+    expectSingleDiagnostic(result, "TC302");
+}
+
+TEST(TypeCheckerTest, TC302_HashMapForeach) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "사전 d = {\"k\": 1}\n"
+        "각각 문자 k d 에서:\n"
+        "    출력(k)\n");
+    expectSingleDiagnostic(result, "TC302");
 }
 
 TEST(TypeCheckerTest, TC601_BoolComparisonRejected) {
@@ -813,13 +832,13 @@ TEST(TypeCheckerTest, TC301_StringBound) {
     expectSingleDiagnostic(result, "TC301");
 }
 
-TEST(TypeCheckerTest, TC301_FloatBoundExempt) {
+TEST(TypeCheckerTest, TC301_FloatBoundNowChecked) {
     TypeChecker tc;
-    // 실수 경계는 런타임 불일치 (부록 B #4) — 진단 면제
+    // 런타임 통일(2026-06-12, range_strict 골든)로 실수 경계도 양 백엔드 거부 — 면제 해제
     auto result = checkSource(tc,
         "반복 정수 i = 0.5 부터 3 까지:\n"
         "    출력(i)\n");
-    EXPECT_TRUE(result.diagnostics.empty());
+    expectSingleDiagnostic(result, "TC301");
 }
 
 TEST(TypeCheckerTest, TC301_IntBoundsOk) {
