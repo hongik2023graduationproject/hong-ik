@@ -146,6 +146,7 @@ else()
             tests/vm_test.cpp
             tests/web_module_test.cpp
             tests/golden_test.cpp
+            tests/type_checker_test.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.
             web/wasm_interface.cpp
