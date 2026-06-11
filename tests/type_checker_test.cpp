@@ -312,6 +312,41 @@ TEST(TypeCheckerTest, HigherOrderSpecialOpsResolved) {
     EXPECT_TRUE(result.diagnostics.empty());
 }
 
+// ---- plan Task 9: TC501 Nullable 미해제 ----
+
+TEST(TypeCheckerTest, TC501_BinaryOnOptional) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수? x = 10\nx + 1\n"), "TC501");
+}
+
+TEST(TypeCheckerTest, TC501_EqualityExempt) {
+    TypeChecker tc;
+    // null 체크 패턴 `x == 없음`은 예외 (spec 3 TC501)
+    auto result = checkSource(tc, "정수? x = 10\n논리 b = x == 없음\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC501_IndexOnOptional) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "배열? a = [1, 2]\na[0]\n"), "TC501");
+}
+
+TEST(TypeCheckerTest, TC501_OptionalToNonNullIsTC001) {
+    TypeChecker tc;
+    // 대입 검사가 먼저 — TC501 아님 (plan Task 9)
+    expectSingleDiagnostic(checkSource(tc, "정수? x = 10\n정수 y = x\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC501_NoNarrowingInPhaseA) {
+    TypeChecker tc;
+    // 좁히기 미구현 (Phase B) — null 검사 분기 안에서도 TC501 발화
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    정수 y = x + 1\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함

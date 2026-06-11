@@ -277,7 +277,7 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return makeNever();  // cascade 진단 차단 (spec 1.1.2)
     }
 
-    // ---- 연산자/접근 (결과 타입은 Task 9에서 정밀화) ----
+    // ---- 연산자/접근 ----
     if (auto* infix = dynamic_cast<InfixExpression*>(expr.get())) {
         auto left = inferExpression(infix->left);
         auto right = inferExpression(infix->right);
@@ -285,6 +285,18 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         if (dynamic_cast<NeverType*>(left.get()) || dynamic_cast<NeverType*>(right.get())) {
             return makeNever();
         }
+        // null 체크 패턴 `x == 없음` / `x != 없음`은 TC501 예외 (spec 3)
+        bool isEquality = infix->token
+            && (infix->token->type == TokenType::EQUAL || infix->token->type == TokenType::NOT_EQUAL);
+        if (isEquality) {
+            return makePrim(ObjectType::BOOLEAN);
+        }
+        if (auto* opt = dynamic_cast<OptionalType*>(left.get())) {
+            warnUnresolvedOptional(*opt);
+        } else if (auto* optRight = dynamic_cast<OptionalType*>(right.get())) {
+            warnUnresolvedOptional(*optRight);
+        }
+        // 이항 연산자의 일반 타입 호환성·결과 타입은 Phase B
         return makeAny();
     }
     if (auto* prefix = dynamic_cast<PrefixExpression*>(expr.get())) {
@@ -306,11 +318,17 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return makeAny();
     }
     if (auto* member = dynamic_cast<MemberAccessExpression*>(expr.get())) {
-        inferExpression(member->object);
+        auto objectType = inferExpression(member->object);
+        if (auto* opt = dynamic_cast<OptionalType*>(objectType.get())) {
+            warnUnresolvedOptional(*opt);  // TC501: 멤버 접근 좌항 (inner로 진행)
+        }
         return makeAny();
     }
     if (auto* index = dynamic_cast<IndexExpression*>(expr.get())) {
-        inferExpression(index->name);
+        auto collectionType = inferExpression(index->name);
+        if (auto* opt = dynamic_cast<OptionalType*>(collectionType.get())) {
+            warnUnresolvedOptional(*opt);  // TC501: 인덱스 접근 좌항
+        }
         inferExpression(index->index);
         return makeAny();
     }
@@ -447,6 +465,12 @@ void TypeChecker::error(long long line, const std::string& code, const std::stri
 
 void TypeChecker::warn(long long line, const std::string& code, const std::string& msg) {
     diagnostics_.push_back(TypeDiagnostic{line, 0, Severity::WARNING, code, msg});
+}
+
+void TypeChecker::warnUnresolvedOptional(const OptionalType& opt) {
+    warn(currentLine_, "TC501",
+         "Optional 타입 '" + opt.toKorean()
+             + "' 값에 대해 직접 연산할 수 없습니다. null 검사 후 사용하세요.");
 }
 
 std::shared_ptr<Type> TypeChecker::typeFromToken(const std::shared_ptr<Token>& tok, bool optional) {

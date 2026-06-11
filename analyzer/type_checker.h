@@ -72,6 +72,7 @@ private:
 
     void error(long long line, const std::string& code, const std::string& msg);
     void warn(long long line, const std::string& code, const std::string& msg);
+    void warnUnresolvedOptional(const OptionalType& opt);  // TC501 공통 발화
 
     // 타입 표기 토큰 → Type. 기본 키워드는 PrimType, IDENTIFIER는 classTypes_ lookup
     // (미등록 클래스 이름은 AnyType — Task 10에서 진단 처리).
