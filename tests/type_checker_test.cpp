@@ -234,6 +234,84 @@ TEST(TypeCheckerTest, IdentifierMatchingTypeOk) {
     EXPECT_TRUE(checkSource(tc, "정수 x = 1\n정수 y = x\n").diagnostics.empty());
 }
 
+// ---- plan Task 8: TC101/TC102/TC103 함수 호출/리턴 (top-down) ----
+
+TEST(TypeCheckerTest, TC102_ArgTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "f(\"x\")\n");
+    expectSingleDiagnostic(result, "TC102");
+}
+
+TEST(TypeCheckerTest, TC101_ArgCountMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "f()\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
+TEST(TypeCheckerTest, TC103_ReturnTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f() -> 정수:\n"
+        "    리턴 \"a\"\n");
+    expectSingleDiagnostic(result, "TC103");
+}
+
+TEST(TypeCheckerTest, FunctionCallOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f() -> 정수:\n"
+        "    리턴 1\n"
+        "정수 x = f()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, RecursionOk) {
+    TypeChecker tc;
+    // 본문 진입 직전 declare → 재귀 호출 가능 (spec 2.3)
+    auto result = checkSource(tc,
+        "함수 사실() -> 정수:\n"
+        "    리턴 사실()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ForwardReferenceIsTC006) {
+    TypeChecker tc;
+    // hoisting 미지원 (spec D3.1) — evaluator도 런타임 실패하는 케이스
+    auto result = checkSource(tc,
+        "정수 x = 나중에()\n"
+        "함수 나중에() -> 정수:\n"
+        "    리턴 1\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, UndeclaredFunctionCallSingleTC006) {
+    TypeChecker tc;
+    // NeverType 차단으로 TC101/TC102 추가 발화 없음
+    expectSingleDiagnostic(checkSource(tc, "없는함수(1)\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, TC101_BuiltinArity) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "길이()\n"), "TC101");
+}
+
+TEST(TypeCheckerTest, HigherOrderSpecialOpsResolved) {
+    TypeChecker tc;
+    // 매핑/걸러내기/줄이기는 빌트인 맵에 없는 특수 연산자 — TC006 미발화
+    auto result = checkSource(tc,
+        "함수 두배(정수 x) -> 정수:\n"
+        "    리턴 x * 2\n"
+        "배열 a = [1, 2, 3]\n"
+        "배열 b = 매핑(a, 두배)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함

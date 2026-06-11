@@ -56,6 +56,7 @@ public:
     std::vector<std::shared_ptr<Type>> params;
     std::shared_ptr<Type> ret;
     std::vector<bool> paramHasDefault;
+    std::vector<std::string> paramNames;  // 진단 메시지용 (spec D8 TC102) — 동등성 비교 불참여
 
     FunctionType(std::vector<std::shared_ptr<Type>> p,
                  std::shared_ptr<Type> r,

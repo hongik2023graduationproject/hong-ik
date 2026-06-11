@@ -57,10 +57,13 @@ private:
     std::map<std::string, std::shared_ptr<ClassType>> classTypes_;   // 누적 보존
     std::vector<TypeDiagnostic> diagnostics_;
     std::shared_ptr<Type> currentReturnType_;
+    std::string currentFunctionName_;  // TC103 진단 메시지용
     long long currentLine_ = 0;  // 토큰 보유 노드 방문 시 갱신 (evaluator current_line 준용)
 
     void checkStatement(const std::shared_ptr<Statement>& stmt);
+    void checkFunctionStatement(FunctionStatement& fn);
     std::shared_ptr<Type> inferExpression(const std::shared_ptr<Expression>& expr);
+    std::shared_ptr<Type> inferCallExpression(CallExpression& call);
 
     void pushScope();
     void popScope();

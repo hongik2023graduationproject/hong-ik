@@ -6,6 +6,7 @@
 #include "../object/builtin_signatures.h"
 
 #include <algorithm>
+#include <climits>
 
 namespace {
 
@@ -179,8 +180,59 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
         return;
     }
 
-    // FunctionStatement/ReturnStatement: Task 8, ClassStatement: Task 10.
+    if (auto* fn = dynamic_cast<FunctionStatement*>(stmt.get())) {
+        checkFunctionStatement(*fn);
+        return;
+    }
+
+    if (auto* ret = dynamic_cast<ReturnStatement*>(stmt.get())) {
+        auto valueType = inferExpression(ret->expression);
+        // 글로벌 스코프의 리턴은 무시 (currentReturnType_ 없음)
+        if (currentReturnType_ && !currentReturnType_->isAssignableFrom(*valueType)) {
+            warn(currentLine_, "TC103",
+                 "함수 '" + currentFunctionName_ + "'의 반환 타입 '" + currentReturnType_->toKorean()
+                     + "'에 '" + valueType->toKorean() + "' 값을 반환할 수 없습니다.");
+        }
+        return;
+    }
+
+    // ClassStatement: Task 10.
     // 그 외 (Import/Break/Continue 등): 검사 대상 없음.
+}
+
+// spec 2.3: top-down 검사. 본문 진입 직전 declare로 재귀만 허용, hoisting 없음.
+void TypeChecker::checkFunctionStatement(FunctionStatement& fn) {
+    std::vector<std::shared_ptr<Type>> params;
+    std::vector<bool> paramHasDefault;
+    std::vector<std::string> paramNames;
+    for (size_t i = 0; i < fn.parameters.size(); i++) {
+        bool optional = i < fn.parameterOptionals.size() && fn.parameterOptionals[i];
+        params.push_back(typeFromToken(i < fn.parameterTypes.size() ? fn.parameterTypes[i] : nullptr,
+                                       optional));
+        paramHasDefault.push_back(i < fn.defaultValues.size() && fn.defaultValues[i] != nullptr);
+        paramNames.push_back(fn.parameters[i] ? fn.parameters[i]->name : "");
+    }
+    auto ret = typeFromToken(fn.returnType, fn.returnTypeOptional);
+    auto funcType = std::make_shared<FunctionType>(params, ret, paramHasDefault);
+    funcType->paramNames = paramNames;
+
+    declare(fn.name, funcType);
+
+    pushScope();
+    for (size_t i = 0; i < paramNames.size(); i++) {
+        declare(paramNames[i], params[i]);
+    }
+    for (const auto& defaultValue : fn.defaultValues) {
+        inferExpression(defaultValue);
+    }
+    auto prevReturnType = currentReturnType_;
+    auto prevFunctionName = currentFunctionName_;
+    currentReturnType_ = ret;
+    currentFunctionName_ = fn.name;
+    checkStatement(fn.body);
+    currentReturnType_ = prevReturnType;
+    currentFunctionName_ = prevFunctionName;
+    popScope();
 }
 
 std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Expression>& expr) {
@@ -244,11 +296,7 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return makeAny();
     }
     if (auto* call = dynamic_cast<CallExpression*>(expr.get())) {
-        // 호출 대상 검사는 Task 8 — 인자 traverse만
-        for (const auto& arg : call->arguments) {
-            inferExpression(arg);
-        }
-        return makeAny();
+        return inferCallExpression(*call);
     }
     if (auto* methodCall = dynamic_cast<MethodCallExpression*>(expr.get())) {
         inferExpression(methodCall->object);
@@ -273,7 +321,91 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return makeAny();
     }
 
-    // IdentifierExpression(Task 7), Lambda/패턴 표현식 등: 분석 불가 처리
+    // Lambda/패턴 표현식 등: 분석 불가 처리
+    return makeAny();
+}
+
+// spec 1.3 + plan Task 8: 호출 검사 (TC101/TC102)
+std::shared_ptr<Type> TypeChecker::inferCallExpression(CallExpression& call) {
+    std::string calleeName = "함수";
+    if (auto* ident = dynamic_cast<IdentifierExpression*>(call.function.get())) {
+        calleeName = ident->name;
+    }
+    auto calleeType = inferExpression(call.function);
+
+    std::vector<std::shared_ptr<Type>> argTypes;
+    argTypes.reserve(call.arguments.size());
+    for (const auto& arg : call.arguments) {
+        argTypes.push_back(inferExpression(arg));
+    }
+    const auto argCount = static_cast<long long>(argTypes.size());
+
+    // 미선언(TC006 기발화) → 추가 진단 없이 차단
+    if (dynamic_cast<NeverType*>(calleeType.get())) {
+        return makeNever();
+    }
+    if (dynamic_cast<AnyType*>(calleeType.get())) {
+        return makeAny();
+    }
+
+    if (auto* builtin = dynamic_cast<BuiltinFunctionType*>(calleeType.get())) {
+        if (argCount < builtin->minArity || argCount > builtin->maxArity) {
+            std::string expected = builtin->minArity == builtin->maxArity
+                                       ? std::to_string(builtin->minArity) + "개의"
+                                       : (builtin->maxArity == INT_MAX
+                                              ? "최소 " + std::to_string(builtin->minArity) + "개의"
+                                              : std::to_string(builtin->minArity) + "~"
+                                                    + std::to_string(builtin->maxArity) + "개의");
+            warn(currentLine_, "TC101",
+                 "함수 '" + builtin->name + "'는 " + expected + " 매개변수를 받지만 "
+                     + std::to_string(argCount) + "개가 전달되었습니다.");
+        }
+        // Phase A: 전 빌트인 skipArgTypeCheck=true (spec D2.1) — 인자 타입 검사 생략
+        return builtin->ret;
+    }
+
+    if (auto* func = dynamic_cast<FunctionType*>(calleeType.get())) {
+        long long required = 0;
+        for (size_t i = 0; i < func->params.size(); i++) {
+            if (i >= func->paramHasDefault.size() || !func->paramHasDefault[i]) {
+                required++;
+            }
+        }
+        const auto maxParams = static_cast<long long>(func->params.size());
+        if (argCount < required || argCount > maxParams) {
+            std::string expected = required == maxParams
+                                       ? std::to_string(maxParams) + "개의"
+                                       : std::to_string(required) + "~" + std::to_string(maxParams)
+                                             + "개의";
+            warn(currentLine_, "TC101",
+                 "함수 '" + calleeName + "'는 " + expected + " 매개변수를 받지만 "
+                     + std::to_string(argCount) + "개가 전달되었습니다.");
+        } else {
+            for (long long i = 0; i < argCount; i++) {
+                if (!func->params[i]->isAssignableFrom(*argTypes[i])) {
+                    std::string paramName = i < static_cast<long long>(func->paramNames.size())
+                                                ? func->paramNames[i]
+                                                : std::to_string(i + 1) + "번째";
+                    warn(currentLine_, "TC102",
+                         "함수 '" + calleeName + "'의 매개변수 '" + paramName + "'는 '"
+                             + func->params[i]->toKorean() + "' 타입이지만 '"
+                             + argTypes[i]->toKorean() + "' 값이 전달되었습니다.");
+                }
+            }
+        }
+        return func->ret;
+    }
+
+    if (auto* cls = dynamic_cast<ClassType*>(calleeType.get())) {
+        // 생성자 호출: 인자 개수만 검사, 결과는 AnyType (spec D6 — Phase B에서 정밀화)
+        if (argCount != cls->constructorArity) {
+            warn(currentLine_, "TC101",
+                 "함수 '" + cls->name + "'는 " + std::to_string(cls->constructorArity)
+                     + "개의 매개변수를 받지만 " + std::to_string(argCount) + "개가 전달되었습니다.");
+        }
+        return makeAny();
+    }
+
     return makeAny();
 }
 
@@ -347,4 +479,9 @@ void TypeChecker::registerBuiltins() {
         globalTypes_[sig.name] =
             makeBuiltin(sig.name, sig.minArity, sig.maxArity, sig.skipArgTypeCheck, std::move(ret));
     }
+    // 고차 함수 특수 연산자 — BuiltinRegistry 밖에서 evaluator/VM이 직접 처리하지만
+    // CallExpression의 식별자로 파싱되므로 TC006 오탐 방지를 위해 등록 (evaluator.cpp 실측 arity).
+    globalTypes_["매핑"] = makeBuiltin("매핑", 2, 2, true, makePrim(ObjectType::ARRAY));
+    globalTypes_["걸러내기"] = makeBuiltin("걸러내기", 2, 2, true, makePrim(ObjectType::ARRAY));
+    globalTypes_["줄이기"] = makeBuiltin("줄이기", 3, 3, true, makeAny());
 }
