@@ -912,6 +912,11 @@ shared_ptr<Object> Evaluator::evalStringInfixExpression(Token* token, shared_ptr
     if (token->type == TokenType::PLUS) return make_shared<String>(ls->value + rs->value);
     if (token->type == TokenType::EQUAL) return make_shared<Boolean>(ls->value == rs->value);
     if (token->type == TokenType::NOT_EQUAL) return make_shared<Boolean>(ls->value != rs->value);
+    // 문자열 사전순 비교 (런타임 일관성 D3 — VM binaryOp와 동일: std::string byte-wise)
+    if (token->type == TokenType::LESS_THAN) return make_shared<Boolean>(ls->value < rs->value);
+    if (token->type == TokenType::GREATER_THAN) return make_shared<Boolean>(ls->value > rs->value);
+    if (token->type == TokenType::LESS_EQUAL) return make_shared<Boolean>(ls->value <= rs->value);
+    if (token->type == TokenType::GREATER_EQUAL) return make_shared<Boolean>(ls->value >= rs->value);
 
     throw RuntimeException("문자열 연산을 지원하지 않는 연산자입니다.", token->line);
 }

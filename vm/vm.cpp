@@ -177,15 +177,17 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
         }
     }
 
-    // Float path (one or both are float, or int+float mix)
+    // Float path — 양쪽 모두 숫자일 때만 (런타임 일관성 D3).
+    // 이전에는 한쪽만 float여도 진입해 비숫자 피연산자를 0으로 취급했다 (1.5 + "a" → 1.5).
+    const bool leftNumeric = left.isFloat() || left.isInt();
+    const bool rightNumeric = right.isFloat() || right.isInt();
     double lv = 0, rv = 0;
-    bool isFloat = false;
-    if (left.isFloat()) { lv = left.asFloat(); isFloat = true; }
+    if (left.isFloat()) { lv = left.asFloat(); }
     else if (left.isInt()) { lv = static_cast<double>(left.asInt()); }
-    if (right.isFloat()) { rv = right.asFloat(); isFloat = true; }
+    if (right.isFloat()) { rv = right.asFloat(); }
     else if (right.isInt()) { rv = static_cast<double>(right.asInt()); }
 
-    if (isFloat) {
+    if (leftNumeric && rightNumeric) {
         switch (op) {
         case OpCode::OP_ADD: return VMValue::Float(lv + rv);
         case OpCode::OP_SUB: return VMValue::Float(lv - rv);

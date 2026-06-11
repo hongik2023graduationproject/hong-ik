@@ -72,6 +72,8 @@ INSTANTIATE_TEST_SUITE_P(
         // 런타임 일관성 (2026-06-12 spec) — 시맨틱 통일 패리티
         GoldenCase{"decl_check"},
         GoldenCase{"subtype_assign"},
+        GoldenCase{"binary_strict"},
+        GoldenCase{"string_compare"},
         GoldenCase{"try_catch"},
         GoldenCase{"ops_misc"}
     ),
