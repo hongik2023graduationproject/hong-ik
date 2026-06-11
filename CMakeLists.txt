@@ -59,6 +59,8 @@ set(HONGIK_CORE_SOURCES
         object/builtins/conversion.cpp
         object/builtins/json.cpp
         vm/compiler.cpp
+        vm/compiler_stmt.cpp
+        vm/compiler_expr.cpp
         vm/vm.cpp
         vm/vm_handlers.cpp
         io/io_interface.cpp
