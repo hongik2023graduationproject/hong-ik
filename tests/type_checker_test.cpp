@@ -211,6 +211,29 @@ TEST(TypeCheckerTest, Z2_IndexAssignmentNoCheck) {
     EXPECT_TRUE(result.diagnostics.empty());
 }
 
+// ---- plan Task 7: TC006 미선언 식별자 + 식별자 추론 ----
+
+TEST(TypeCheckerTest, TC006_UndeclaredIdentifier) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = foo\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, TC006_UndeclaredInBinaryNoCascade) {
+    TypeChecker tc;
+    // NeverType 전파로 이항 연산·대입에서 추가 진단 없음 (spec 1.1.2)
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 미선언 + 1\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, IdentifierInfersDeclaredType) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1\n문자 s = x\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, IdentifierMatchingTypeOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\n정수 y = x\n").diagnostics.empty());
+}
+
 TEST(TypeCheckerTest, ScopePopAfterForEach) {
     TypeChecker tc;
     // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함

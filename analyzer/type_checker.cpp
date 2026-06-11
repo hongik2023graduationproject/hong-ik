@@ -216,10 +216,23 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
         return makePrim(ObjectType::TUPLE);
     }
 
+    // ---- 식별자 (TC006) ----
+    if (auto* ident = dynamic_cast<IdentifierExpression*>(expr.get())) {
+        if (auto found = lookup(ident->name)) {
+            return found;
+        }
+        warn(currentLine_, "TC006", "식별자 '" + ident->name + "'를 찾을 수 없습니다.");
+        return makeNever();  // cascade 진단 차단 (spec 1.1.2)
+    }
+
     // ---- 연산자/접근 (결과 타입은 Task 9에서 정밀화) ----
     if (auto* infix = dynamic_cast<InfixExpression*>(expr.get())) {
-        inferExpression(infix->left);
-        inferExpression(infix->right);
+        auto left = inferExpression(infix->left);
+        auto right = inferExpression(infix->right);
+        // 한쪽이 NeverType이면 결과도 NeverType (spec 1.1.2)
+        if (dynamic_cast<NeverType*>(left.get()) || dynamic_cast<NeverType*>(right.get())) {
+            return makeNever();
+        }
         return makeAny();
     }
     if (auto* prefix = dynamic_cast<PrefixExpression*>(expr.get())) {
