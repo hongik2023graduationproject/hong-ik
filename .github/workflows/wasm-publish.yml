@@ -97,7 +97,7 @@ jobs:
       # (delete-then-create가 아니므로 다운로드 URL 404 race condition이 없다).
       - name: Rolling release 갱신 (wasm-latest)
         if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: wasm-latest
           name: "WASM rolling build (latest main)"
@@ -120,7 +120,7 @@ jobs:
       # 안정 참조용 — commit SHA로 별도 release. 소비자가 특정 빌드에 고정하고 싶을 때.
       - name: SHA-pinned release 생성
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: wasm-${{ github.sha }}
           name: "WASM ${{ github.sha }}"
