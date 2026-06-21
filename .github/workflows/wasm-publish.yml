@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Emscripten SDK 설정
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: 3.1.61
           actions-cache-folder: emsdk-cache
