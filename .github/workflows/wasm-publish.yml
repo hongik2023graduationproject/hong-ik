@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 코드 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Emscripten SDK 설정
         uses: mymindstorm/setup-emsdk@v14
