@@ -147,6 +147,7 @@ else()
             tests/lexer_test.cpp
             tests/utf8_converter_test.cpp
             tests/parser_test.cpp
+            tests/parser_diagnostics_test.cpp
             tests/evaluator_test.cpp
             tests/repl_test.cpp
             tests/vm_test.cpp

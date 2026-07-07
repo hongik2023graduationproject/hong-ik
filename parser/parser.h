@@ -5,14 +5,24 @@
 #include "../token/token.h"
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
+
+struct ParseDiagnostic {
+    long long line = 0;
+    long long column = 0;     // 0-based 코드포인트
+    long long endColumn = 0;
+    std::string message;
+};
 
 class Parser {
 public:
     std::shared_ptr<Program> Parsing(const std::vector<std::shared_ptr<Token>>& tokens);
     const std::vector<std::string>& getErrors() const { return errors; }
+    const std::vector<ParseDiagnostic>& getDiagnostics() const { return diagnostics; }
 
 private:
+    std::vector<ParseDiagnostic> diagnostics;
     std::vector<std::shared_ptr<Token>> tokens;
 
     std::shared_ptr<Program> program;

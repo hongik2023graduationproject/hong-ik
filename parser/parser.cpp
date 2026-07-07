@@ -23,8 +23,13 @@ shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& t
             if (statement != nullptr) {
                 program->statements.push_back(statement);
             }
+        } catch (const ParseError& e) {
+            errors.push_back(e.what());
+            diagnostics.push_back({e.line, e.column, e.endColumn, e.what()});
+            skipToNextLine();
         } catch (const std::exception& e) {
             errors.push_back(e.what());
+            diagnostics.push_back({current_token ? current_token->line : 0, 0, 0, e.what()});
             skipToNextLine();
         }
     }
@@ -37,6 +42,7 @@ void Parser::initialization() {
     program               = make_shared<Program>();
     current_read_position = 0;
     errors.clear();
+    diagnostics.clear();
     setToken();
 }
 
@@ -66,20 +72,20 @@ void Parser::setNextToken() {
 
 void Parser::skipToken(const TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
     setNextToken();
 }
 
 void Parser::checkToken(TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
 }
 
@@ -684,7 +690,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
 
 shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
-        throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
+        throw UnknownPrefixParseFunctionException(current_token->type, *current_token);
     }
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
@@ -695,7 +701,7 @@ shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
         Precedence nextPrec = (precIt != getPrecedence.end()) ? precIt->second : Precedence::LOWEST;
         if (precedence >= nextPrec) break;
         if (!infixParseFunctions.contains(next_token->type)) {
-            throw UnknownInfixParseFunctionException(next_token->type, next_token->line);
+            throw UnknownInfixParseFunctionException(next_token->type, *next_token);
         }
         InfixParseFunction infixParseFunction = infixParseFunctions[next_token->type];
         setNextToken();
