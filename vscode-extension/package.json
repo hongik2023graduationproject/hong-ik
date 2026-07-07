@@ -2,7 +2,7 @@
     "name": "hongik-language",
     "displayName": "Hong-Ik Language",
     "description": "Syntax highlighting and code snippets for the Hong-Ik Korean programming language (.hik files)",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "publisher": "hong-ik",
     "engines": {
         "vscode": "^1.75.0"
@@ -10,6 +10,10 @@
     "categories": [
         "Programming Languages",
         "Snippets"
+    ],
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:hongik"
     ],
     "contributes": {
         "languages": [
@@ -42,6 +46,28 @@
                 "language": "hongik",
                 "path": "./snippets/hongik.json"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "Hong-Ik",
+            "properties": {
+                "hongik.lsp.path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "hongik-lsp 실행 파일 경로. 비어 있으면 PATH에서 'hongik-lsp'를 찾습니다."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "compile": "tsc -p .",
+        "watch": "tsc -w -p ."
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "@types/vscode": "^1.75.0",
+        "typescript": "^5.4.0"
     }
 }

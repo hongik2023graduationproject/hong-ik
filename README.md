@@ -246,6 +246,24 @@ x == 없음    // true
 
 VM은 소스코드를 바이트코드로 컴파일한 후 스택 기반 가상 머신에서 실행합니다. 기본 연산, 변수, 함수, 클래스, 예외 처리 등 대부분의 기능을 지원합니다.
 
+## 에디터 지원 (LSP)
+
+`hongik-lsp`는 표준 입출력(stdio) 기반 JSON-RPC로 통신하는 Language Server입니다. 진단(문법/타입 에러), 호버, 자동완성, 정의로 이동, 문서 심볼(아웃라인)을 지원합니다.
+
+### 빌드
+```bash
+cmake --build cmake-build-debug --target hongik-lsp
+```
+
+### VSCode 확장
+```bash
+cd vscode-extension
+npm install
+npm run compile
+```
+
+VSCode에서 `hongik.lsp.path` 설정에 빌드된 `hongik-lsp(.exe)`의 절대 경로를 지정하면 확장이 서버를 실행합니다. 비어 있으면 PATH에서 `hongik-lsp`를 찾습니다. 자세한 검증 절차는 [`vscode-extension/DEVELOPMENT.md`](./vscode-extension/DEVELOPMENT.md)를 참고하세요.
+
 ## 아키텍처
 
 ```
