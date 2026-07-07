@@ -126,6 +126,21 @@ else()
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
+    # ---- LSP 서버 (native 전용) ----
+    FetchContent_Declare(
+            nlohmann_json
+            URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+
+    set(HONGIK_LSP_SOURCES
+            lsp/position.cpp
+    )
+    add_library(HongIkLspLib STATIC ${HONGIK_LSP_SOURCES})
+    target_include_directories(HongIkLspLib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(HongIkLspLib PUBLIC HongIkLib nlohmann_json::nlohmann_json)
+    hongik_apply_sanitizers(HongIkLspLib)
+
     # For visual studio
     add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
@@ -154,6 +169,7 @@ else()
             tests/web_module_test.cpp
             tests/golden_test.cpp
             tests/type_checker_test.cpp
+            tests/lsp_position_test.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.
             web/wasm_interface.cpp
@@ -171,6 +187,7 @@ else()
     target_link_libraries(
             HongIkTests
             HongIkLib
+            HongIkLspLib
             GTest::gtest_main
     )
     hongik_apply_sanitizers(HongIkTests)
