@@ -1,6 +1,12 @@
 # hong-ik LSP 서버 v1 설계
 
-Revision: v1 (2026-07-07)
+Revision: v1.1 (2026-07-07) — plan 작성 중 실측으로 Phase 0 단순화 (아래 개정 노트)
+
+> **v1.1 개정 노트 (실측 기반):**
+> - **column 단위 확정**: `Utf8Converter::Convert`가 소스를 코드포인트 단위 `vector<string>`으로 분해하고 lexer가 그 인덱스로 column을 계산 — 내부 column은 **0-based 코드포인트** (`tests/web_module_test.cpp` LexerColumnTest로 확인). LSP UTF-16 변환은 BMP 밖 문자(이모지)만 2유닛 — `lsp/position` 변환 유틸로 처리.
+> - **P0-2 축소**: hover/definition의 position→대상 해석은 토큰 스트림 lookup(토큰이 이미 line/column/endColumn 보유)으로 수행. AST 전면 토큰 보관은 불필요 — **선언 노드 5종 + IdentifierExpression에 이름 토큰만 추가** ("가장 침습적" 리스크 대부분 소멸).
+> - **P0-3 대체**: hong-ik은 선언 타입 명시 언어 — 심볼의 타입 문자열은 문법에서 직접 획득 가능. TypeChecker 확장 대신 **독립 `SymbolCollector`(AST 순회)** 신설. TypeChecker는 진단 용도로만 사용하되 **분석마다 새 인스턴스** 생성 (REPL용 글로벌 누적이 편집 간 오염을 만들기 때문).
+> - **v1 한계 명시**: ① completion은 스코프 필터링 없이 문서 전체 심볼 + 키워드 + 빌트인 (스코프 정밀화는 v2), ② definition은 "같은 이름 중 요청 줄 이전의 가장 가까운 선언" 휴리스틱, ③ 렉서 예외(알 수 없는 문자 등)는 파일 전체 분석 중단 → 단일 진단으로 보고 (렉서 에러 복구는 v2).
 
 **Goal:** VSCode에서 `.hik` 파일을 열면 실시간 진단·호버·자동완성·정의로 이동·문서 심볼이 동작하는 LSP 서버를 제공한다. "완성도 쇼케이스" 트랙의 첫 프로젝트 — 기존 lexer/parser/analyzer 자산을 IDE 경험으로 승격시킨다.
 
