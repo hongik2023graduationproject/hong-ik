@@ -136,6 +136,7 @@ else()
     set(HONGIK_LSP_SOURCES
             lsp/position.cpp
             lsp/jsonrpc.cpp
+            lsp/document_store.cpp
             analyzer/symbol_collector.cpp
     )
     add_library(HongIkLspLib STATIC ${HONGIK_LSP_SOURCES})
@@ -173,6 +174,7 @@ else()
             tests/type_checker_test.cpp
             tests/lsp_position_test.cpp
             tests/lsp_jsonrpc_test.cpp
+            tests/lsp_document_store_test.cpp
             tests/symbol_collector_test.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.
