@@ -150,6 +150,10 @@ else()
     target_link_libraries(HongIkLspLib PUBLIC HongIkLib nlohmann_json::nlohmann_json)
     hongik_apply_sanitizers(HongIkLspLib)
 
+    add_executable(hongik-lsp lsp/main.cpp)
+    target_link_libraries(hongik-lsp HongIkLspLib)
+    hongik_apply_sanitizers(hongik-lsp)
+
     # For visual studio
     add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
