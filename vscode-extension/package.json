@@ -5,7 +5,7 @@
     "version": "0.3.0",
     "publisher": "hong-ik",
     "engines": {
-        "vscode": "^1.75.0"
+        "vscode": "^1.82.0"
     },
     "categories": [
         "Programming Languages",
@@ -67,7 +67,7 @@
     },
     "devDependencies": {
         "@types/node": "^20.11.0",
-        "@types/vscode": "^1.75.0",
+        "@types/vscode": "^1.82.0",
         "typescript": "^5.4.0"
     }
 }
