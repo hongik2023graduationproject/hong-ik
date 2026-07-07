@@ -189,3 +189,26 @@ TEST_F(LspServerTest, DocumentSymbolBuildsClassTree) {
     // children: x(Field 8), 값얻기(Method 6) — 생성자 파라미터 제외
     ASSERT_EQ(cls["children"].size(), 2u);
 }
+
+TEST_F(LspServerTest, DocumentSymbolDoesNotMixSameNamedClasses) {
+    d.handle(didOpen("file:///dup.hik",
+                     "클래스 점:\n"
+                     "    정수 x\n"
+                     "클래스 점:\n"
+                     "    정수 y\n"),
+             out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 8}, {"method", "textDocument/documentSymbol"},
+                  {"params", {{"textDocument", {{"uri", "file:///dup.hik"}}}}}},
+             out);
+    auto msgs = drain(out);
+    const auto& syms = msgs[0]["result"];
+    ASSERT_TRUE(syms.is_array());
+    ASSERT_EQ(syms.size(), 2u); // 톱레벨 클래스 2개, 둘 다 이름 "점"
+    EXPECT_EQ(syms[0]["name"], "점");
+    EXPECT_EQ(syms[1]["name"], "점");
+    ASSERT_EQ(syms[0]["children"].size(), 1u);
+    EXPECT_EQ(syms[0]["children"][0]["name"], "x"); // 첫 번째 클래스는 자신의 필드만
+    ASSERT_EQ(syms[1]["children"].size(), 1u);
+    EXPECT_EQ(syms[1]["children"][0]["name"], "y"); // 두 번째 클래스는 자신의 필드만
+}
