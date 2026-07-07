@@ -41,6 +41,7 @@ public:
 class IdentifierExpression : public Expression {
 public:
     std::string name;
+    std::shared_ptr<Token> token;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
 
     std::string String() override {
         return name;

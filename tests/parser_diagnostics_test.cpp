@@ -34,3 +34,46 @@ TEST(ParserDiagnosticsTest, DiagnosticsClearedBetweenParses) {
     parseWith(parser, "정수 x = 1\n");
     EXPECT_TRUE(parser.getDiagnostics().empty());
 }
+
+TEST(DeclNameTokenTest, FunctionAndVariableCarryNameTokens) {
+    Parser parser;
+    auto program = parseWith(parser,
+                             "정수 개수 = 3\n"
+                             "함수 더하기(정수 a, 정수 b) -> 정수:\n"
+                             "    리턴 a + b\n"
+                             "\n");
+    ASSERT_TRUE(parser.getErrors().empty());
+    ASSERT_EQ(program->statements.size(), 2u);
+
+    auto init = std::dynamic_pointer_cast<InitializationStatement>(program->statements[0]);
+    ASSERT_NE(init, nullptr);
+    ASSERT_NE(init->nameToken, nullptr);
+    EXPECT_EQ(init->nameToken->text, "개수");
+    EXPECT_EQ(init->nameToken->line, 1);
+    EXPECT_EQ(init->nameToken->column, 3);  // 정(0)수(1)␣(2)개(3)수(4)
+
+    auto fn = std::dynamic_pointer_cast<FunctionStatement>(program->statements[1]);
+    ASSERT_NE(fn, nullptr);
+    ASSERT_NE(fn->nameToken, nullptr);
+    EXPECT_EQ(fn->nameToken->text, "더하기");
+    ASSERT_EQ(fn->parameters.size(), 2u);
+    ASSERT_NE(fn->parameters[0]->token, nullptr);
+    EXPECT_EQ(fn->parameters[0]->token->text, "a");
+}
+
+TEST(DeclNameTokenTest, ClassCarriesNameAndFieldTokens) {
+    Parser parser;
+    auto program = parseWith(parser,
+                             "클래스 점:\n"
+                             "    정수 x\n"
+                             "    생성(정수 값):\n"
+                             "        자기.x = 값\n"
+                             "\n");
+    ASSERT_TRUE(parser.getErrors().empty());
+    auto cls = std::dynamic_pointer_cast<ClassStatement>(program->statements[0]);
+    ASSERT_NE(cls, nullptr);
+    ASSERT_NE(cls->nameToken, nullptr);
+    EXPECT_EQ(cls->nameToken->text, "점");
+    ASSERT_EQ(cls->fieldNameTokens.size(), 1u);
+    EXPECT_EQ(cls->fieldNameTokens[0]->text, "x");
+}

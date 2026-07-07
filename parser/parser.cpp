@@ -260,6 +260,7 @@ shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
     skipToken(TokenType::ASSIGN);
     statement->value = parseExpression(Precedence::LOWEST);
@@ -292,6 +293,7 @@ shared_ptr<IndexAssignmentStatement> Parser::parseIndexAssignmentStatement() {
     auto ident = make_shared<IdentifierExpression>();
     ident->line = stmt->line;
     ident->name = current_token->text;
+    ident->token = current_token;
     stmt->collection = ident;
     skipToken(TokenType::IDENTIFIER);
 
@@ -415,6 +417,7 @@ shared_ptr<ForEachStatement> Parser::parseForEachStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->elementName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 반복 대상 표현식
@@ -463,6 +466,7 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::LPAREN);
@@ -487,6 +491,7 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
             auto ident = make_shared<IdentifierExpression>();
             ident->line = current_token->line;
             ident->name = current_token->text;
+            ident->token = current_token;
             statement->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
 
@@ -619,6 +624,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 상속: 클래스 자식 < 부모:
@@ -647,6 +653,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
             statement->fieldTypes.push_back(current_token);
             setNextToken();
             statement->fieldNames.push_back(current_token->text);
+            statement->fieldNameTokens.push_back(current_token);
             skipToken(TokenType::IDENTIFIER);
             skipToken(TokenType::NEW_LINE);
             continue;
@@ -664,6 +671,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
                     auto ident = make_shared<IdentifierExpression>();
                     ident->line = current_token->line;
                     ident->name = current_token->text;
+                    ident->token = current_token;
                     statement->constructorParams.push_back(ident);
                     skipToken(TokenType::IDENTIFIER);
                 } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -771,6 +779,7 @@ shared_ptr<Expression> Parser::parseIdentifierExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token->line;
     identifier_expression->name = current_token->text;
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -778,6 +787,7 @@ shared_ptr<Expression> Parser::parseSelfExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "자기";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -785,6 +795,7 @@ shared_ptr<Expression> Parser::parseParentExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "부모";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -989,6 +1000,7 @@ shared_ptr<Expression> Parser::parseLambdaExpression() {
             checkToken(TokenType::IDENTIFIER);
             auto ident = make_shared<IdentifierExpression>();
             ident->name = current_token->text;
+            ident->token = current_token;
             lambda->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
         } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -1019,6 +1031,7 @@ shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->varName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::ASSIGN);

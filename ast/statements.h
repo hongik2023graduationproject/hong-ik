@@ -20,6 +20,7 @@ class InitializationStatement : public Statement {
 public:
     std::shared_ptr<Token> type;
     std::string name;
+    std::shared_ptr<Token> nameToken;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
     std::shared_ptr<Expression> value;
     bool isOptional = false;
 
@@ -131,6 +132,7 @@ class ForEachStatement : public Statement {
 public:
     std::shared_ptr<Token> elementType;
     std::string elementName;
+    std::shared_ptr<Token> nameToken;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
     std::shared_ptr<Expression> iterable;
     std::shared_ptr<BlockStatement> body;
 
@@ -161,6 +163,7 @@ public:
     std::vector<std::shared_ptr<Expression>> defaultValues;
     std::vector<bool> parameterOptionals;
     std::string name;
+    std::shared_ptr<Token> nameToken;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
     std::shared_ptr<BlockStatement> body;
     std::shared_ptr<Token> returnType;
     bool returnTypeOptional = false;
@@ -213,6 +216,7 @@ class ForRangeStatement : public Statement {
 public:
     std::shared_ptr<Token> varType;
     std::string varName;
+    std::shared_ptr<Token> nameToken;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
     std::shared_ptr<Expression> startExpr;
     std::shared_ptr<Expression> endExpr;
     std::shared_ptr<BlockStatement> body;
@@ -228,9 +232,11 @@ public:
 class ClassStatement : public Statement {
 public:
     std::string name;
+    std::shared_ptr<Token> nameToken;  // 이름 토큰 (LSP 위치용, 없으면 nullptr)
     std::string parentName;
     std::vector<std::shared_ptr<Token>> fieldTypes;
     std::vector<std::string> fieldNames;
+    std::vector<std::shared_ptr<Token>> fieldNameTokens;  // fieldNames와 1:1
     std::vector<std::shared_ptr<Token>> constructorParamTypes;
     std::vector<std::shared_ptr<IdentifierExpression>> constructorParams;
     std::shared_ptr<BlockStatement> constructorBody;
