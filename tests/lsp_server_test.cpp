@@ -85,3 +85,41 @@ TEST_F(LspServerTest, ShutdownThenExitSetsShouldExit) {
     d.handle(json{{"jsonrpc", "2.0"}, {"method", "exit"}}, out);
     EXPECT_TRUE(server.shouldExit());
 }
+
+TEST_F(LspServerTest, HoverOnVariableShowsDeclaredType) {
+    d.handle(didOpen("file:///h.hik", "정수 개수 = 3\n출력(개수)\n"), out);
+    drain(out);
+    // 2행 "출력(개수)" — 개수: 출(0)력(1)((2)개(3)수(4) → cp 3
+    d.handle(
+        json{{"jsonrpc", "2.0"}, {"id", 2}, {"method", "textDocument/hover"},
+            {"params", {{"textDocument", {{"uri", "file:///h.hik"}}}, {"position", {{"line", 1}, {"character", 3}}}}}},
+        out);
+    auto msgs = drain(out);
+    ASSERT_EQ(msgs.size(), 1u);
+    const std::string value = msgs[0]["result"]["contents"]["value"];
+    EXPECT_NE(value.find("정수 개수"), std::string::npos);
+}
+
+TEST_F(LspServerTest, HoverOnBuiltinShowsArity) {
+    d.handle(didOpen("file:///h2.hik", "출력(1)\n"), out);
+    drain(out);
+    d.handle(
+        json{{"jsonrpc", "2.0"}, {"id", 3}, {"method", "textDocument/hover"},
+            {"params", {{"textDocument", {{"uri", "file:///h2.hik"}}}, {"position", {{"line", 0}, {"character", 0}}}}}},
+        out);
+    auto msgs               = drain(out);
+    const std::string value = msgs[0]["result"]["contents"]["value"];
+    EXPECT_NE(value.find("내장 함수"), std::string::npos);
+    EXPECT_NE(value.find("출력"), std::string::npos);
+}
+
+TEST_F(LspServerTest, HoverOnNothingReturnsNull) {
+    d.handle(didOpen("file:///h3.hik", "정수 x = 1\n"), out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 4}, {"method", "textDocument/hover"},
+                 {"params", {{"textDocument", {{"uri", "file:///h3.hik"}}},
+                                {"position", {{"line", 0}, {"character", 7}}}}}}, // '=' 위
+        out);
+    auto msgs = drain(out);
+    EXPECT_TRUE(msgs[0]["result"].is_null());
+}
