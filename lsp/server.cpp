@@ -1,5 +1,6 @@
 #include "server.h"
 
+#include "features/completion.h"
 #include "features/diagnostics.h"
 #include "features/hover.h"
 
@@ -14,6 +15,7 @@ namespace lsp {
         d.onNotification("textDocument/didChange", [this](const nlohmann::json& p) { onDidChange(p); });
         d.onNotification("textDocument/didClose", [this](const nlohmann::json& p) { onDidClose(p); });
         d.onRequest("textDocument/hover", [this](const nlohmann::json& p) { return onHover(p); });
+        d.onRequest("textDocument/completion", [this](const nlohmann::json& p) { return onCompletion(p); });
     }
 
     nlohmann::json Server::onInitialize(const nlohmann::json&) {
@@ -68,6 +70,12 @@ namespace lsp {
         }
         const auto& pos = params.at("position");
         return features::hover(*doc, pos.at("line"), pos.at("character"));
+    }
+
+    nlohmann::json Server::onCompletion(const nlohmann::json& params) {
+        const auto* doc = docFor(params);
+        if (!doc) return nlohmann::json::array();
+        return features::completion(*doc);
     }
 
 } // namespace lsp

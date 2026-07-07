@@ -6,8 +6,8 @@
 
 using namespace std;
 
-Lexer::Lexer() {
-    keywords = {
+const std::unordered_map<std::string, TokenType>& Lexer::Keywords() {
+    static const std::unordered_map<std::string, TokenType> kKeywords = {
         {"정수", TokenType::정수},
         {"실수", TokenType::실수},
         {"문자", TokenType::문자},
@@ -42,6 +42,11 @@ Lexer::Lexer() {
         {"true", TokenType::TRUE},
         {"false", TokenType::FALSE},
     };
+    return kKeywords;
+}
+
+Lexer::Lexer() {
+    keywords = Keywords();
     singleCharacterTokens = {
         {"+", TokenType::PLUS},
         {"*", TokenType::ASTERISK},

@@ -123,3 +123,24 @@ TEST_F(LspServerTest, HoverOnNothingReturnsNull) {
     auto msgs = drain(out);
     EXPECT_TRUE(msgs[0]["result"].is_null());
 }
+
+TEST_F(LspServerTest, CompletionListsKeywordsBuiltinsAndSymbols) {
+    d.handle(didOpen("file:///c.hik", "정수 내변수 = 1\n"), out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 5}, {"method", "textDocument/completion"},
+                  {"params", {{"textDocument", {{"uri", "file:///c.hik"}}},
+                              {"position", {{"line", 0}, {"character", 0}}}}}},
+             out);
+    auto msgs = drain(out);
+    ASSERT_EQ(msgs.size(), 1u);
+    const auto& items = msgs[0]["result"];
+    ASSERT_TRUE(items.is_array());
+    auto has = [&](const std::string& label, int kind) {
+        for (const auto& item : items)
+            if (item["label"] == label && item["kind"] == kind) return true;
+        return false;
+    };
+    EXPECT_TRUE(has("만약", 14));    // Keyword
+    EXPECT_TRUE(has("출력", 3));     // 내장 Function
+    EXPECT_TRUE(has("내변수", 6));   // Variable
+}
