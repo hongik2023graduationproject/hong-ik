@@ -141,6 +141,8 @@ else()
             lsp/features/diagnostics.cpp
             lsp/features/hover.cpp
             lsp/features/completion.cpp
+            lsp/features/definition.cpp
+            lsp/features/symbols.cpp
             analyzer/symbol_collector.cpp
     )
     add_library(HongIkLspLib STATIC ${HONGIK_LSP_SOURCES})

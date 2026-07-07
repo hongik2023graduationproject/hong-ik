@@ -1,8 +1,10 @@
 #include "server.h"
 
 #include "features/completion.h"
+#include "features/definition.h"
 #include "features/diagnostics.h"
 #include "features/hover.h"
+#include "features/symbols.h"
 
 namespace lsp {
 
@@ -16,6 +18,8 @@ namespace lsp {
         d.onNotification("textDocument/didClose", [this](const nlohmann::json& p) { onDidClose(p); });
         d.onRequest("textDocument/hover", [this](const nlohmann::json& p) { return onHover(p); });
         d.onRequest("textDocument/completion", [this](const nlohmann::json& p) { return onCompletion(p); });
+        d.onRequest("textDocument/definition", [this](const nlohmann::json& p) { return onDefinition(p); });
+        d.onRequest("textDocument/documentSymbol", [this](const nlohmann::json& p) { return onDocumentSymbol(p); });
     }
 
     nlohmann::json Server::onInitialize(const nlohmann::json&) {
@@ -76,6 +80,19 @@ namespace lsp {
         const auto* doc = docFor(params);
         if (!doc) return nlohmann::json::array();
         return features::completion(*doc);
+    }
+
+    nlohmann::json Server::onDefinition(const nlohmann::json& params) {
+        const auto* doc = docFor(params);
+        if (!doc) return nullptr;
+        const auto& pos = params.at("position");
+        return features::definition(*doc, pos.at("line"), pos.at("character"));
+    }
+
+    nlohmann::json Server::onDocumentSymbol(const nlohmann::json& params) {
+        const auto* doc = docFor(params);
+        if (!doc) return nlohmann::json::array();
+        return features::documentSymbols(*doc);
     }
 
 } // namespace lsp

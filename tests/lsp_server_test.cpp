@@ -144,3 +144,48 @@ TEST_F(LspServerTest, CompletionListsKeywordsBuiltinsAndSymbols) {
     EXPECT_TRUE(has("출력", 3));     // 내장 Function
     EXPECT_TRUE(has("내변수", 6));   // Variable
 }
+
+TEST_F(LspServerTest, DefinitionJumpsToDeclaration) {
+    d.handle(didOpen("file:///g.hik", "정수 개수 = 3\n출력(개수)\n"), out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 6}, {"method", "textDocument/definition"},
+                  {"params", {{"textDocument", {{"uri", "file:///g.hik"}}},
+                              {"position", {{"line", 1}, {"character", 3}}}}}},  // 2행의 '개수'
+             out);
+    auto msgs = drain(out);
+    const auto& loc = msgs[0]["result"];
+    ASSERT_FALSE(loc.is_null());
+    EXPECT_EQ(loc["uri"], "file:///g.hik");
+    EXPECT_EQ(loc["range"]["start"]["line"], 0);       // 1행 선언부
+    EXPECT_EQ(loc["range"]["start"]["character"], 3);  // 정수␣ 다음
+}
+
+TEST_F(LspServerTest, DocumentSymbolBuildsClassTree) {
+    d.handle(didOpen("file:///s.hik",
+                     "정수 전역 = 1\n"
+                     "함수 도우미() -> 정수:\n"
+                     "    리턴 1\n"
+                     "클래스 점:\n"
+                     "    정수 x\n"
+                     "    생성(정수 값):\n"
+                     "        자기.x = 값\n"
+                     "    함수 값얻기() -> 정수:\n"
+                     "        리턴 자기.x\n"),
+             out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 7}, {"method", "textDocument/documentSymbol"},
+                  {"params", {{"textDocument", {{"uri", "file:///s.hik"}}}}}},
+             out);
+    auto msgs = drain(out);
+    const auto& syms = msgs[0]["result"];
+    ASSERT_TRUE(syms.is_array());
+    // 톱레벨: 전역(Variable 13), 도우미(Function 12), 점(Class 5) — 지역/파라미터 제외
+    ASSERT_EQ(syms.size(), 3u);
+    json cls;
+    for (const auto& s : syms)
+        if (s["name"] == "점") cls = s;
+    ASSERT_FALSE(cls.is_null());
+    EXPECT_EQ(cls["kind"], 5);
+    // children: x(Field 8), 값얻기(Method 6) — 생성자 파라미터 제외
+    ASSERT_EQ(cls["children"].size(), 2u);
+}
