@@ -127,63 +127,68 @@ TEST_F(LspServerTest, HoverOnNothingReturnsNull) {
 TEST_F(LspServerTest, CompletionListsKeywordsBuiltinsAndSymbols) {
     d.handle(didOpen("file:///c.hik", "정수 내변수 = 1\n"), out);
     drain(out);
-    d.handle(json{{"jsonrpc", "2.0"}, {"id", 5}, {"method", "textDocument/completion"},
-                  {"params", {{"textDocument", {{"uri", "file:///c.hik"}}},
-                              {"position", {{"line", 0}, {"character", 0}}}}}},
-             out);
+    d.handle(
+        json{{"jsonrpc", "2.0"}, {"id", 5}, {"method", "textDocument/completion"},
+            {"params", {{"textDocument", {{"uri", "file:///c.hik"}}}, {"position", {{"line", 0}, {"character", 0}}}}}},
+        out);
     auto msgs = drain(out);
     ASSERT_EQ(msgs.size(), 1u);
     const auto& items = msgs[0]["result"];
     ASSERT_TRUE(items.is_array());
     auto has = [&](const std::string& label, int kind) {
-        for (const auto& item : items)
-            if (item["label"] == label && item["kind"] == kind) return true;
+        for (const auto& item : items) {
+            if (item["label"] == label && item["kind"] == kind) {
+                return true;
+            }
+        }
         return false;
     };
-    EXPECT_TRUE(has("만약", 14));    // Keyword
-    EXPECT_TRUE(has("출력", 3));     // 내장 Function
-    EXPECT_TRUE(has("내변수", 6));   // Variable
+    EXPECT_TRUE(has("만약", 14)); // Keyword
+    EXPECT_TRUE(has("출력", 3)); // 내장 Function
+    EXPECT_TRUE(has("내변수", 6)); // Variable
 }
 
 TEST_F(LspServerTest, DefinitionJumpsToDeclaration) {
     d.handle(didOpen("file:///g.hik", "정수 개수 = 3\n출력(개수)\n"), out);
     drain(out);
     d.handle(json{{"jsonrpc", "2.0"}, {"id", 6}, {"method", "textDocument/definition"},
-                  {"params", {{"textDocument", {{"uri", "file:///g.hik"}}},
-                              {"position", {{"line", 1}, {"character", 3}}}}}},  // 2행의 '개수'
-             out);
-    auto msgs = drain(out);
+                 {"params", {{"textDocument", {{"uri", "file:///g.hik"}}},
+                                {"position", {{"line", 1}, {"character", 3}}}}}}, // 2행의 '개수'
+        out);
+    auto msgs       = drain(out);
     const auto& loc = msgs[0]["result"];
     ASSERT_FALSE(loc.is_null());
     EXPECT_EQ(loc["uri"], "file:///g.hik");
-    EXPECT_EQ(loc["range"]["start"]["line"], 0);       // 1행 선언부
-    EXPECT_EQ(loc["range"]["start"]["character"], 3);  // 정수␣ 다음
+    EXPECT_EQ(loc["range"]["start"]["line"], 0); // 1행 선언부
+    EXPECT_EQ(loc["range"]["start"]["character"], 3); // 정수␣ 다음
 }
 
 TEST_F(LspServerTest, DocumentSymbolBuildsClassTree) {
-    d.handle(didOpen("file:///s.hik",
-                     "정수 전역 = 1\n"
-                     "함수 도우미() -> 정수:\n"
-                     "    리턴 1\n"
-                     "클래스 점:\n"
-                     "    정수 x\n"
-                     "    생성(정수 값):\n"
-                     "        자기.x = 값\n"
-                     "    함수 값얻기() -> 정수:\n"
-                     "        리턴 자기.x\n"),
-             out);
+    d.handle(didOpen("file:///s.hik", "정수 전역 = 1\n"
+                                      "함수 도우미() -> 정수:\n"
+                                      "    리턴 1\n"
+                                      "클래스 점:\n"
+                                      "    정수 x\n"
+                                      "    생성(정수 값):\n"
+                                      "        자기.x = 값\n"
+                                      "    함수 값얻기() -> 정수:\n"
+                                      "        리턴 자기.x\n"),
+        out);
     drain(out);
     d.handle(json{{"jsonrpc", "2.0"}, {"id", 7}, {"method", "textDocument/documentSymbol"},
-                  {"params", {{"textDocument", {{"uri", "file:///s.hik"}}}}}},
-             out);
-    auto msgs = drain(out);
+                 {"params", {{"textDocument", {{"uri", "file:///s.hik"}}}}}},
+        out);
+    auto msgs        = drain(out);
     const auto& syms = msgs[0]["result"];
     ASSERT_TRUE(syms.is_array());
     // 톱레벨: 전역(Variable 13), 도우미(Function 12), 점(Class 5) — 지역/파라미터 제외
     ASSERT_EQ(syms.size(), 3u);
     json cls;
-    for (const auto& s : syms)
-        if (s["name"] == "점") cls = s;
+    for (const auto& s : syms) {
+        if (s["name"] == "점") {
+            cls = s;
+        }
+    }
     ASSERT_FALSE(cls.is_null());
     EXPECT_EQ(cls["kind"], 5);
     // children: x(Field 8), 값얻기(Method 6) — 생성자 파라미터 제외
@@ -191,17 +196,16 @@ TEST_F(LspServerTest, DocumentSymbolBuildsClassTree) {
 }
 
 TEST_F(LspServerTest, DocumentSymbolDoesNotMixSameNamedClasses) {
-    d.handle(didOpen("file:///dup.hik",
-                     "클래스 점:\n"
-                     "    정수 x\n"
-                     "클래스 점:\n"
-                     "    정수 y\n"),
-             out);
+    d.handle(didOpen("file:///dup.hik", "클래스 점:\n"
+                                        "    정수 x\n"
+                                        "클래스 점:\n"
+                                        "    정수 y\n"),
+        out);
     drain(out);
     d.handle(json{{"jsonrpc", "2.0"}, {"id", 8}, {"method", "textDocument/documentSymbol"},
-                  {"params", {{"textDocument", {{"uri", "file:///dup.hik"}}}}}},
-             out);
-    auto msgs = drain(out);
+                 {"params", {{"textDocument", {{"uri", "file:///dup.hik"}}}}}},
+        out);
+    auto msgs        = drain(out);
     const auto& syms = msgs[0]["result"];
     ASSERT_TRUE(syms.is_array());
     ASSERT_EQ(syms.size(), 2u); // 톱레벨 클래스 2개, 둘 다 이름 "점"
@@ -211,4 +215,33 @@ TEST_F(LspServerTest, DocumentSymbolDoesNotMixSameNamedClasses) {
     EXPECT_EQ(syms[0]["children"][0]["name"], "x"); // 첫 번째 클래스는 자신의 필드만
     ASSERT_EQ(syms[1]["children"].size(), 1u);
     EXPECT_EQ(syms[1]["children"][0]["name"], "y"); // 두 번째 클래스는 자신의 필드만
+}
+
+TEST_F(LspServerTest, DocumentSymbolNestedSameNameClassDoesNotContaminate) {
+    d.handle(didOpen("file:///nested.hik", "클래스 점:\n"
+                                           "    정수 x\n"
+                                           "    함수 값얻기() -> 정수:\n"
+                                           "        클래스 점:\n"
+                                           "            정수 z\n"
+                                           "        리턴 자기.x\n"),
+        out);
+    drain(out);
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 9}, {"method", "textDocument/documentSymbol"},
+                 {"params", {{"textDocument", {{"uri", "file:///nested.hik"}}}}}},
+        out);
+    auto msgs        = drain(out);
+    const auto& syms = msgs[0]["result"];
+    ASSERT_TRUE(syms.is_array());
+    ASSERT_EQ(syms.size(), 1u); // 톱레벨 "점" 1개 (중첩 클래스는 함수 본문 지역이라 톱레벨엔 없음)
+    const auto& cls = syms[0];
+    EXPECT_EQ(cls["name"], "점");
+    // children: x(Field), 값얻기(Method) 정확히 2개 — 중첩 클래스의 z는 섞이지 않는다
+    ASSERT_EQ(cls["children"].size(), 2u);
+    bool hasZ = false;
+    for (const auto& c : cls["children"]) {
+        if (c["name"] == "z") {
+            hasZ = true;
+        }
+    }
+    EXPECT_FALSE(hasZ);
 }

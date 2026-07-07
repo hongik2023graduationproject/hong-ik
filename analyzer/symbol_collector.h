@@ -14,9 +14,10 @@ struct SymbolInfo {
     DocSymbolKind kind;
     std::string typeText;
     std::string container;
-    long long line = 0;
-    long long column = 0;
-    long long endColumn = 0;
+    long long line            = 0;
+    long long column          = 0;
+    long long endColumn       = 0;
+    long long ownerClassIndex = -1; // 클래스 직접 멤버(Field/Method)만: 소유 클래스 심볼의 out 벡터 인덱스
 };
 
 // AST 1회 순회로 선언 심볼을 수집한다 (LSP hover/completion/definition/documentSymbol 재료).
@@ -26,12 +27,12 @@ public:
     std::vector<SymbolInfo> collect(const std::shared_ptr<Program>& program);
 
 private:
-    void walkStatement(const std::shared_ptr<Statement>& stmt, const std::string& container,
-                       std::vector<SymbolInfo>& out);
-    void walkBlock(const std::shared_ptr<BlockStatement>& block, const std::string& container,
-                   std::vector<SymbolInfo>& out);
-    void addFunction(const std::shared_ptr<FunctionStatement>& fn, const std::string& container,
-                     DocSymbolKind kind, std::vector<SymbolInfo>& out);
+    void walkStatement(
+        const std::shared_ptr<Statement>& stmt, const std::string& container, std::vector<SymbolInfo>& out);
+    void walkBlock(
+        const std::shared_ptr<BlockStatement>& block, const std::string& container, std::vector<SymbolInfo>& out);
+    void addFunction(const std::shared_ptr<FunctionStatement>& fn, const std::string& container, DocSymbolKind kind,
+        std::vector<SymbolInfo>& out);
 };
 
 #endif // SYMBOL_COLLECTOR_H
