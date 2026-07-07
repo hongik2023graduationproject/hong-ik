@@ -24,7 +24,8 @@ namespace lsp {
                 }
             }
         }
-        if (!in || contentLength < 0) {
+        constexpr long long kMaxContentLength = 16LL * 1024 * 1024; // 16 MiB — LSP full-sync 문서 상한으로 충분
+        if (!in || contentLength < 0 || contentLength > kMaxContentLength) {
             return std::nullopt;
         }
         std::string body(static_cast<size_t>(contentLength), '\0');
@@ -50,7 +51,14 @@ namespace lsp {
     }
 
     void Dispatcher::handle(const nlohmann::json& msg, std::ostream& out) {
-        const std::string method    = msg.value("method", "");
+        if (!msg.contains("method") || !msg["method"].is_string()) {
+            if (msg.contains("id")) {
+                writeMessage(out, {{"jsonrpc", "2.0"}, {"id", msg["id"]},
+                                      {"error", {{"code", -32600}, {"message", "invalid request"}}}});
+            }
+            return;
+        }
+        const std::string method    = msg["method"];
         const nlohmann::json params = msg.contains("params") ? msg["params"] : nlohmann::json::object();
 
         if (!msg.contains("id")) { // 알림

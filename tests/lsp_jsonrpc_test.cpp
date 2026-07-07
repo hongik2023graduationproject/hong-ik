@@ -27,6 +27,24 @@ TEST(JsonRpcFramingTest, GarbageHeaderReturnsNullopt) {
     EXPECT_FALSE(lsp::readMessage(ss).has_value());
 }
 
+TEST(JsonRpcFramingTest, OversizedContentLengthReturnsNullopt) {
+    std::stringstream ss("Content-Length: 999999999999\r\n\r\n");
+    EXPECT_FALSE(lsp::readMessage(ss).has_value());
+}
+
+TEST(DispatcherTest, NonStringMethodYieldsInvalidRequest) {
+    lsp::Dispatcher d;
+    std::ostringstream out;
+    d.handle(json{{"jsonrpc", "2.0"}, {"id", 3}, {"method", 123}}, out);
+    std::istringstream in(out.str());
+    auto resp = json::parse(*lsp::readMessage(in));
+    EXPECT_EQ(resp["error"]["code"], -32600);
+
+    std::ostringstream out2;
+    d.handle(json{{"jsonrpc", "2.0"}}, out2); // id 없는 알림 — method 필드 자체 없음
+    EXPECT_TRUE(out2.str().empty());
+}
+
 TEST(DispatcherTest, RoutesRequestAndWritesResponse) {
     lsp::Dispatcher d;
     d.onRequest("echo", [](const json& p) { return p; });
