@@ -59,11 +59,15 @@ namespace {
         EXPECT_EQ(asInt(bench::runEval(sp)), 500000LL);
     }
 
-    // 결정성: 같은 ScenarioProgram으로 2회 실행해도 같은 결과 (벤치 반복 실행의 전제)
+    // 결정성: 같은 ScenarioProgram으로 2회 실행해도 같은 결과 (벤치 반복 실행의 전제).
+    // 상수 풀 변형 회귀가 실제로 위험한 컬렉션·클래스 시나리오까지 포함한다
+    // (arith/string 계열은 스칼라라 제외 — CI 시간 절충).
     TEST(BenchScenarios, RepeatedRunsAreDeterministic) {
-        auto sp = bench::loadScenario("fib_recursive");
-        EXPECT_EQ(asInt(bench::runVm(sp)), asInt(bench::runVm(sp)));
-        EXPECT_EQ(asInt(bench::runEval(sp)), asInt(bench::runEval(sp)));
+        for (const char* name : {"fib_recursive", "array_ops", "hashmap_ops", "class_method", "builtin_calls"}) {
+            auto sp = bench::loadScenario(name);
+            EXPECT_EQ(asInt(bench::runVm(sp)), asInt(bench::runVm(sp))) << name;
+            EXPECT_EQ(asInt(bench::runEval(sp)), asInt(bench::runEval(sp))) << name;
+        }
     }
 
     TEST(BenchScenarios, MissingScenarioThrows) {

@@ -1,6 +1,7 @@
 #include "runner.h"
 #include "vm/compiler.h"
 #include <benchmark/benchmark.h>
+#include <cstdio>
 #include <memory>
 #include <string>
 #include <vector>
@@ -54,7 +55,12 @@ namespace {
 } // namespace
 
 int main(int argc, char** argv) {
-    registerAll();
+    try {
+        registerAll();
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "벤치마크 등록 실패: %s\n", e.what());
+        return 1;
+    }
     benchmark::Initialize(&argc, argv);
     if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
         return 1;
