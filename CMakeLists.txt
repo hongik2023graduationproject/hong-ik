@@ -187,6 +187,8 @@ else()
             tests/lsp_document_store_test.cpp
             tests/lsp_server_test.cpp
             tests/symbol_collector_test.cpp
+            tests/benchmark_scenarios_test.cpp
+            benchmarks/runner.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.
             web/wasm_interface.cpp
@@ -199,6 +201,7 @@ else()
 
     target_compile_definitions(HongIkTests PRIVATE
             "HONGIK_GOLDEN_FIXTURES_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/golden\""
+            "HONGIK_BENCH_SCENARIO_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/scenarios\""
     )
 
     target_link_libraries(
