@@ -115,6 +115,9 @@ else()
     # ==========================================
     set(CMAKE_CXX_STANDARD 26)
 
+    # For visual studio — 모든 타깃 정의보다 앞에 있어야 적용된다
+    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
     # Google Test
     include(FetchContent)
     FetchContent_Declare(
@@ -153,9 +156,6 @@ else()
     add_executable(hongik-lsp lsp/main.cpp)
     target_link_libraries(hongik-lsp HongIkLspLib)
     hongik_apply_sanitizers(hongik-lsp)
-
-    # For visual studio
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
     enable_testing()
 
