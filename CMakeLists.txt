@@ -136,6 +136,15 @@ else()
     )
     FetchContent_MakeAvailable(nlohmann_json)
 
+    # ---- Google Benchmark (native 전용, 벤치마크 타깃용) ----
+    FetchContent_Declare(
+            googlebenchmark
+            URL https://github.com/google/benchmark/archive/refs/tags/v1.9.1.zip
+    )
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googlebenchmark)
+
     set(HONGIK_LSP_SOURCES
             lsp/position.cpp
             lsp/jsonrpc.cpp
@@ -166,10 +175,12 @@ else()
     target_link_libraries(HongIk HongIkLib)
     hongik_apply_sanitizers(HongIk)
 
-    add_executable(HongIkBench tests/benchmark.cpp)
-    target_include_directories(HongIkBench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(HongIkBench HongIkLib)
-    hongik_apply_sanitizers(HongIkBench)
+    add_executable(HongIkBenchmarks benchmarks/main.cpp benchmarks/runner.cpp)
+    target_include_directories(HongIkBenchmarks PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(HongIkBenchmarks HongIkLib benchmark::benchmark)
+    target_compile_definitions(HongIkBenchmarks PRIVATE
+            "HONGIK_BENCH_SCENARIO_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/scenarios\"")
+    hongik_apply_sanitizers(HongIkBenchmarks)
 
     add_executable(HongIkTests
             tests/lexer_test.cpp

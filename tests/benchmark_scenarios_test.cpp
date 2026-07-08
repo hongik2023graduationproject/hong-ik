@@ -74,6 +74,11 @@ namespace {
         EXPECT_THROW(bench::prepare("만약 만약 만약\n"), std::runtime_error);
     }
 
+    TEST(BenchScenarios, LexErrorThrows) {
+        // 미종결 문자열 → lexer ParseError → runtime_error 변환 검증
+        EXPECT_THROW(bench::prepare("\"미완성 문자열\n"), std::runtime_error);
+    }
+
     TEST(BenchScenarios, FrontendSourceParses) {
         auto src     = bench::buildFrontendSource(10);
         auto program = bench::parseOnly(src);
