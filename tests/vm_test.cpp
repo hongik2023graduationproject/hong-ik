@@ -1015,3 +1015,27 @@ TEST(VMBuiltinBoundary, MethodStyleBuiltinInvoke) {
     // OP_INVOKE 빌트인 경로 (내장 타입 메서드 호출)
     EXPECT_EQ(runVMSource("배열 a = [3, 1, 2]\na.길이()")->ToString(), "3");
 }
+
+TEST(VMIndexBoundary, IndexSemanticsLocked) {
+    EXPECT_EQ(runVMSource("배열 a = [10, 20, 30]\na[1]")->ToString(), "20");
+    EXPECT_EQ(runVMSource("배열 a = [10, 20, 30]\na[-1]")->ToString(), "30"); // 음수 인덱스
+    EXPECT_EQ(runVMSource("문자 s = \"가나다\"\ns[1]")->ToString(), "나");
+    EXPECT_EQ(runVMSource("문자 s = \"가나다\"\ns[-1]")->ToString(), "다");
+    EXPECT_EQ(runVMSource("사전 d = {\"k\": 42}\nd[\"k\"]")->ToString(), "42");
+    EXPECT_EQ(runVMSource("배열 a = [1, 2]\na[0] = 9\na[0]")->ToString(), "9");
+    EXPECT_EQ(runVMSource("배열 a = [1, 2]\na[-1] = 9\na[1]")->ToString(), "9"); // set 음수 인덱스
+    EXPECT_EQ(runVMSource("사전 d = {\"k\": 1}\nd[\"k\"] = 7\nd[\"k\"]")->ToString(), "7");
+}
+
+TEST(VMIndexBoundary, IndexErrorsLocked) {
+    // 에러 메시지 바이트 단위 잠금 — D4 재작성이 메시지를 바꾸면 실패
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("배열 a = [1]\na[5]"), "배열의 범위 밖 인덱스입니다: 인덱스 5, 배열 크기 1");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("배열 a = [1]\na[\"x\"]"), "배열 인덱스는 정수여야 합니다.");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("문자 s = \"가\"\ns[3]"), "문자열의 범위 밖 인덱스입니다.");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("사전 d = {\"a\": 1}\nd[\"z\"]"), "사전에 키가 존재하지 않습니다.");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("사전 d = {\"a\": 1}\nd[0]"), "사전 키는 문자열이어야 합니다.");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("정수 x = 1\nx[0]"), "인덱스 연산이 지원되지 않는 형식입니다.");
+    EXPECT_THROW_WITH_MESSAGE(
+        runVMSource("배열 a = [1]\na[5] = 0"), "배열의 범위 밖 인덱스입니다: 인덱스 5, 배열 크기 1");
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("정수 x = 1\nx[0] = 1"), "인덱스 대입이 지원되지 않는 형식입니다.");
+}

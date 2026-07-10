@@ -380,35 +380,51 @@ void VM::opBuildTuple() {
     push(VMValue::Obj(tuple));
 }
 
+namespace {
+    // VMValue 인덱스에서 정수 추출 — INT 태그 직접, OBJECT 태그의 Integer도 수용(방어적; 정상 경로에선 안 나타남)
+    bool vmIndexAsInt(const VMValue& v, long long& out) {
+        if (v.isInt()) {
+            out = v.asInt();
+            return true;
+        }
+        if (v.isObject()) {
+            if (auto* i = dynamic_cast<Integer*>(v.asObject().get())) {
+                out = i->value;
+                return true;
+            }
+        }
+        return false;
+    }
+} // namespace
+
 void VM::opIndexGet() {
     auto index      = pop();
     auto collection = pop();
-    // Convert to objects for complex operations
-    auto indexObj      = index.toObject();
-    auto collectionObj = collection.toObject();
-    if (auto* arr = dynamic_cast<Array*>(collectionObj.get())) {
-        auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) {
+    // 스칼라 인덱스의 toObject() 힙 할당 제거 (spec D4) — 태그 직접 검사, 시맨틱·메시지 불변
+    Object* colObj = collection.isObject() ? collection.asObject().get() : nullptr;
+    if (auto* arr = colObj ? dynamic_cast<Array*>(colObj) : nullptr) {
+        long long idxVal;
+        if (!vmIndexAsInt(index, idxVal)) {
             throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
         }
-        long long actualIdx = idx->value;
+        long long actualIdx = idxVal;
         if (actualIdx < 0) {
             actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
         }
         if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size())) {
-            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 "
+            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idxVal) + ", 배열 크기 "
                                        + to_string(arr->elements.size()),
                 currentLine());
         }
         push(VMValue::fromObject(arr->elements[actualIdx]));
-    } else if (auto* str = dynamic_cast<String*>(collectionObj.get())) {
-        auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) {
+    } else if (auto* str = colObj ? dynamic_cast<String*>(colObj) : nullptr) {
+        long long idxVal;
+        if (!vmIndexAsInt(index, idxVal)) {
             throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
         }
         const auto& cps     = str->codePoints();
         long long len       = static_cast<long long>(cps.size());
-        long long actualIdx = idx->value;
+        long long actualIdx = idxVal;
         if (actualIdx < 0) {
             actualIdx = len + actualIdx;
         }
@@ -416,8 +432,8 @@ void VM::opIndexGet() {
             throw RuntimeException("문자열의 범위 밖 인덱스입니다.", currentLine());
         }
         push(VMValue::Obj(make_shared<String>(cps[actualIdx])));
-    } else if (auto* hm = dynamic_cast<HashMap*>(collectionObj.get())) {
-        auto* key = dynamic_cast<String*>(indexObj.get());
+    } else if (auto* hm = colObj ? dynamic_cast<HashMap*>(colObj) : nullptr) {
+        String* key = index.isObject() ? dynamic_cast<String*>(index.asObject().get()) : nullptr;
         if (!key) {
             throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
         }
@@ -426,45 +442,43 @@ void VM::opIndexGet() {
             throw RuntimeException("사전에 키가 존재하지 않습니다.", currentLine());
         }
         push(VMValue::fromObject(it->second));
-    } else if (auto* tup = dynamic_cast<Tuple*>(collectionObj.get())) {
-        auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx || idx->value < 0 || idx->value >= static_cast<long long>(tup->elements.size())) {
+    } else if (auto* tup = colObj ? dynamic_cast<Tuple*>(colObj) : nullptr) {
+        long long idxVal;
+        if (!vmIndexAsInt(index, idxVal) || idxVal < 0 || idxVal >= static_cast<long long>(tup->elements.size())) {
             throw RuntimeException("튜플의 범위 밖 인덱스입니다.", currentLine());
         }
-        push(VMValue::fromObject(tup->elements[idx->value]));
+        push(VMValue::fromObject(tup->elements[idxVal]));
     } else {
         throw RuntimeException("인덱스 연산이 지원되지 않는 형식입니다.", currentLine());
     }
 }
 
 void VM::opIndexSet() {
-    auto value         = pop();
-    auto index         = pop();
-    auto collection    = pop();
-    auto valueObj      = value.toObject();
-    auto indexObj      = index.toObject();
-    auto collectionObj = collection.toObject();
-    if (auto* arr = dynamic_cast<Array*>(collectionObj.get())) {
-        auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) {
+    auto value      = pop();
+    auto index      = pop();
+    auto collection = pop();
+    Object* colObj  = collection.isObject() ? collection.asObject().get() : nullptr;
+    if (auto* arr = colObj ? dynamic_cast<Array*>(colObj) : nullptr) {
+        long long idxVal;
+        if (!vmIndexAsInt(index, idxVal)) {
             throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
         }
-        long long actualIdx = idx->value;
+        long long actualIdx = idxVal;
         if (actualIdx < 0) {
             actualIdx += static_cast<long long>(arr->elements.size());
         }
         if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size())) {
-            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 "
+            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idxVal) + ", 배열 크기 "
                                        + to_string(arr->elements.size()),
                 currentLine());
         }
-        arr->elements[actualIdx] = valueObj;
-    } else if (auto* hm = dynamic_cast<HashMap*>(collectionObj.get())) {
-        auto* key = dynamic_cast<String*>(indexObj.get());
+        arr->elements[actualIdx] = value.toObject(); // 원소 저장은 Object — 후보 ③(별도 사이클) 전까지 유지
+    } else if (auto* hm = colObj ? dynamic_cast<HashMap*>(colObj) : nullptr) {
+        String* key = index.isObject() ? dynamic_cast<String*>(index.asObject().get()) : nullptr;
         if (!key) {
             throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
         }
-        hm->pairs[key->value] = valueObj;
+        hm->pairs[key->value] = value.toObject();
     } else {
         throw RuntimeException("인덱스 대입이 지원되지 않는 형식입니다.", currentLine());
     }
