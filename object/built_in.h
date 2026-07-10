@@ -5,7 +5,7 @@
 #include "object.h"
 
 class Length : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Print : public Builtin {
@@ -13,27 +13,27 @@ class Print : public Builtin {
 
 public:
     Print(IOContext* ctx = nullptr) : ioCtx(ctx) {}
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Push : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class TypeOf : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class ToInteger : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class ToFloat : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class ToString_ : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Input : public Builtin {
@@ -41,23 +41,23 @@ class Input : public Builtin {
 
 public:
     Input(IOContext* ctx = nullptr) : ioCtx(ctx) {}
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Keys : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Contains : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class MapSet : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Remove : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class FileRead : public Builtin {
@@ -65,7 +65,7 @@ class FileRead : public Builtin {
 
 public:
     FileRead(IOContext* ctx = nullptr) : ioCtx(ctx) {}
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class FileWrite : public Builtin {
@@ -73,143 +73,143 @@ class FileWrite : public Builtin {
 
 public:
     FileWrite(IOContext* ctx = nullptr) : ioCtx(ctx) {}
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 수학 내장함수
 class Abs : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Sqrt : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Max : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Min : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Random : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 삼각함수
 class Sin : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Cos : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Tan : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 로그/지수
 class Log : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Ln : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Power : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 상수
 class Pi : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class EulerE : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 반올림 계열
 class Round : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Ceil : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Floor : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 문자열 내장함수
 class Split : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class ToUpper : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class ToLower : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Replace : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Trim : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class StartsWith : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class EndsWith : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Repeat : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Pad : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Substring : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // 배열 내장함수
 class Sort : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Reverse : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Find : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class Slice : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 // JSON 내장함수
 class JsonParse : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 class JsonSerialize : public Builtin {
-    std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> parameters) override;
+    std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& parameters) override;
 };
 
 #endif // BUILT_IN_H

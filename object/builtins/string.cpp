@@ -10,7 +10,7 @@ using namespace std;
 
 // ===== 문자열 내장함수 =====
 
-std::shared_ptr<Object> Split::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Split::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("분리 함수는 인자를 2개 받습니다 (문자열, 구분자).");
     }
@@ -42,7 +42,7 @@ std::shared_ptr<Object> Split::function(std::vector<std::shared_ptr<Object>> par
     return result;
 }
 
-std::shared_ptr<Object> ToUpper::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> ToUpper::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("대문자 함수는 인자를 1개만 받습니다.");
     }
@@ -53,7 +53,7 @@ std::shared_ptr<Object> ToUpper::function(std::vector<std::shared_ptr<Object>> p
     return make_shared<String>(result);
 }
 
-std::shared_ptr<Object> ToLower::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> ToLower::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("소문자 함수는 인자를 1개만 받습니다.");
     }
@@ -64,7 +64,7 @@ std::shared_ptr<Object> ToLower::function(std::vector<std::shared_ptr<Object>> p
     return make_shared<String>(result);
 }
 
-std::shared_ptr<Object> Replace::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Replace::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("치환 함수는 인자를 3개 받습니다 (원본, 대상, 교체).");
     }
@@ -83,7 +83,7 @@ std::shared_ptr<Object> Replace::function(std::vector<std::shared_ptr<Object>> p
     return make_shared<String>(result);
 }
 
-std::shared_ptr<Object> Trim::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Trim::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("자르기 함수는 인자를 1개만 받습니다.");
     }
@@ -96,7 +96,7 @@ std::shared_ptr<Object> Trim::function(std::vector<std::shared_ptr<Object>> para
     return make_shared<String>(result.substr(start, end - start + 1));
 }
 
-std::shared_ptr<Object> StartsWith::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> StartsWith::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("시작확인 함수는 인자를 2개 받습니다 (문자열, 접두사).");
     }
@@ -108,7 +108,7 @@ std::shared_ptr<Object> StartsWith::function(std::vector<std::shared_ptr<Object>
     return make_shared<Boolean>(utf8::startsWithStr(str->value, prefix->value));
 }
 
-std::shared_ptr<Object> EndsWith::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> EndsWith::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("끝확인 함수는 인자를 2개 받습니다 (문자열, 접미사).");
     }
@@ -120,7 +120,7 @@ std::shared_ptr<Object> EndsWith::function(std::vector<std::shared_ptr<Object>> 
     return make_shared<Boolean>(utf8::endsWithStr(str->value, suffix->value));
 }
 
-std::shared_ptr<Object> Repeat::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Repeat::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("반복 함수는 인자를 2개 받습니다 (문자열, 횟수).");
     }
@@ -145,7 +145,7 @@ std::shared_ptr<Object> Repeat::function(std::vector<std::shared_ptr<Object>> pa
     return make_shared<String>(result);
 }
 
-std::shared_ptr<Object> Pad::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Pad::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("채우기 함수는 인자를 3개 받습니다 (문자열, 길이, 채울문자).");
     }
@@ -176,7 +176,7 @@ std::shared_ptr<Object> Pad::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<String>(result);
 }
 
-std::shared_ptr<Object> Substring::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Substring::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("부분문자 함수는 인자를 3개 받습니다 (문자열, 시작, 끝).");
     }

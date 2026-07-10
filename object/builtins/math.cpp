@@ -9,7 +9,7 @@ using namespace std;
 
 // ===== 수학 내장함수 =====
 
-std::shared_ptr<Object> Abs::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Abs::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("절대값 함수는 인자를 1개만 받습니다.");
     }
@@ -22,7 +22,7 @@ std::shared_ptr<Object> Abs::function(std::vector<std::shared_ptr<Object>> param
     throw runtime_error("절대값 함수는 정수 또는 실수만 지원합니다.");
 }
 
-std::shared_ptr<Object> Sqrt::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Sqrt::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("제곱근 함수는 인자를 1개만 받습니다.");
     }
@@ -40,7 +40,7 @@ std::shared_ptr<Object> Sqrt::function(std::vector<std::shared_ptr<Object>> para
     return make_shared<Float>(std::sqrt(val));
 }
 
-std::shared_ptr<Object> Max::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Max::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("최대 함수는 인자를 2개 받습니다.");
     }
@@ -60,7 +60,7 @@ std::shared_ptr<Object> Max::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<Float>(std::max(va, vb));
 }
 
-std::shared_ptr<Object> Min::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Min::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("최소 함수는 인자를 2개 받습니다.");
     }
@@ -79,7 +79,7 @@ std::shared_ptr<Object> Min::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<Float>(std::min(va, vb));
 }
 
-std::shared_ptr<Object> Random::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Random::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("난수 함수는 인자를 2개 받습니다 (최소, 최대).");
     }
@@ -98,7 +98,7 @@ std::shared_ptr<Object> Random::function(std::vector<std::shared_ptr<Object>> pa
 
 // ===== 삼각함수 =====
 
-std::shared_ptr<Object> Sin::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Sin::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("사인 함수는 인자를 1개만 받습니다.");
     }
@@ -113,7 +113,7 @@ std::shared_ptr<Object> Sin::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<Float>(std::sin(val));
 }
 
-std::shared_ptr<Object> Cos::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Cos::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("코사인 함수는 인자를 1개만 받습니다.");
     }
@@ -128,7 +128,7 @@ std::shared_ptr<Object> Cos::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<Float>(std::cos(val));
 }
 
-std::shared_ptr<Object> Tan::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Tan::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("탄젠트 함수는 인자를 1개만 받습니다.");
     }
@@ -145,7 +145,7 @@ std::shared_ptr<Object> Tan::function(std::vector<std::shared_ptr<Object>> param
 
 // ===== 로그/지수 =====
 
-std::shared_ptr<Object> Log::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Log::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("로그 함수는 인자를 1개만 받습니다.");
     }
@@ -163,7 +163,7 @@ std::shared_ptr<Object> Log::function(std::vector<std::shared_ptr<Object>> param
     return make_shared<Float>(std::log10(val));
 }
 
-std::shared_ptr<Object> Ln::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Ln::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("자연로그 함수는 인자를 1개만 받습니다.");
     }
@@ -181,7 +181,7 @@ std::shared_ptr<Object> Ln::function(std::vector<std::shared_ptr<Object>> parame
     return make_shared<Float>(std::log(val));
 }
 
-std::shared_ptr<Object> Power::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Power::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("거듭제곱 함수는 인자를 2개 받습니다 (밑, 지수).");
     }
@@ -205,14 +205,14 @@ std::shared_ptr<Object> Power::function(std::vector<std::shared_ptr<Object>> par
 
 // ===== 상수 =====
 
-std::shared_ptr<Object> Pi::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Pi::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (!parameters.empty()) {
         throw runtime_error("파이 함수는 인자를 받지 않습니다.");
     }
     return make_shared<Float>(3.14159265358979323846);
 }
 
-std::shared_ptr<Object> EulerE::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> EulerE::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (!parameters.empty()) {
         throw runtime_error("자연수e 함수는 인자를 받지 않습니다.");
     }
@@ -221,7 +221,7 @@ std::shared_ptr<Object> EulerE::function(std::vector<std::shared_ptr<Object>> pa
 
 // ===== 반올림 계열 =====
 
-std::shared_ptr<Object> Round::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Round::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("반올림 함수는 인자를 1개만 받습니다.");
     }
@@ -234,7 +234,7 @@ std::shared_ptr<Object> Round::function(std::vector<std::shared_ptr<Object>> par
     throw runtime_error("반올림 함수는 정수 또는 실수만 지원합니다.");
 }
 
-std::shared_ptr<Object> Ceil::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Ceil::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("올림 함수는 인자를 1개만 받습니다.");
     }
@@ -247,7 +247,7 @@ std::shared_ptr<Object> Ceil::function(std::vector<std::shared_ptr<Object>> para
     throw runtime_error("올림 함수는 정수 또는 실수만 지원합니다.");
 }
 
-std::shared_ptr<Object> Floor::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Floor::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("내림 함수는 인자를 1개만 받습니다.");
     }

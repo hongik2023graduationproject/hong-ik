@@ -275,7 +275,7 @@ string serializeToJson(const shared_ptr<Object>& obj) {
 
 } // anonymous namespace
 
-std::shared_ptr<Object> JsonParse::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> JsonParse::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("JSON_파싱 함수는 인자를 1개만 받습니다.");
     }
@@ -287,7 +287,7 @@ std::shared_ptr<Object> JsonParse::function(std::vector<std::shared_ptr<Object>>
     return parser.parse();
 }
 
-std::shared_ptr<Object> JsonSerialize::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> JsonSerialize::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("JSON_직렬화 함수는 인자를 1개만 받습니다.");
     }

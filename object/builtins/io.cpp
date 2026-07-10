@@ -10,7 +10,7 @@ using namespace std;
 
 // ===== I/O 내장함수 =====
 
-std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Print::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     string output;
     for (size_t i = 0; i < parameters.size(); i++) {
         if (auto str = dynamic_cast<String*>(parameters[i].get())) {
@@ -53,7 +53,7 @@ std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> par
     return make_shared<Null>();
 }
 
-std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Input::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() > 1) {
         throw runtime_error("입력 함수는 인자를 0개 또는 1개 받습니다.");
     }
@@ -78,7 +78,7 @@ std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> par
     return make_shared<String>(input);
 }
 
-std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> FileRead::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("파일읽기 함수는 인자를 1개 받습니다.");
     }
@@ -116,7 +116,7 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
     return make_shared<String>(buffer.str());
 }
 
-std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> FileWrite::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("파일쓰기 함수는 인자를 2개 받습니다 (파일 경로, 내용).");
     }

@@ -8,7 +8,7 @@ using namespace std;
 
 // ===== 컬렉션 내장함수 (문자열/배열/사전 공통) =====
 
-std::shared_ptr<Object> Length::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Length::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("길이 함수는 인자를 1개만 받습니다.");
     }
@@ -26,7 +26,7 @@ std::shared_ptr<Object> Length::function(std::vector<std::shared_ptr<Object>> pa
     throw runtime_error("길이 함수는 문자열, 배열 또는 사전만 지원합니다.");
 }
 
-std::shared_ptr<Object> Keys::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Keys::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("키목록 함수는 인자를 1개만 받습니다.");
     }
@@ -43,7 +43,7 @@ std::shared_ptr<Object> Keys::function(std::vector<std::shared_ptr<Object>> para
     return array;
 }
 
-std::shared_ptr<Object> Contains::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Contains::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("포함 함수는 인자를 2개 받습니다.");
     }
@@ -70,7 +70,7 @@ std::shared_ptr<Object> Contains::function(std::vector<std::shared_ptr<Object>> 
     throw runtime_error("포함 함수는 사전, 배열 또는 문자열만 지원합니다.");
 }
 
-std::shared_ptr<Object> MapSet::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> MapSet::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("설정 함수는 인자를 3개 받습니다 (사전, 키, 값).");
     }
@@ -87,7 +87,7 @@ std::shared_ptr<Object> MapSet::function(std::vector<std::shared_ptr<Object>> pa
     return make_shared<Null>();
 }
 
-std::shared_ptr<Object> Remove::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Remove::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("삭제 함수는 인자를 2개 받습니다.");
     }

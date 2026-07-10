@@ -7,7 +7,7 @@ using namespace std;
 
 // ===== 타입 변환 내장함수 =====
 
-std::shared_ptr<Object> TypeOf::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> TypeOf::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("타입 함수는 인자를 1개만 받습니다.");
     }
@@ -29,7 +29,7 @@ std::shared_ptr<Object> TypeOf::function(std::vector<std::shared_ptr<Object>> pa
     }
 }
 
-std::shared_ptr<Object> ToInteger::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> ToInteger::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("정수변환 함수는 인자를 1개만 받습니다.");
     }
@@ -54,7 +54,7 @@ std::shared_ptr<Object> ToInteger::function(std::vector<std::shared_ptr<Object>>
     throw runtime_error("정수변환이 지원되지 않는 타입입니다.");
 }
 
-std::shared_ptr<Object> ToFloat::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> ToFloat::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("실수변환 함수는 인자를 1개만 받습니다.");
     }
@@ -76,7 +76,7 @@ std::shared_ptr<Object> ToFloat::function(std::vector<std::shared_ptr<Object>> p
     throw runtime_error("실수변환이 지원되지 않는 타입입니다.");
 }
 
-std::shared_ptr<Object> ToString_::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> ToString_::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("문자변환 함수는 인자를 1개만 받습니다.");
     }
