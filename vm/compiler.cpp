@@ -1,6 +1,8 @@
 #include "compiler.h"
+
 #include "../exception/exception.h"
 #include "../util/type_utils.h"
+#include "peephole.h"
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -67,7 +69,9 @@ uint16_t Compiler::addUpvalue(CompilerState* state, uint16_t index, bool isLocal
 
 
 int Compiler::resolveUpvalue(CompilerState* state, const string& name) {
-    if (state->enclosing == nullptr) return -1;
+    if (state->enclosing == nullptr) {
+        return -1;
+    }
 
     // enclosing의 로컬에서 찾기
     int local = resolveLocal(state->enclosing, name);
@@ -88,13 +92,13 @@ int Compiler::resolveUpvalue(CompilerState* state, const string& name) {
 
 shared_ptr<CompiledFunction> Compiler::Compile(shared_ptr<Program> program) {
     CompilerState state;
-    state.function = make_shared<CompiledFunction>();
+    state.function       = make_shared<CompiledFunction>();
     state.function->name = "";
-    current = &state;
+    current              = &state;
 
     for (size_t i = 0; i < program->statements.size(); i++) {
         bool isLast = (i == program->statements.size() - 1);
-        auto* stmt = program->statements[i].get();
+        auto* stmt  = program->statements[i].get();
 
         // 마지막 문이 ExpressionStatement이면 결과를 스택에 유지 (POP 안 함)
         if (isLast && dynamic_cast<ExpressionStatement*>(stmt)) {
@@ -118,7 +122,18 @@ shared_ptr<CompiledFunction> Compiler::Compile(shared_ptr<Program> program) {
 
 
 void Compiler::optimize(CompiledFunction& fn) {
-    // Peephole optimization pass (placeholder for future patterns)
+    peephole::optimizeChunk(fn);
+    // 중첩 함수(OP_CLOSURE 상수)와 클래스 생성자/메서드에 재귀 적용
+    for (auto& c : fn.constants) {
+        if (auto* nested = dynamic_cast<CompiledFunction*>(c.get())) {
+            optimize(*nested);
+        } else if (auto* ccd = dynamic_cast<CompiledClassDef*>(c.get())) {
+            if (ccd->compiledConstructor) {
+                optimize(*ccd->compiledConstructor);
+            }
+            for (auto& [name, method] : ccd->compiledMethods) {
+                optimize(*method);
+            }
+        }
+    }
 }
-
-

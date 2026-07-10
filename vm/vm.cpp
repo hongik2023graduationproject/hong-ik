@@ -479,6 +479,31 @@ shared_ptr<Object> VM::run() {
                 push(peek(0));
                 break;
 
+            // 융합 명령 (peephole 산출): 기존 핸들러 + pop — 디스패치 1회 절약
+            case OpCode::OP_SET_LOCAL_POP:
+                {
+                    uint16_t slot = readUint16();
+                    size_t idx    = frame.slotOffset + slot;
+                    if (idx >= stack.size()) {
+                        throw RuntimeException("VM 로컬 슬롯이 범위 밖입니다.", currentLine());
+                    }
+                    stack[idx] = peek(0);
+                    pop();
+                    break;
+                }
+            case OpCode::OP_SET_GLOBAL_POP:
+                opSetGlobal();
+                pop();
+                break;
+            case OpCode::OP_SET_UPVALUE_POP:
+                opSetUpvalue();
+                pop();
+                break;
+            case OpCode::OP_SET_MEMBER_POP:
+                opSetMember();
+                pop();
+                break;
+
             case OpCode::OP_RANGE_CHECK:
                 opRangeCheck();
                 break;

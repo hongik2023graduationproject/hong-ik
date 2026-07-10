@@ -63,6 +63,7 @@ set(HONGIK_CORE_SOURCES
         vm/compiler_expr.cpp
         vm/vm.cpp
         vm/vm_handlers.cpp
+        vm/peephole.cpp
         io/io_interface.cpp
         error/hongik_error.cpp
         analyzer/analyzer.cpp
@@ -199,6 +200,7 @@ else()
             tests/lsp_server_test.cpp
             tests/symbol_collector_test.cpp
             tests/benchmark_scenarios_test.cpp
+            tests/peephole_test.cpp
             benchmarks/runner.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.
