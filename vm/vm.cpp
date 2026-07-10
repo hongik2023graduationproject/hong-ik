@@ -44,7 +44,33 @@ namespace {
 
 VM::VM(IOContext* ioCtxPtr, ExecutionLimiter* limiterPtr) : ioCtx(ioCtxPtr), limiter(limiterPtr) {
     stack.reserve(STACK_MAX);
-    builtins = BuiltinRegistry::build(ioCtx);
+    builtins   = BuiltinRegistry::build(ioCtx);
+    auto lenIt = builtins.find("길이");
+    if (lenIt != builtins.end()) {
+        lengthBuiltin_ = lenIt->second;
+    }
+}
+
+// '길이' fast path (spec D3). 지원 타입이 아니면 false — 호출측이 제네릭 경로로 폴스루해
+// 에러 메시지·엣지 시맨틱이 registry 구현과 자동으로 일치한다.
+bool VM::tryLengthOf(const VMValue& arg, long long& out) {
+    if (!arg.isObject()) {
+        return false;
+    }
+    Object* o = arg.asObject().get();
+    if (auto* str = dynamic_cast<String*>(o)) {
+        out = static_cast<long long>(utf8::codePointCount(str->value));
+        return true;
+    }
+    if (auto* arr = dynamic_cast<Array*>(o)) {
+        out = static_cast<long long>(arr->elements.size());
+        return true;
+    }
+    if (auto* hm = dynamic_cast<HashMap*>(o)) {
+        out = static_cast<long long>(hm->pairs.size());
+        return true;
+    }
+    return false;
 }
 
 void VM::push(VMValue value) {

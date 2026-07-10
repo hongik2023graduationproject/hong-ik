@@ -147,21 +147,31 @@ void VM::opCall() {
     uint8_t argCount = readByte();
     auto& callee     = peek(argCount);
 
-    if (callee.isObject() && dynamic_cast<Builtin*>(callee.asObject().get())) {
-        auto* builtin = dynamic_cast<Builtin*>(callee.asObject().get());
-        vector<shared_ptr<Object>> args(argCount);
-        for (int i = 0; i < argCount; i++) {
-            args[i] = peek(argCount - 1 - i).toObject();
+    if (callee.isObject()) {
+        if (auto* builtin = dynamic_cast<Builtin*>(callee.asObject().get())) {
+            // '길이' fast path: 인자 vector·결과 Integer 할당·std::function 디스패치 생략 (spec D3)
+            if (argCount == 1 && builtin == lengthBuiltin_.get()) {
+                long long len;
+                if (tryLengthOf(peek(0), len)) {
+                    stack.resize(stack.size() - 2); // 인자 + callee 제거
+                    push(VMValue::Int(len));
+                    return;
+                }
+            }
+            // 제네릭 경로: 버퍼 재사용 (const& 시그니처라 호출 복사 없음, spec D2)
+            builtinArgs_.clear();
+            for (int i = 0; i < argCount; i++) {
+                builtinArgs_.push_back(peek(argCount - 1 - i).toObject());
+            }
+            stack.resize(stack.size() - argCount - 1); // 인자들 + callee 제거
+            auto result = builtin->function(builtinArgs_);
+            // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를
+            // VMValue::Null()로 정규화.
+            push(VMValue::fromObject(result));
+            return;
         }
-        for (int i = 0; i < argCount; i++) {
-            pop();
-        }
-        pop(); // callee
-        auto result = builtin->function(args);
-        // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를 VMValue::Null()로
-        // 정규화.
-        push(VMValue::fromObject(result));
-    } else if (callee.isObject() && dynamic_cast<Closure*>(callee.asObject().get())) {
+    }
+    if (callee.isObject() && dynamic_cast<Closure*>(callee.asObject().get())) {
         auto* cls = dynamic_cast<Closure*>(callee.asObject().get());
         auto* fn  = cls->function.get();
         fillDefaults(fn, argCount);
@@ -592,16 +602,13 @@ void VM::opInvoke() {
             || dynamic_cast<HashMap*>(obj.asObject().get()))) {
         auto bit = builtins.find(methodName->value);
         if (bit != builtins.end()) {
-            vector<shared_ptr<Object>> args(argCount + 1);
+            builtinArgs_.clear();
+            builtinArgs_.push_back(peek(argCount).toObject()); // target이 args[0]
             for (int i = 0; i < argCount; i++) {
-                args[i + 1] = peek(argCount - 1 - i).toObject();
+                builtinArgs_.push_back(peek(argCount - 1 - i).toObject());
             }
-            for (int i = 0; i < argCount; i++) {
-                pop();
-            }
-            auto target = pop(); // the object itself
-            args[0]     = target.toObject();
-            auto result = bit->second->function(args);
+            stack.resize(stack.size() - argCount - 1); // 인자들 + target 제거
+            auto result = bit->second->function(builtinArgs_);
             push(VMValue::fromObject(result));
             return;
         }

@@ -1,3 +1,4 @@
+#include "benchmarks/runner.h"
 #include "exception/exception.h"
 #include "io/io_interface.h"
 #include "lexer/lexer.h"
@@ -11,6 +12,22 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+
+namespace {
+    // bench::prepare 재사용 — 표준 파이프라인 (trailing \n 포함)
+    std::shared_ptr<Object> runVMSource(const std::string& src) {
+        auto sp = bench::prepare(src + "\n");
+        return bench::runVm(sp);
+    }
+} // namespace
+
+#define EXPECT_THROW_WITH_MESSAGE(stmt, msg)                                           \
+    try {                                                                              \
+        stmt;                                                                          \
+        FAIL() << "예외가 발생하지 않음";                                              \
+    } catch (const std::exception& e) {                                                \
+        EXPECT_TRUE(std::string(e.what()).find(msg) != std::string::npos) << e.what(); \
+    }
 
 using namespace std;
 
@@ -965,4 +982,36 @@ TEST_F(VMTest, TimeoutZeroFiresImmediatelyInLoop) {
                 &limiter);
         },
         RuntimeException);
+}
+
+// ---- VM 최적화 사이클 1: 빌트인 경계 시맨틱 잠금 (spec D2·D3) ----
+// 길이 fast path(VM 네이티브 경로)가 registry 구현과 동일하게 동작하는지 고정.
+TEST(VMBuiltinBoundary, LengthSemanticsLocked) {
+    // (source, expected ToString) — VM 실행 결과
+    EXPECT_EQ(runVMSource("길이(\"가나다\")")->ToString(), "3");
+    EXPECT_EQ(runVMSource("길이(\"\")")->ToString(), "0");
+    EXPECT_EQ(runVMSource("길이([1, 2, 3, 4])")->ToString(), "4");
+    EXPECT_EQ(runVMSource("길이({\"a\": 1, \"b\": 2})")->ToString(), "2");
+    // ASCII+한글 혼합: 코드포인트 기준
+    EXPECT_EQ(runVMSource("길이(\"a가b나\")")->ToString(), "4");
+}
+
+TEST(VMBuiltinBoundary, LengthErrorsFallThroughToGenericPath) {
+    // 지원 안 되는 타입 → registry의 에러 메시지 그대로 (fast path 폴스루 검증)
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("길이(5)"), "길이 함수는 문자열, 배열 또는 사전만 지원합니다.");
+    // 인자 수 오류 → registry 메시지 그대로
+    EXPECT_THROW_WITH_MESSAGE(runVMSource("길이(\"a\", \"b\")"), "길이 함수는 인자를 1개만 받습니다.");
+}
+
+TEST(VMBuiltinBoundary, GenericBuiltinPathStillWorks) {
+    // 재사용 버퍼 경로: 다인자 빌트인 + 스칼라/컬렉션 인자 혼합
+    EXPECT_EQ(runVMSource("최대(3, 7)")->ToString(), "7");
+    EXPECT_EQ(runVMSource("배열 a = []\n추가(a, 1)\n추가(a, 2)\n길이(a)")->ToString(), "2");
+    // 연속 호출에서 버퍼 재사용이 인자를 오염시키지 않는지
+    EXPECT_EQ(runVMSource("최소(최대(1, 2), 최대(3, 4))")->ToString(), "2");
+}
+
+TEST(VMBuiltinBoundary, MethodStyleBuiltinInvoke) {
+    // OP_INVOKE 빌트인 경로 (내장 타입 메서드 호출)
+    EXPECT_EQ(runVMSource("배열 a = [3, 1, 2]\na.길이()")->ToString(), "3");
 }

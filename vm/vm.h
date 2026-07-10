@@ -81,6 +81,10 @@ private:
     std::vector<CallFrame> frames;
     std::unordered_map<std::string, VMValue> globals;
     std::unordered_map<std::string, std::shared_ptr<Builtin>> builtins;
+    // 빌트인 경계 최적화 (spec D2·D3)
+    std::shared_ptr<Builtin> lengthBuiltin_; // '길이' fast path 식별용 (identity 비교)
+    std::vector<std::shared_ptr<Object>> builtinArgs_; // 빌트인 인자 버퍼 재사용 — 빌트인은 VM 재진입 없는 leaf 함수
+    bool tryLengthOf(const VMValue& arg, long long& out);
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
