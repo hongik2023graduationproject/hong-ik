@@ -2,8 +2,8 @@
 #define VM_H
 
 #include "../io/io_interface.h"
-#include "../object/object.h"
 #include "../object/built_in.h"
+#include "../object/object.h"
 #include "../sandbox/execution_limiter.h"
 #include "chunk.h"
 #include "opcode.h"
@@ -20,10 +20,10 @@
 // VM 호출 프레임
 struct CallFrame {
     CompiledFunction* function;
-    size_t ip;                      // 명령 포인터
-    size_t slotOffset;              // 스택 내 로컬 시작 위치
-    bool hasCallee = true;          // OP_CALL은 true, OP_INVOKE는 false
-    Closure* closure = nullptr;     // 클로저인 경우 업밸류 접근용
+    size_t ip; // 명령 포인터
+    size_t slotOffset; // 스택 내 로컬 시작 위치
+    bool hasCallee   = true; // OP_CALL은 true, OP_INVOKE는 false
+    Closure* closure = nullptr; // 클로저인 경우 업밸류 접근용
     bool isGenerator = false;
     std::vector<VMValue> yieldBuffer;
 };
@@ -41,8 +41,12 @@ struct IteratorState : public Object {
     size_t index = 0;
     std::vector<std::string> codePoints; // UTF-8 code points for string iteration
 
-    IteratorState() { type = ObjectType::ITERATOR; }
-    std::string ToString() override { return "<이터레이터>"; }
+    IteratorState() {
+        type = ObjectType::ITERATOR;
+    }
+    std::string ToString() override {
+        return "<이터레이터>";
+    }
 };
 
 class VM {
@@ -56,16 +60,20 @@ public:
     // REPL 세션용: 전역 상태 접근 (external interface stays shared_ptr based)
     std::map<std::string, std::shared_ptr<Object>> getGlobals() {
         std::map<std::string, std::shared_ptr<Object>> result;
-        for (auto& [k, v] : globals) result[k] = v.toObject();
+        for (auto& [k, v] : globals) {
+            result[k] = v.toObject();
+        }
         return result;
     }
     void setGlobals(const std::map<std::string, std::shared_ptr<Object>>& g) {
         globals.clear();
-        for (auto& [k, v] : g) globals[k] = VMValue::fromObject(v);
+        for (auto& [k, v] : g) {
+            globals[k] = VMValue::fromObject(v);
+        }
     }
 
 private:
-    static constexpr size_t STACK_MAX = 65536;
+    static constexpr size_t STACK_MAX  = 65536;
     static constexpr size_t FRAMES_MAX = 256;
 
     std::shared_ptr<CompiledFunction> topLevelFn; // 소유권 유지
@@ -76,7 +84,7 @@ private:
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
-    IOContext* ioCtx = nullptr;
+    IOContext* ioCtx          = nullptr;
     ExecutionLimiter* limiter = nullptr;
 
     // 실행 루프

@@ -1,6 +1,4 @@
 // VM — opcode 핸들러 구현 (Phase 2-2 분할: 실행 루프·스택·binaryOp는 vm.cpp 참조)
-#include "vm.h"
-#include "compiler.h"
 #include "../environment/environment.h"
 #include "../exception/exception.h"
 #include "../lexer/lexer.h"
@@ -8,6 +6,8 @@
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
+#include "compiler.h"
+#include "vm.h"
 #include "vm_internal.h"
 #include <algorithm>
 #include <cmath>
@@ -22,47 +22,55 @@ using vm_internal::vmValueToObjectType;
 
 void VM::opNegate() {
     auto operand = pop();
-    if (operand.isInt())
+    if (operand.isInt()) {
         push(VMValue::Int(-operand.asInt()));
-    else if (operand.isFloat())
+    } else if (operand.isFloat()) {
         push(VMValue::Float(-operand.asFloat()));
-    else
+    } else {
         throw RuntimeException("'-' 전위 연산자가 지원되지 않는 타입입니다.", currentLine());
+    }
 }
 
 void VM::opNot() {
     auto operand = pop();
-    if (operand.isBool())
+    if (operand.isBool()) {
         push(VMValue::Bool(!operand.asBool()));
-    else
+    } else {
         throw RuntimeException("'!' 전위 연산자가 지원되지 않는 타입입니다.", currentLine());
+    }
 }
 
 void VM::opGetGlobal() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
     // 컴파일러는 이 위치에 항상 String 상수를 넣는다(이 invariant는 우리가 직접 만든다).
     // dynamic_cast 비용은 매 전역 접근마다 발생하므로 static_cast로 줄인다.
     auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
-    auto it = globals.find(name->value);
-    if (it != globals.end()) { push(it->second); return; }
+    auto it    = globals.find(name->value);
+    if (it != globals.end()) {
+        push(it->second);
+        return;
+    }
     auto bit = builtins.find(name->value);
-    if (bit != builtins.end()) { push(VMValue::Obj(bit->second)); return; }
+    if (bit != builtins.end()) {
+        push(VMValue::Obj(bit->second));
+        return;
+    }
     throw RuntimeException("'" + name->value + "' 존재하지 않는 식별자입니다.", currentLine());
 }
 
 void VM::opSetGlobal() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
+    auto* name       = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
     globals[name->value] = peek(0);
 }
 
 void VM::opDefineGlobal() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* name = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
-    auto val = pop();
+    auto* name       = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
+    auto val         = pop();
     // 상속 해결: CompiledClassDef의 부모 참조 설정
     if (val.isObject()) {
         if (auto* ccd = dynamic_cast<CompiledClassDef*>(val.asObject().get())) {
@@ -73,14 +81,14 @@ void VM::opDefineGlobal() {
                     if (parentCcd) {
                         ccd->parent = parentCcd;
                         // 부모 필드 병합
-                        vector<string> mergedFieldNames = parentCcd->fieldNames;
+                        vector<string> mergedFieldNames            = parentCcd->fieldNames;
                         vector<shared_ptr<Token>> mergedFieldTypes = parentCcd->fieldTypes;
                         for (size_t i = 0; i < ccd->fieldNames.size(); i++) {
                             bool found = false;
                             for (size_t j = 0; j < mergedFieldNames.size(); j++) {
                                 if (mergedFieldNames[j] == ccd->fieldNames[i]) {
                                     mergedFieldTypes[j] = ccd->fieldTypes[i];
-                                    found = true;
+                                    found               = true;
                                     break;
                                 }
                             }
@@ -116,7 +124,7 @@ void VM::opJump() {
 
 void VM::opJumpIfFalse() {
     uint16_t offset = readUint16();
-    auto condition = pop();
+    auto condition  = pop();
     if (!condition.isBool()) {
         throw RuntimeException("조건식의 결과는 논리(참/거짓) 값이어야 합니다.", currentLine());
     }
@@ -137,7 +145,7 @@ void VM::opLoop() {
 
 void VM::opCall() {
     uint8_t argCount = readByte();
-    auto& callee = peek(argCount);
+    auto& callee     = peek(argCount);
 
     if (callee.isObject() && dynamic_cast<Builtin*>(callee.asObject().get())) {
         auto* builtin = dynamic_cast<Builtin*>(callee.asObject().get());
@@ -145,29 +153,39 @@ void VM::opCall() {
         for (int i = 0; i < argCount; i++) {
             args[i] = peek(argCount - 1 - i).toObject();
         }
-        for (int i = 0; i < argCount; i++) pop();
+        for (int i = 0; i < argCount; i++) {
+            pop();
+        }
         pop(); // callee
         auto result = builtin->function(args);
-        // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를 VMValue::Null()로 정규화.
+        // builtin은 void 의미를 Null 객체로 반환한다 (nullptr 반환 안 함). fromObject가 NULL_OBJ를 VMValue::Null()로
+        // 정규화.
         push(VMValue::fromObject(result));
     } else if (callee.isObject() && dynamic_cast<Closure*>(callee.asObject().get())) {
         auto* cls = dynamic_cast<Closure*>(callee.asObject().get());
-        auto* fn = cls->function.get();
+        auto* fn  = cls->function.get();
         fillDefaults(fn, argCount);
         // 매개변수 타입 체크
         if (!fn->paramTypeChecks.empty()) {
             for (size_t i = 0; i < fn->paramTypeChecks.size() && i < static_cast<size_t>(fn->arity); i++) {
-                if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) continue;
-                auto& arg = stack[stack.size() - fn->arity + i];
+                if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) {
+                    continue;
+                }
+                auto& arg          = stack[stack.size() - fn->arity + i];
                 ObjectType argType = vmValueToObjectType(arg);
                 if (argType == ObjectType::NULL_OBJ) {
-                    if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) continue;
-                    throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)", currentLine());
+                    if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) {
+                        continue;
+                    }
+                    throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1)
+                                               + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)",
+                        currentLine());
                 }
                 if (argType != fn->paramTypeChecks[i]) {
                     throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 ("
-                        + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
-                        + typeToKorean(argType) + " 전달)", currentLine());
+                                               + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
+                                               + typeToKorean(argType) + " 전달)",
+                        currentLine());
                 }
             }
         }
@@ -175,10 +193,10 @@ void VM::opCall() {
             throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
         }
         CallFrame newFrame;
-        newFrame.function = fn;
-        newFrame.ip = 0;
-        newFrame.slotOffset = stack.size() - fn->arity;
-        newFrame.closure = cls;
+        newFrame.function    = fn;
+        newFrame.ip          = 0;
+        newFrame.slotOffset  = stack.size() - fn->arity;
+        newFrame.closure     = cls;
         newFrame.isGenerator = fn->hasYield;
         frames.push_back(newFrame);
     } else if (callee.isObject() && dynamic_cast<CompiledFunction*>(callee.asObject().get())) {
@@ -187,17 +205,24 @@ void VM::opCall() {
         // 매개변수 타입 체크
         if (!fn->paramTypeChecks.empty()) {
             for (size_t i = 0; i < fn->paramTypeChecks.size() && i < static_cast<size_t>(fn->arity); i++) {
-                if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) continue;
-                auto& arg = stack[stack.size() - fn->arity + i];
+                if (fn->paramTypeChecks[i] == ObjectType::NULL_OBJ) {
+                    continue;
+                }
+                auto& arg          = stack[stack.size() - fn->arity + i];
                 ObjectType argType = vmValueToObjectType(arg);
                 if (argType == ObjectType::NULL_OBJ) {
-                    if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) continue;
-                    throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)", currentLine());
+                    if (i < fn->paramOptionals.size() && fn->paramOptionals[i]) {
+                        continue;
+                    }
+                    throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1)
+                                               + "번째 인자 (선택적 타입이 아닌 매개변수에 '없음' 전달)",
+                        currentLine());
                 }
                 if (argType != fn->paramTypeChecks[i]) {
                     throw RuntimeException("함수 인자 타입 오류: " + to_string(i + 1) + "번째 인자 ("
-                        + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
-                        + typeToKorean(argType) + " 전달)", currentLine());
+                                               + typeToKorean(fn->paramTypeChecks[i]) + " 필요, "
+                                               + typeToKorean(argType) + " 전달)",
+                        currentLine());
                 }
             }
         }
@@ -205,16 +230,16 @@ void VM::opCall() {
             throw RuntimeException("최대 호출 프레임 수(" + to_string(FRAMES_MAX) + ")를 초과했습니다.", currentLine());
         }
         CallFrame newFrame;
-        newFrame.function = fn;
-        newFrame.ip = 0;
-        newFrame.slotOffset = stack.size() - fn->arity;
+        newFrame.function    = fn;
+        newFrame.ip          = 0;
+        newFrame.slotOffset  = stack.size() - fn->arity;
         newFrame.isGenerator = fn->hasYield;
         frames.push_back(newFrame);
     } else if (callee.isObject() && dynamic_cast<CompiledClassDef*>(callee.asObject().get())) {
-        auto* classDef = dynamic_cast<CompiledClassDef*>(callee.asObject().get());
-        auto instance = make_shared<Instance>();
+        auto* classDef     = dynamic_cast<CompiledClassDef*>(callee.asObject().get());
+        auto instance      = make_shared<Instance>();
         instance->classDef = dynamic_pointer_cast<ClassDef>(callee.asObject());
-        instance->fields = make_shared<Environment>();
+        instance->fields   = make_shared<Environment>();
         for (auto& fieldName : classDef->fieldNames) {
             instance->fields->Set(fieldName, make_shared<Null>());
         }
@@ -227,17 +252,20 @@ void VM::opCall() {
             stack[stack.size() - ctorFn->arity - 1] = VMValue::Obj(instance);
 
             CallFrame ctorFrame;
-            ctorFrame.function = ctorFn;
-            ctorFrame.ip = 0;
+            ctorFrame.function   = ctorFn;
+            ctorFrame.ip         = 0;
             ctorFrame.slotOffset = stack.size() - ctorFn->arity - 1;
             frames.push_back(ctorFrame);
         } else {
-            for (int i = 0; i < argCount; i++) pop();
+            for (int i = 0; i < argCount; i++) {
+                pop();
+            }
             pop();
             push(VMValue::Obj(instance));
         }
     } else {
-        throw RuntimeException("호출할 수 없는 객체입니다: " + typeToKorean(vmValueToObjectType(callee)) + " 타입", currentLine());
+        throw RuntimeException(
+            "호출할 수 없는 객체입니다: " + typeToKorean(vmValueToObjectType(callee)) + " 타입", currentLine());
     }
 }
 
@@ -250,18 +278,20 @@ std::optional<std::shared_ptr<Object>> VM::opReturn() {
         if (resultType == ObjectType::NULL_OBJ) {
             if (!retFrame.function->returnTypeOptional) {
                 throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다. ("
-                    + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, 없음 반환)", currentLine());
+                                           + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, 없음 반환)",
+                    currentLine());
             }
         } else if (resultType != retFrame.function->returnTypeCheck) {
             throw RuntimeException("함수 반환 타입과 실제 반환의 타입이 일치하지 않습니다. ("
-                + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, "
-                + typeToKorean(resultType) + " 반환)", currentLine());
+                                       + typeToKorean(retFrame.function->returnTypeCheck) + " 필요, "
+                                       + typeToKorean(resultType) + " 반환)",
+                currentLine());
         }
     }
     size_t slotOffset = currentFrame().slotOffset;
-    bool hasCallee = currentFrame().hasCallee;
+    bool hasCallee    = currentFrame().hasCallee;
     bool wasGenerator = currentFrame().isGenerator;
-    auto yieldValues = std::move(currentFrame().yieldBuffer);
+    auto yieldValues  = std::move(currentFrame().yieldBuffer);
     frames.pop_back();
 
     // 현재 프레임의 로컬 스택 정리
@@ -299,7 +329,7 @@ std::optional<std::shared_ptr<Object>> VM::opReturn() {
 
 void VM::opBuildArray() {
     uint16_t count = readUint16();
-    auto array = make_shared<Array>();
+    auto array     = make_shared<Array>();
     array->elements.reserve(count);
     for (uint16_t i = 0; i < count; i++) {
         array->elements.push_back(pop().toObject());
@@ -310,16 +340,18 @@ void VM::opBuildArray() {
 
 void VM::opBuildHashMap() {
     uint16_t count = readUint16();
-    auto hashmap = make_shared<HashMap>();
+    auto hashmap   = make_shared<HashMap>();
     vector<pair<shared_ptr<Object>, shared_ptr<Object>>> pairs;
     for (uint16_t i = 0; i < count; i++) {
         auto value = pop().toObject();
-        auto key = pop().toObject();
+        auto key   = pop().toObject();
         pairs.emplace_back(std::move(key), std::move(value));
     }
     for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
         auto* strKey = dynamic_cast<String*>(it->first.get());
-        if (!strKey) throw RuntimeException("사전의 키는 문자열이어야 합니다.", currentLine());
+        if (!strKey) {
+            throw RuntimeException("사전의 키는 문자열이어야 합니다.", currentLine());
+        }
         hashmap->pairs[strKey->value] = it->second;
     }
     push(VMValue::Obj(hashmap));
@@ -327,7 +359,7 @@ void VM::opBuildHashMap() {
 
 void VM::opBuildTuple() {
     uint16_t count = readUint16();
-    auto tuple = make_shared<Tuple>();
+    auto tuple     = make_shared<Tuple>();
     tuple->elements.reserve(count);
     // 스택은 LIFO이므로 pop 순서가 역순이다. insert(begin(),...)는 O(N²)이므로
     // push_back으로 채운 뒤 한 번에 reverse한다 (opBuildArray와 동일한 패턴).
@@ -339,40 +371,56 @@ void VM::opBuildTuple() {
 }
 
 void VM::opIndexGet() {
-    auto index = pop();
+    auto index      = pop();
     auto collection = pop();
     // Convert to objects for complex operations
-    auto indexObj = index.toObject();
+    auto indexObj      = index.toObject();
     auto collectionObj = collection.toObject();
     if (auto* arr = dynamic_cast<Array*>(collectionObj.get())) {
         auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
+        if (!idx) {
+            throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
+        }
         long long actualIdx = idx->value;
-        if (actualIdx < 0) actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
-        if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
-            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 " + to_string(arr->elements.size()), currentLine());
+        if (actualIdx < 0) {
+            actualIdx = static_cast<long long>(arr->elements.size()) + actualIdx;
+        }
+        if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size())) {
+            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 "
+                                       + to_string(arr->elements.size()),
+                currentLine());
+        }
         push(VMValue::fromObject(arr->elements[actualIdx]));
     } else if (auto* str = dynamic_cast<String*>(collectionObj.get())) {
         auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
-        const auto& cps = str->codePoints();
-        long long len = static_cast<long long>(cps.size());
+        if (!idx) {
+            throw RuntimeException("문자열 인덱스는 정수여야 합니다.", currentLine());
+        }
+        const auto& cps     = str->codePoints();
+        long long len       = static_cast<long long>(cps.size());
         long long actualIdx = idx->value;
-        if (actualIdx < 0) actualIdx = len + actualIdx;
-        if (actualIdx < 0 || actualIdx >= len)
+        if (actualIdx < 0) {
+            actualIdx = len + actualIdx;
+        }
+        if (actualIdx < 0 || actualIdx >= len) {
             throw RuntimeException("문자열의 범위 밖 인덱스입니다.", currentLine());
+        }
         push(VMValue::Obj(make_shared<String>(cps[actualIdx])));
     } else if (auto* hm = dynamic_cast<HashMap*>(collectionObj.get())) {
         auto* key = dynamic_cast<String*>(indexObj.get());
-        if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
+        if (!key) {
+            throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
+        }
         auto it = hm->pairs.find(key->value);
-        if (it == hm->pairs.end())
+        if (it == hm->pairs.end()) {
             throw RuntimeException("사전에 키가 존재하지 않습니다.", currentLine());
+        }
         push(VMValue::fromObject(it->second));
     } else if (auto* tup = dynamic_cast<Tuple*>(collectionObj.get())) {
         auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx || idx->value < 0 || idx->value >= static_cast<long long>(tup->elements.size()))
+        if (!idx || idx->value < 0 || idx->value >= static_cast<long long>(tup->elements.size())) {
             throw RuntimeException("튜플의 범위 밖 인덱스입니다.", currentLine());
+        }
         push(VMValue::fromObject(tup->elements[idx->value]));
     } else {
         throw RuntimeException("인덱스 연산이 지원되지 않는 형식입니다.", currentLine());
@@ -380,23 +428,32 @@ void VM::opIndexGet() {
 }
 
 void VM::opIndexSet() {
-    auto value = pop();
-    auto index = pop();
-    auto collection = pop();
-    auto valueObj = value.toObject();
-    auto indexObj = index.toObject();
+    auto value         = pop();
+    auto index         = pop();
+    auto collection    = pop();
+    auto valueObj      = value.toObject();
+    auto indexObj      = index.toObject();
     auto collectionObj = collection.toObject();
     if (auto* arr = dynamic_cast<Array*>(collectionObj.get())) {
         auto* idx = dynamic_cast<Integer*>(indexObj.get());
-        if (!idx) throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
+        if (!idx) {
+            throw RuntimeException("배열 인덱스는 정수여야 합니다.", currentLine());
+        }
         long long actualIdx = idx->value;
-        if (actualIdx < 0) actualIdx += static_cast<long long>(arr->elements.size());
-        if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size()))
-            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 " + to_string(arr->elements.size()), currentLine());
+        if (actualIdx < 0) {
+            actualIdx += static_cast<long long>(arr->elements.size());
+        }
+        if (actualIdx < 0 || actualIdx >= static_cast<long long>(arr->elements.size())) {
+            throw RuntimeException("배열의 범위 밖 인덱스입니다: 인덱스 " + to_string(idx->value) + ", 배열 크기 "
+                                       + to_string(arr->elements.size()),
+                currentLine());
+        }
         arr->elements[actualIdx] = valueObj;
     } else if (auto* hm = dynamic_cast<HashMap*>(collectionObj.get())) {
         auto* key = dynamic_cast<String*>(indexObj.get());
-        if (!key) throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
+        if (!key) {
+            throw RuntimeException("사전 키는 문자열이어야 합니다.", currentLine());
+        }
         hm->pairs[key->value] = valueObj;
     } else {
         throw RuntimeException("인덱스 대입이 지원되지 않는 형식입니다.", currentLine());
@@ -407,11 +464,11 @@ void VM::opIndexSet() {
 void VM::opSlice() {
     uint8_t flags = readByte();
     bool hasStart = flags & 0x01;
-    bool hasEnd = flags & 0x02;
+    bool hasEnd   = flags & 0x02;
 
-    shared_ptr<Object> endObj = hasEnd ? pop().toObject() : nullptr;
+    shared_ptr<Object> endObj   = hasEnd ? pop().toObject() : nullptr;
     shared_ptr<Object> startObj = hasStart ? pop().toObject() : nullptr;
-    auto collectionObj = pop().toObject();
+    auto collectionObj          = pop().toObject();
 
     if (auto* arr = dynamic_cast<Array*>(collectionObj.get())) {
         long long len = static_cast<long long>(arr->elements.size());
@@ -419,17 +476,29 @@ void VM::opSlice() {
 
         if (startObj) {
             auto* si = dynamic_cast<Integer*>(startObj.get());
-            if (!si) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+            if (!si) {
+                throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+            }
             s = si->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
+            if (s < 0) {
+                s = len + s;
+            }
+            if (s < 0) {
+                s = 0;
+            }
         }
         if (endObj) {
             auto* ei = dynamic_cast<Integer*>(endObj.get());
-            if (!ei) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+            if (!ei) {
+                throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+            }
             e = ei->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+            if (e < 0) {
+                e = len + e;
+            }
+            if (e > len) {
+                e = len;
+            }
         }
         auto result = make_shared<Array>();
         for (long long i = s; i < e; i++) {
@@ -442,22 +511,35 @@ void VM::opSlice() {
 
         if (startObj) {
             auto* si = dynamic_cast<Integer*>(startObj.get());
-            if (!si) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+            if (!si) {
+                throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", currentLine());
+            }
             s = si->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
+            if (s < 0) {
+                s = len + s;
+            }
+            if (s < 0) {
+                s = 0;
+            }
         }
         if (endObj) {
             auto* ei = dynamic_cast<Integer*>(endObj.get());
-            if (!ei) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+            if (!ei) {
+                throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", currentLine());
+            }
             e = ei->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+            if (e < 0) {
+                e = len + e;
+            }
+            if (e > len) {
+                e = len;
+            }
         }
         if (s >= e) {
             push(VMValue::Obj(make_shared<String>("")));
         } else {
-            push(VMValue::Obj(make_shared<String>(utf8::substringCodePoints(str->value, static_cast<size_t>(s), static_cast<size_t>(e)))));
+            push(VMValue::Obj(make_shared<String>(
+                utf8::substringCodePoints(str->value, static_cast<size_t>(s), static_cast<size_t>(e)))));
         }
     } else {
         throw RuntimeException("슬라이스 연산이 지원되지 않는 형식입니다.", currentLine());
@@ -465,14 +547,17 @@ void VM::opSlice() {
 }
 
 void VM::opGetMember() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
     auto* memberName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
-    auto obj = pop();
+    auto obj         = pop();
     if (obj.isObject()) {
         if (auto* inst = dynamic_cast<Instance*>(obj.asObject().get())) {
             auto val = inst->fields->Get(memberName->value);
-            if (val) { push(VMValue::fromObject(val)); return; }
+            if (val) {
+                push(VMValue::fromObject(val));
+                return;
+            }
             throw RuntimeException("인스턴스에 '" + memberName->value + "' 필드가 존재하지 않습니다.", currentLine());
         }
     }
@@ -480,11 +565,11 @@ void VM::opGetMember() {
 }
 
 void VM::opSetMember() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
     auto* memberName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
-    auto instance = pop();
-    auto& value = peek(0);
+    auto instance    = pop();
+    auto& value      = peek(0);
     if (instance.isObject()) {
         if (auto* inst = dynamic_cast<Instance*>(instance.asObject().get())) {
             inst->fields->Set(memberName->value, value.toObject());
@@ -495,24 +580,27 @@ void VM::opSetMember() {
 }
 
 void VM::opInvoke() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
     uint8_t argCount = readByte();
     auto* methodName = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
-    auto& obj = peek(argCount);
+    auto& obj        = peek(argCount);
 
     // 내장 타입에 대한 메서드 호출 지원
-    if (obj.isObject() &&
-        (dynamic_cast<String*>(obj.asObject().get()) || dynamic_cast<Array*>(obj.asObject().get()) || dynamic_cast<HashMap*>(obj.asObject().get()))) {
+    if (obj.isObject()
+        && (dynamic_cast<String*>(obj.asObject().get()) || dynamic_cast<Array*>(obj.asObject().get())
+            || dynamic_cast<HashMap*>(obj.asObject().get()))) {
         auto bit = builtins.find(methodName->value);
         if (bit != builtins.end()) {
             vector<shared_ptr<Object>> args(argCount + 1);
             for (int i = 0; i < argCount; i++) {
                 args[i + 1] = peek(argCount - 1 - i).toObject();
             }
-            for (int i = 0; i < argCount; i++) pop();
+            for (int i = 0; i < argCount; i++) {
+                pop();
+            }
             auto target = pop(); // the object itself
-            args[0] = target.toObject();
+            args[0]     = target.toObject();
             auto result = bit->second->function(args);
             push(VMValue::fromObject(result));
             return;
@@ -528,14 +616,15 @@ void VM::opInvoke() {
                     auto* methodFn = it->second.get();
                     fillDefaults(methodFn, static_cast<int>(argCount));
                     CallFrame methodFrame;
-                    methodFrame.function = methodFn;
-                    methodFrame.ip = 0;
+                    methodFrame.function   = methodFn;
+                    methodFrame.ip         = 0;
                     methodFrame.slotOffset = stack.size() - methodFn->arity - 1;
-                    methodFrame.hasCallee = false;
+                    methodFrame.hasCallee  = false;
                     frames.push_back(methodFrame);
                     return;
                 }
-                throw RuntimeException("인스턴스에 '" + methodName->value + "' 메서드가 존재하지 않습니다.", currentLine());
+                throw RuntimeException(
+                    "인스턴스에 '" + methodName->value + "' 메서드가 존재하지 않습니다.", currentLine());
             }
             throw RuntimeException("VM에서 지원하지 않는 클래스 형식입니다.", currentLine());
         }
@@ -546,14 +635,16 @@ void VM::opInvoke() {
 void VM::opTryBegin() {
     uint16_t catchOffset = readUint16();
     ExceptionHandler handler;
-    handler.catchIp = currentFrame().ip + catchOffset;
+    handler.catchIp    = currentFrame().ip + catchOffset;
     handler.frameDepth = static_cast<int>(frames.size());
     handler.stackDepth = stack.size();
     exceptionHandlers.push_back(handler);
 }
 
 void VM::opTryEnd() {
-    if (!exceptionHandlers.empty()) exceptionHandlers.pop_back();
+    if (!exceptionHandlers.empty()) {
+        exceptionHandlers.pop_back();
+    }
 }
 
 void VM::opIterInit() {
@@ -564,9 +655,9 @@ void VM::opIterInit() {
         && !dynamic_cast<GeneratorObject*>(iterable.get())) {
         throw RuntimeException("각각 반복문은 배열, 문자열 또는 제너레이터만 지원합니다.", currentLine());
     }
-    auto iter = make_shared<IteratorState>();
+    auto iter      = make_shared<IteratorState>();
     iter->iterable = iterable;
-    iter->index = 0;
+    iter->index    = 0;
     if (auto* str = dynamic_cast<String*>(iterable.get())) {
         iter->codePoints = str->codePoints();
     }
@@ -575,10 +666,14 @@ void VM::opIterInit() {
 
 void VM::opIterNext() {
     uint16_t exitOffset = readUint16();
-    auto& iterVal = peek(0);
-    if (!iterVal.isObject()) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    auto& iterVal       = peek(0);
+    if (!iterVal.isObject()) {
+        throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    }
     auto* iter = dynamic_cast<IteratorState*>(iterVal.asObject().get());
-    if (!iter) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    if (!iter) {
+        throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    }
 
     bool exhausted = false;
     if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
@@ -599,9 +694,13 @@ void VM::opIterNext() {
 
 void VM::opIterValue() {
     auto& iterVal = peek(0);
-    if (!iterVal.isObject()) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    if (!iterVal.isObject()) {
+        throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    }
     auto* iter = dynamic_cast<IteratorState*>(iterVal.asObject().get());
-    if (!iter) throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    if (!iter) {
+        throw RuntimeException("유효하지 않은 이터레이터입니다.", currentLine());
+    }
 
     if (auto* arr = dynamic_cast<Array*>(iter->iterable.get())) {
         if (iter->index >= arr->elements.size()) {
@@ -621,10 +720,11 @@ void VM::opIterValue() {
 }
 
 void VM::opClosure() {
-    auto& frame = currentFrame();
+    auto& frame       = currentFrame();
     uint16_t constIdx = readUint16();
     // 컴파일러는 OP_CLOSURE 위치에 항상 CompiledFunction 상수를 둔다.
-    auto fn = static_pointer_cast<CompiledFunction>(checkedConstant(frame.function->constants, constIdx, currentLine()));
+    auto fn =
+        static_pointer_cast<CompiledFunction>(checkedConstant(frame.function->constants, constIdx, currentLine()));
     auto closure = make_shared<Closure>(fn);
 
     uint8_t upvalueCount = readByte();
@@ -632,11 +732,11 @@ void VM::opClosure() {
 
     for (uint8_t i = 0; i < upvalueCount; i++) {
         uint8_t isLocal = readByte();
-        uint16_t index = readUint16();
+        uint16_t index  = readUint16();
         if (isLocal) {
             // enclosing 함수의 로컬 변수를 캡처
-            auto uv = make_shared<Upvalue>();
-            uv->value = stack[frame.slotOffset + index].toObject();
+            auto uv              = make_shared<Upvalue>();
+            uv->value            = stack[frame.slotOffset + index].toObject();
             closure->upvalues[i] = uv;
         } else {
             // enclosing 함수의 업밸류를 체이닝
@@ -649,7 +749,7 @@ void VM::opClosure() {
 }
 
 void VM::opGetUpvalue() {
-    auto& frame = currentFrame();
+    auto& frame   = currentFrame();
     uint16_t slot = readUint16();
     if (frame.closure && slot < frame.closure->upvalues.size()) {
         push(VMValue::fromObject(frame.closure->upvalues[slot]->value));
@@ -659,7 +759,7 @@ void VM::opGetUpvalue() {
 }
 
 void VM::opSetUpvalue() {
-    auto& frame = currentFrame();
+    auto& frame   = currentFrame();
     uint16_t slot = readUint16();
     if (frame.closure && slot < frame.closure->upvalues.size()) {
         frame.closure->upvalues[slot]->value = peek(0).toObject();
@@ -667,31 +767,32 @@ void VM::opSetUpvalue() {
 }
 
 void VM::opRangeCheck() {
-    auto endVal = pop();
+    auto endVal   = pop();
     auto startVal = pop();
-    auto subject = pop();
-    bool result = false;
-    if (subject.isInt() &&
-        startVal.isInt() &&
-        endVal.isInt()) {
-        auto sv = subject.asInt();
+    auto subject  = pop();
+    bool result   = false;
+    if (subject.isInt() && startVal.isInt() && endVal.isInt()) {
+        auto sv       = subject.asInt();
         auto sv_start = startVal.asInt();
-        auto sv_end = endVal.asInt();
-        result = (sv >= sv_start && sv <= sv_end);
+        auto sv_end   = endVal.asInt();
+        result        = (sv >= sv_start && sv <= sv_end);
     } else {
         // float/mixed numeric range
         auto toDouble = [](const VMValue& v) -> double {
-            if (v.isFloat()) return v.asFloat();
-            if (v.isInt()) return static_cast<double>(v.asInt());
+            if (v.isFloat()) {
+                return v.asFloat();
+            }
+            if (v.isInt()) {
+                return static_cast<double>(v.asInt());
+            }
             return 0.0;
         };
-        if ((subject.isInt() || subject.isFloat()) &&
-            (startVal.isInt() || startVal.isFloat()) &&
-            (endVal.isInt() || endVal.isFloat())) {
-            double sv = toDouble(subject);
+        if ((subject.isInt() || subject.isFloat()) && (startVal.isInt() || startVal.isFloat())
+            && (endVal.isInt() || endVal.isFloat())) {
+            double sv       = toDouble(subject);
             double sv_start = toDouble(startVal);
-            double sv_end = toDouble(endVal);
-            result = (sv >= sv_start && sv <= sv_end);
+            double sv_end   = toDouble(endVal);
+            result          = (sv >= sv_start && sv <= sv_end);
         }
     }
     push(VMValue::Bool(result));
@@ -699,26 +800,36 @@ void VM::opRangeCheck() {
 
 void VM::opTypeCheck() {
     uint16_t typeIdx = readUint16();
-    auto subject = pop();
+    auto subject     = pop();
     auto typeNameObj = checkedConstant(currentFrame().function->constants, typeIdx, currentLine());
-    string typeName = typeNameObj->ToString();
-    bool result = false;
+    string typeName  = typeNameObj->ToString();
+    bool result      = false;
     // Map VMValue tag to ObjectType for comparison
     ObjectType subjectType;
     switch (subject.kind()) {
-    case ValueTag::INT: subjectType = ObjectType::INTEGER; break;
-    case ValueTag::FLOAT: subjectType = ObjectType::FLOAT; break;
-    case ValueTag::BOOL: subjectType = ObjectType::BOOLEAN; break;
-    case ValueTag::NULL_V: subjectType = ObjectType::NULL_OBJ; break;
-    case ValueTag::OBJECT: subjectType = subject.asObject()->type; break;
+    case ValueTag::INT:
+        subjectType = ObjectType::INTEGER;
+        break;
+    case ValueTag::FLOAT:
+        subjectType = ObjectType::FLOAT;
+        break;
+    case ValueTag::BOOL:
+        subjectType = ObjectType::BOOLEAN;
+        break;
+    case ValueTag::NULL_V:
+        subjectType = ObjectType::NULL_OBJ;
+        break;
+    case ValueTag::OBJECT:
+        subjectType = subject.asObject()->type;
+        break;
     }
     static const unordered_map<string, ObjectType> typeMap = {
-        {"\xEC\xA0\x95\xEC\x88\x98", ObjectType::INTEGER},       // 정수
-        {"\xEC\x8B\xA4\xEC\x88\x98", ObjectType::FLOAT},        // 실수
-        {"\xEB\xAC\xB8\xEC\x9E\x90", ObjectType::STRING},       // 문자
-        {"\xEB\x85\xBC\xEB\xA6\xAC", ObjectType::BOOLEAN},      // 논리
-        {"\xEB\xB0\xB0\xEC\x97\xB4", ObjectType::ARRAY},        // 배열
-        {"\xEC\x82\xAC\xEC\xA0\x84", ObjectType::HASH_MAP},     // 사전
+        {"\xEC\xA0\x95\xEC\x88\x98", ObjectType::INTEGER}, // 정수
+        {"\xEC\x8B\xA4\xEC\x88\x98", ObjectType::FLOAT}, // 실수
+        {"\xEB\xAC\xB8\xEC\x9E\x90", ObjectType::STRING}, // 문자
+        {"\xEB\x85\xBC\xEB\xA6\xAC", ObjectType::BOOLEAN}, // 논리
+        {"\xEB\xB0\xB0\xEC\x97\xB4", ObjectType::ARRAY}, // 배열
+        {"\xEC\x82\xAC\xEC\xA0\x84", ObjectType::HASH_MAP}, // 사전
     };
     auto it = typeMap.find(typeName);
     if (it != typeMap.end()) {
@@ -740,31 +851,47 @@ void VM::opAssertBool() {
 void VM::opDeclCheck() {
     uint16_t typeIdx = readUint16();
     auto typeNameObj = checkedConstant(currentFrame().function->constants, typeIdx, currentLine());
-    string typeName = typeNameObj->ToString();
+    string typeName  = typeNameObj->ToString();
 
     bool optional = !typeName.empty() && typeName.back() == '?';
-    if (optional) typeName.pop_back();
+    if (optional) {
+        typeName.pop_back();
+    }
 
     const VMValue& value = peek(0);
     if (value.isNull()) {
-        if (optional) return;  // 타입? <- 없음 허용
+        if (optional) {
+            return; // 타입? <- 없음 허용
+        }
         throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", currentLine());
     }
 
     ObjectType valueType;
     switch (value.kind()) {
-    case ValueTag::INT: valueType = ObjectType::INTEGER; break;
-    case ValueTag::FLOAT: valueType = ObjectType::FLOAT; break;
-    case ValueTag::BOOL: valueType = ObjectType::BOOLEAN; break;
-    case ValueTag::NULL_V: valueType = ObjectType::NULL_OBJ; break;
-    case ValueTag::OBJECT: valueType = value.asObject()->type; break;
+    case ValueTag::INT:
+        valueType = ObjectType::INTEGER;
+        break;
+    case ValueTag::FLOAT:
+        valueType = ObjectType::FLOAT;
+        break;
+    case ValueTag::BOOL:
+        valueType = ObjectType::BOOLEAN;
+        break;
+    case ValueTag::NULL_V:
+        valueType = ObjectType::NULL_OBJ;
+        break;
+    case ValueTag::OBJECT:
+        valueType = value.asObject()->type;
+        break;
     }
 
     // 클래스 타입 표기: 인스턴스 + 부모 체인 (서브타입 허용 — spec D1/#6)
     if (valueType == ObjectType::INSTANCE) {
         auto* inst = static_cast<Instance*>(value.asObject().get());
         for (auto def = inst->classDef; def; def = def->parent) {
-            if (def->name == typeName) return;
+            if (def->name == typeName) {
+                return;
+            }
         }
         throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", currentLine());
     }
@@ -780,9 +907,9 @@ void VM::opDeclCheck() {
 }
 
 void VM::opImport() {
-    auto& frame = currentFrame();
+    auto& frame      = currentFrame();
     uint16_t nameIdx = readUint16();
-    auto* filename = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
+    auto* filename   = static_cast<String*>(checkedConstant(frame.function->constants, nameIdx, currentLine()).get());
 
     // 경로 탐색 방지 (FileRead/FileWrite와 동일한 정책; 완전한 샌드박스는 아님)
     const string& path = filename->value;
@@ -808,7 +935,9 @@ void VM::opImport() {
     }
 
     // Skip if already imported
-    if (importedFiles.count(canonicalPath)) return;
+    if (importedFiles.count(canonicalPath)) {
+        return;
+    }
     importedFiles.insert(canonicalPath);
 
     // Read file
@@ -830,11 +959,15 @@ void VM::opImport() {
     while (getline(importStream, srcLine)) {
         srcLine += "\n";
         auto utf8chars = Utf8Converter::Convert(srcLine);
-        auto tokens = importLexer.Tokenize(utf8chars);
+        auto tokens    = importLexer.Tokenize(utf8chars);
         allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
         for (auto& t : tokens) {
-            if (t->type == TokenType::START_BLOCK) indent++;
-            if (t->type == TokenType::END_BLOCK) indent--;
+            if (t->type == TokenType::START_BLOCK) {
+                indent++;
+            }
+            if (t->type == TokenType::END_BLOCK) {
+                indent--;
+            }
         }
     }
     for (int i = 0; i < indent; i++) {
@@ -855,10 +988,10 @@ void VM::opImport() {
 
     // Execute imported code in current VM context
     CallFrame importFrame;
-    importFrame.function = importedFn.get();
-    importFrame.ip = 0;
+    importFrame.function   = importedFn.get();
+    importFrame.ip         = 0;
     importFrame.slotOffset = stack.size();
-    importFrame.hasCallee = false;
+    importFrame.hasCallee  = false;
     frames.push_back(importFrame);
 }
 
@@ -877,6 +1010,8 @@ void VM::opInterpolate() {
     }
     std::reverse(segments.begin(), segments.end());
     string result;
-    for (auto& seg : segments) result += seg.toString();
+    for (auto& seg : segments) {
+        result += seg.toString();
+    }
     push(VMValue::Obj(make_shared<String>(result)));
 }
