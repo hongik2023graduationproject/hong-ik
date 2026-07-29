@@ -83,7 +83,7 @@ jobs:
       # ────────────────────────────────────────
       - name: PR 산출물 업로드
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hongik-wasm-pr-${{ github.event.pull_request.number }}
           path: wasm-dist/
