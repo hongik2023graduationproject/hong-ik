@@ -127,6 +127,16 @@ TEST(BoundaryTest, ModerateRecursionRunsOnBothBackends) {
     expectIntegerOnBoth(countDown(50), 50);
 }
 
+TEST(BoundaryTest, EvalReportsRecursionLimitInsteadOfCrashing) {
+    auto sp = bench::prepare(countDown(1100));
+    try {
+        bench::runEval(sp);
+        FAIL() << "재귀 한도 초과가 오류로 보고되지 않음";
+    } catch (const std::exception& e) {
+        EXPECT_NE(std::string(e.what()).find("최대 재귀 깊이"), std::string::npos) << e.what();
+    }
+}
+
 TEST(BoundaryTest, VmReportsFrameLimitInsteadOfCrashing) {
     auto sp = bench::prepare(countDown(300));
     try {

@@ -39,6 +39,24 @@ function(hongik_apply_sanitizers target)
     endif()
 endfunction()
 
+# ----------------------------------------------------------------------------
+# Windows 실행 파일 스택 크기
+#
+# 재귀 하강 파서·컴파일러·트리워킹 평가기는 AST 깊이만큼 C++ 스택을 쓴다. Windows 기본 스택
+# (MSVC 1MB, MinGW 2MB)으로는 평가기 재귀 한도(1000)에 닿기 전에 스택이 넘쳐 프로세스가 죽는다.
+# 16MB에서 MSVC Release·MSVC ASan·MinGW 모두 평가기 한도가 먼저 걸리고, VM은 식 깊이 5000 이상을 처리한다.
+# 예약 크기라 실제 메모리는 쓰는 만큼만 잡힌다. Linux/macOS는 ulimit(기본 8MB)을 따른다.
+# ----------------------------------------------------------------------------
+set(HONGIK_STACK_BYTES 16777216 CACHE STRING "Windows 실행 파일의 스택 예약 크기(바이트)")
+
+function(hongik_apply_stack_size target)
+    if(MSVC)
+        target_link_options(${target} PRIVATE "/STACK:${HONGIK_STACK_BYTES}")
+    elseif(WIN32)
+        target_link_options(${target} PRIVATE "-Wl,--stack,${HONGIK_STACK_BYTES}")
+    endif()
+endfunction()
+
 # 공통 소스 (네이티브 + WASM 모두 사용)
 set(HONGIK_CORE_SOURCES
         repl/repl.cpp
@@ -171,6 +189,7 @@ else()
     add_executable(hongik-lsp lsp/main.cpp)
     target_link_libraries(hongik-lsp HongIkLspLib)
     hongik_apply_sanitizers(hongik-lsp)
+    hongik_apply_stack_size(hongik-lsp)
 
     enable_testing()
 
@@ -180,6 +199,7 @@ else()
     add_executable(HongIk main.cpp)
     target_link_libraries(HongIk HongIkLib)
     hongik_apply_sanitizers(HongIk)
+    hongik_apply_stack_size(HongIk)
 
     add_executable(HongIkBenchmarks benchmarks/main.cpp benchmarks/runner.cpp)
     target_include_directories(HongIkBenchmarks PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -187,6 +207,7 @@ else()
     target_compile_definitions(HongIkBenchmarks PRIVATE
             "HONGIK_BENCH_SCENARIO_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/scenarios\"")
     hongik_apply_sanitizers(HongIkBenchmarks)
+    hongik_apply_stack_size(HongIkBenchmarks)
 
     add_executable(HongIkTests
             tests/lexer_test.cpp
@@ -231,6 +252,7 @@ else()
             GTest::gtest_main
     )
     hongik_apply_sanitizers(HongIkTests)
+    hongik_apply_stack_size(HongIkTests)
 
     include(GoogleTest)
     gtest_discover_tests(HongIkTests)
