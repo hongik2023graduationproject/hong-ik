@@ -8,6 +8,7 @@
 #include "../object/builtin_registry.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/checked_int.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
@@ -842,28 +843,11 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
         return make_shared<Integer>(lv % rv);
     }
     if (token->type == TokenType::POWER) {
-        long long result = 1;
-        long long base = lv;
-        long long exp = rv;
-        if (exp < 0) return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
-        // long long signed overflow는 UB이므로 곱셈 전에 오버플로 가능성을 검사하고,
-        // 가능성이 보이면 즉시 double 경로로 폴백한다. (VM::binaryOp의 mulOverflowsLL과 동일 정책)
-        constexpr long long kMax = std::numeric_limits<long long>::max();
-        constexpr long long kMin = std::numeric_limits<long long>::min();
-        for (long long i = 0; i < exp; i++) {
-            if (result != 0 && base != 0) {
-                if (result == kMin || base == kMin) {
-                    return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
-                }
-                long long absResult = result < 0 ? -result : result;
-                long long absBase = base < 0 ? -base : base;
-                if (absResult > kMax / absBase) {
-                    return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
-                }
-            }
-            result *= base;
+        // 음수 지수이거나 정수로 넘치면 double 경로로 폴백한다 (VM::binaryOp와 같은 checked_int::pow).
+        if (rv >= 0) {
+            if (auto exact = checked_int::pow(lv, rv)) return make_shared<Integer>(*exact);
         }
-        return make_shared<Integer>(result);
+        return make_shared<Float>(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
     }
     if (token->type == TokenType::BITWISE_AND) return make_shared<Integer>(lv & rv);
     if (token->type == TokenType::BITWISE_OR) return make_shared<Integer>(lv | rv);

@@ -6,6 +6,7 @@
 #include "../object/builtin_registry.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/checked_int.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include "compiler.h"
@@ -21,26 +22,6 @@
 using namespace std;
 using vm_internal::checkedConstant;
 using vm_internal::vmValueToObjectType;
-
-namespace {
-    // 이식성 있는 signed long long 곱셈 오버플로 검사.
-    // __builtin_mul_overflow는 GCC/Clang 전용이라 MSVC에서 컴파일이 깨진다.
-    bool mulOverflowsLL(long long a, long long b) {
-        if (a == 0 || b == 0) {
-            return false;
-        }
-        constexpr long long kMax = std::numeric_limits<long long>::max();
-        constexpr long long kMin = std::numeric_limits<long long>::min();
-        // std::abs(kMin)은 UB이므로 별도 처리한다.
-        if (a == kMin || b == kMin) {
-            return true;
-        }
-        long long absA = a < 0 ? -a : a;
-        long long absB = b < 0 ? -b : b;
-        return absA > kMax / absB;
-    }
-
-} // namespace
 
 VM::VM(IOContext* ioCtxPtr, ExecutionLimiter* limiterPtr) : ioCtx(ioCtxPtr), limiter(limiterPtr) {
     stack.reserve(STACK_MAX);
@@ -176,19 +157,13 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
             return VMValue::Int(lv % rv);
         case OpCode::OP_POW:
             {
-                if (rv < 0) {
-                    return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
-                }
-                // 누적 곱 시 long long 오버플로가 감지되면 즉시 double 경로로 폴백한다.
-                // 그대로 두면 signed integer overflow가 일어나 UB가 발생하고 잘못된 정수 결과가 반환된다.
-                long long result = 1;
-                for (long long i = 0; i < rv; i++) {
-                    if (mulOverflowsLL(result, lv)) {
-                        return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
+                // 음수 지수이거나 정수로 넘치면 double 경로로 폴백한다 (signed overflow UB 방지).
+                if (rv >= 0) {
+                    if (auto exact = checked_int::pow(lv, rv)) {
+                        return VMValue::Int(*exact);
                     }
-                    result *= lv;
                 }
-                return VMValue::Int(result);
+                return VMValue::Float(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
             }
         case OpCode::OP_BITWISE_AND:
             return VMValue::Int(lv & rv);
