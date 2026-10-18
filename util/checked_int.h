@@ -22,6 +22,9 @@ namespace checked_int {
     inline constexpr const char* kFloatToIntegerMessage
         = "실수 값을 정수로 변환할 수 없습니다 (정수 범위 밖이거나 무한대·NaN입니다).";
 
+    // JSON 숫자가 정수(long long)나 실수(double) 범위를 벗어났을 때의 런타임 오류 문구.
+    inline constexpr const char* kJsonNumberOutOfRangeMessage = "JSON 숫자가 범위를 벗어났습니다";
+
     // 실수를 0 방향으로 버려 정수로 바꾼다. 범위 밖·무한대·NaN이면 nullopt (그대로 캐스팅하면 UB).
     // -2^63과 2^63은 double로 정확히 표현되므로 [-2^63, 2^63) 안이면 변환이 정의된다. NaN은 비교가 거짓이라 걸러진다.
     inline std::optional<long long> fromDouble(double value) {

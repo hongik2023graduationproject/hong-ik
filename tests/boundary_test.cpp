@@ -117,6 +117,22 @@ TEST(BoundaryTest, FloatToIntegerOutOfRangeIsAnError) {
     }
 }
 
+TEST(BoundaryTest, JsonNumbersInsideInt64StayExactIntegers) {
+    constexpr long long kMax = std::numeric_limits<long long>::max();
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    expectIntegerOnBoth("JSON_파싱(\"9007199254740993\")", 9007199254740993LL); // 2^53+1, 실수로 바뀌면 정밀도를 잃는다
+    expectIntegerOnBoth("JSON_파싱(\"9223372036854775807\")", kMax);
+    expectIntegerOnBoth("JSON_파싱(\"-9223372036854775808\")", kMin);
+    expectFloatOnBoth("JSON_파싱(\"1.5e10\")");
+}
+
+TEST(BoundaryTest, JsonNumbersOutOfRangeAreRejected) {
+    for (const std::string number :
+        {"9223372036854775808", "-9223372036854775809", "99999999999999999999", "1e999", "-1e999", "1e-400"}) {
+        expectRuntimeErrorOnBoth("JSON_파싱(\"" + number + "\")", "JSON 숫자가 범위를 벗어났습니다");
+    }
+}
+
 TEST(BoundaryTest, PowerKeepsIntegerWhenItFitsAndFallsBackToFloatOtherwise) {
     expectIntegerOnBoth("2 ** 62", 4611686018427387904LL);
     expectIntegerOnBoth("3 ** 39", 4052555153018976267LL);
