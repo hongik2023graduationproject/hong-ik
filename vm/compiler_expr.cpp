@@ -321,8 +321,14 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
             }
             result = leftInt * rightInt;
             break;
-        case TokenType::SLASH: result = leftInt / rightInt; break;
-        case TokenType::PERCENT: result = leftInt % rightInt; break;
+        case TokenType::SLASH: {
+            // 범위를 넘는 몫(LLONG_MIN / -1)은 폴딩하지 않고 런타임 오류에 맡긴다.
+            auto quotient = checked_int::div(leftInt, rightInt);
+            if (!quotient) return false;
+            result = *quotient;
+            break;
+        }
+        case TokenType::PERCENT: result = checked_int::mod(leftInt, rightInt); break;
         case TokenType::POWER: {
             // 음수 지수이거나 정수로 넘치면 폴딩하지 않고 런타임(실수 폴백)에 맡긴다.
             if (rightInt < 0) return false;

@@ -149,12 +149,15 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
             if (rv == 0) {
                 throw RuntimeException("0으로 나눌 수 없습니다.", line);
             }
-            return VMValue::Int(lv / rv);
+            if (auto quotient = checked_int::div(lv, rv)) {
+                return VMValue::Int(*quotient);
+            }
+            throw RuntimeException(checked_int::kOverflowMessage, line);
         case OpCode::OP_MOD:
             if (rv == 0) {
                 throw RuntimeException("0으로 나눌 수 없습니다.", line);
             }
-            return VMValue::Int(lv % rv);
+            return VMValue::Int(checked_int::mod(lv, rv));
         case OpCode::OP_POW:
             {
                 // 음수 지수이거나 정수로 넘치면 double 경로로 폴백한다 (signed overflow UB 방지).

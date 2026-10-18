@@ -33,6 +33,19 @@ namespace {
         EXPECT_NE(dynamic_cast<Float*>(r.eval.get()), nullptr) << "트리워킹 결과가 실수가 아님: " << source;
     }
 
+    void expectRuntimeErrorOnBoth(const std::string& source, const std::string& message) {
+        auto sp = bench::prepare(source);
+        for (bool vm : {true, false}) {
+            try {
+                vm ? bench::runVm(sp) : bench::runEval(sp);
+                ADD_FAILURE() << (vm ? "VM" : "트리워킹") << "에서 오류가 나지 않음: " << source;
+            } catch (const std::exception& e) {
+                EXPECT_NE(std::string(e.what()).find(message), std::string::npos)
+                    << (vm ? "VM: " : "트리워킹: ") << e.what();
+            }
+        }
+    }
+
     std::string nestedParens(int depth) {
         return std::string(depth, '(') + "1" + std::string(depth, ')');
     }
@@ -63,6 +76,20 @@ TEST(BoundaryTest, IntegerLimitsStayExact) {
     expectIntegerOnBoth("9223372036854775806 + 1", kMax);
     expectIntegerOnBoth("-9223372036854775807 / -1", kMax);
     expectIntegerOnBoth("-9223372036854775807 % 10", -7);
+}
+
+TEST(BoundaryTest, MinIntegerDividedByMinusOneIsAnErrorNotACrash) {
+    expectRuntimeErrorOnBoth("정수 최소 = -9223372036854775807 - 1\n최소 / -1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth("정수 최소 = -9223372036854775807 - 1\n정수 결과 = 최소\n결과 /= -1\n결과",
+        "범위를 넘었습니다");
+}
+
+TEST(BoundaryTest, ModuloByMinusOneIsZeroForEveryInteger) {
+    expectIntegerOnBoth("정수 최소 = -9223372036854775807 - 1\n최소 % -1", 0);
+    expectIntegerOnBoth("정수 최소 = -9223372036854775807 - 1\n정수 결과 = 최소\n결과 %= -1\n결과", 0);
+    expectIntegerOnBoth("정수 값 = 7\n값 % -1", 0);
+    expectIntegerOnBoth("정수 값 = -7\n값 % 3", -1);
+    expectIntegerOnBoth("정수 값 = 7\n값 / -1", -7);
 }
 
 TEST(BoundaryTest, PowerKeepsIntegerWhenItFitsAndFallsBackToFloatOtherwise) {

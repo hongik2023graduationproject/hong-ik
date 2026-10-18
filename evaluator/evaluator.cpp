@@ -836,11 +836,12 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
     if (token->type == TokenType::ASTERISK) return make_shared<Integer>(lv * rv);
     if (token->type == TokenType::SLASH) {
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
-        return make_shared<Integer>(lv / rv);
+        if (auto quotient = checked_int::div(lv, rv)) return make_shared<Integer>(*quotient);
+        throw RuntimeException(checked_int::kOverflowMessage, token->line);
     }
     if (token->type == TokenType::PERCENT) {
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
-        return make_shared<Integer>(lv % rv);
+        return make_shared<Integer>(checked_int::mod(lv, rv));
     }
     if (token->type == TokenType::POWER) {
         // 음수 지수이거나 정수로 넘치면 double 경로로 폴백한다 (VM::binaryOp와 같은 checked_int::pow).
