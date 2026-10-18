@@ -18,6 +18,19 @@ namespace checked_int {
         return a / b;
     }
 
+    // 실수를 정수로 바꿀 수 없을 때(long long 범위 밖·무한대·NaN)의 런타임 오류 문구.
+    inline constexpr const char* kFloatToIntegerMessage
+        = "실수 값을 정수로 변환할 수 없습니다 (정수 범위 밖이거나 무한대·NaN입니다).";
+
+    // 실수를 0 방향으로 버려 정수로 바꾼다. 범위 밖·무한대·NaN이면 nullopt (그대로 캐스팅하면 UB).
+    // -2^63과 2^63은 double로 정확히 표현되므로 [-2^63, 2^63) 안이면 변환이 정의된다. NaN은 비교가 거짓이라 걸러진다.
+    inline std::optional<long long> fromDouble(double value) {
+        if (!(value >= -9223372036854775808.0 && value < 9223372036854775808.0)) {
+            return std::nullopt;
+        }
+        return static_cast<long long>(value);
+    }
+
     // a % b (b != 0). 나머지는 항상 범위 안이다. b == -1이면 0 — LLONG_MIN % -1도 하드웨어 예외 대신 0.
     inline long long mod(long long a, long long b) {
         if (b == -1) {

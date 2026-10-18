@@ -92,6 +92,31 @@ TEST(BoundaryTest, ModuloByMinusOneIsZeroForEveryInteger) {
     expectIntegerOnBoth("정수 값 = 7\n값 / -1", -7);
 }
 
+TEST(BoundaryTest, FloatToIntegerInRangeKeepsCurrentResults) {
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    expectIntegerOnBoth("정수변환(2.9)", 2);
+    expectIntegerOnBoth("정수변환(-1.9)", -1);
+    expectIntegerOnBoth("반올림(2.5)", 3);
+    expectIntegerOnBoth("올림(1.1)", 2);
+    expectIntegerOnBoth("내림(-1.1)", -2);
+    // 2^63보다 작은 가장 큰 double과 -2^63은 정확히 변환된다.
+    expectIntegerOnBoth("정수변환(9223372036854774784.0)", 9223372036854774784LL);
+    expectIntegerOnBoth("정수변환(-9223372036854775808.0)", kMin);
+}
+
+TEST(BoundaryTest, FloatToIntegerOutOfRangeIsAnError) {
+    const std::string huge     = "1" + std::string(300, '0') + ".0"; // 1e300
+    const std::string infinity = "실수 큰수 = " + huge + "\n실수 무한 = 큰수 * 큰수\n";
+    const std::string notANumber = infinity + "실수 비수 = 무한 - 무한\n";
+    for (const std::string fn : {"정수변환", "반올림", "올림", "내림"}) {
+        expectRuntimeErrorOnBoth(fn + "(9223372036854775808.0)", "정수로 변환할 수 없습니다");
+        expectRuntimeErrorOnBoth(fn + "(1000000000000000000000000000000.0)", "정수로 변환할 수 없습니다");
+        expectRuntimeErrorOnBoth(infinity + fn + "(무한)", "정수로 변환할 수 없습니다");
+        expectRuntimeErrorOnBoth(infinity + fn + "(0.0 - 무한)", "정수로 변환할 수 없습니다");
+        expectRuntimeErrorOnBoth(notANumber + fn + "(비수)", "정수로 변환할 수 없습니다");
+    }
+}
+
 TEST(BoundaryTest, PowerKeepsIntegerWhenItFitsAndFallsBackToFloatOtherwise) {
     expectIntegerOnBoth("2 ** 62", 4611686018427387904LL);
     expectIntegerOnBoth("3 ** 39", 4052555153018976267LL);

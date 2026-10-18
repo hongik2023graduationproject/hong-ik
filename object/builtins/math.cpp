@@ -1,4 +1,5 @@
 #include "../built_in.h"
+#include "../../util/checked_int.h"
 
 #include <algorithm>
 #include <cmath>
@@ -221,6 +222,16 @@ std::shared_ptr<Object> EulerE::function(const std::vector<std::shared_ptr<Objec
 
 // ===== 반올림 계열 =====
 
+namespace {
+    // 반올림·올림·내림 결과를 정수로 바꾼다. 범위 밖·무한대·NaN이면 정수변환과 같은 오류.
+    long long toIntegerOrThrow(double value) {
+        if (auto converted = checked_int::fromDouble(value)) {
+            return *converted;
+        }
+        throw runtime_error(checked_int::kFloatToIntegerMessage);
+    }
+} // namespace
+
 std::shared_ptr<Object> Round::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("반올림 함수는 인자를 1개만 받습니다.");
@@ -229,7 +240,7 @@ std::shared_ptr<Object> Round::function(const std::vector<std::shared_ptr<Object
         return parameters[0];
     }
     if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
-        return make_shared<Integer>(static_cast<long long>(std::round(f->value)));
+        return make_shared<Integer>(toIntegerOrThrow(std::round(f->value)));
     }
     throw runtime_error("반올림 함수는 정수 또는 실수만 지원합니다.");
 }
@@ -242,7 +253,7 @@ std::shared_ptr<Object> Ceil::function(const std::vector<std::shared_ptr<Object>
         return parameters[0];
     }
     if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
-        return make_shared<Integer>(static_cast<long long>(std::ceil(f->value)));
+        return make_shared<Integer>(toIntegerOrThrow(std::ceil(f->value)));
     }
     throw runtime_error("올림 함수는 정수 또는 실수만 지원합니다.");
 }
@@ -255,7 +266,7 @@ std::shared_ptr<Object> Floor::function(const std::vector<std::shared_ptr<Object
         return parameters[0];
     }
     if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {
-        return make_shared<Integer>(static_cast<long long>(std::floor(f->value)));
+        return make_shared<Integer>(toIntegerOrThrow(std::floor(f->value)));
     }
     throw runtime_error("내림 함수는 정수 또는 실수만 지원합니다.");
 }

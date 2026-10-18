@@ -1,4 +1,5 @@
 #include "../built_in.h"
+#include "../../util/checked_int.h"
 
 #include <stdexcept>
 #include <string>
@@ -38,7 +39,10 @@ std::shared_ptr<Object> ToInteger::function(const std::vector<std::shared_ptr<Ob
         return parameters[0];
     }
     if (auto float_obj = dynamic_cast<Float*>(parameters[0].get())) {
-        return make_shared<Integer>(static_cast<long long>(float_obj->value));
+        if (auto converted = checked_int::fromDouble(float_obj->value)) {
+            return make_shared<Integer>(*converted);
+        }
+        throw runtime_error(checked_int::kFloatToIntegerMessage);
     }
     if (auto str = dynamic_cast<String*>(parameters[0].get())) {
         try {
