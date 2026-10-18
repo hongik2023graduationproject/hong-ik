@@ -2,7 +2,7 @@
   "context": {
     "date": "2026-10-18T15:28:38+09:00",
     "host_name": "TOLELOM",
-    "executable": "C:\\Users\\98kim\\AppData\\Local\\Temp\\claude\\E--\\5e0c5785-d8d9-4807-a137-17128bc7812f\\scratchpad\\hongik\\base\\build-control\\Release\\HongIkBenchmarks.exe",
+    "executable": "build-control/Release/HongIkBenchmarks.exe",
     "num_cpus": 16,
     "mhz_per_cpu": 4700,
     "caches": [
