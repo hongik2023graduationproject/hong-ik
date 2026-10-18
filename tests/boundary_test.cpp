@@ -78,6 +78,39 @@ TEST(BoundaryTest, IntegerLimitsStayExact) {
     expectIntegerOnBoth("-9223372036854775807 % 10", -7);
 }
 
+TEST(BoundaryTest, IntegerArithmeticNextToTheLimitsStaysExact) {
+    constexpr long long kMax = std::numeric_limits<long long>::max();
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    expectIntegerOnBoth("정수 최대 = 9223372036854775807\n정수 최소 = -9223372036854775807 - 1\n최소 + 최대", -1);
+    expectIntegerOnBoth("정수 최대 = 9223372036854775807\n최대 - 1 + 1", kMax);
+    expectIntegerOnBoth("정수 최소 = -9223372036854775807 - 1\n최소 + 1 - 1", kMin);
+    expectIntegerOnBoth("정수 값 = -9223372036854775807\n-값", kMax);
+    expectIntegerOnBoth("정수 값 = 3037000499\n값 * 값", 9223372030926249001LL);
+    expectIntegerOnBoth("정수 값 = -4611686018427387904\n값 * 2", kMin);
+    expectIntegerOnBoth("정수 x = 9223372036854775806\nx++\nx", kMax);
+    expectIntegerOnBoth("정수 x = -9223372036854775807\nx--\nx", kMin);
+    expectIntegerOnBoth("절대값(-9223372036854775807)", kMax);
+}
+
+TEST(BoundaryTest, IntegerOverflowIsAnErrorOnBothBackends) {
+    const std::string max = "정수 최대 = 9223372036854775807\n";
+    const std::string min = "정수 최소 = -9223372036854775807 - 1\n";
+    expectRuntimeErrorOnBoth(max + "최대 + 1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "최소 - 1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "최소 + -1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(max + "최대 - -1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth("정수 큰 = 4611686018427387904\n큰 * 2", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "최소 * -1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "-최소", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(max + "정수 x = 최대\nx += 1\nx", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(max + "정수 x = 최대\nx++\nx", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "정수 x = 최소\nx--\nx", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth(min + "절대값(최소)", "범위를 넘었습니다");
+    // 상수식은 컴파일 단계 폴딩이 넘침을 런타임으로 넘긴다.
+    expectRuntimeErrorOnBoth("9223372036854775807 + 1", "범위를 넘었습니다");
+    expectRuntimeErrorOnBoth("3037000500 * 3037000500", "범위를 넘었습니다");
+}
+
 TEST(BoundaryTest, MinIntegerDividedByMinusOneIsAnErrorNotACrash) {
     expectRuntimeErrorOnBoth("정수 최소 = -9223372036854775807 - 1\n최소 / -1", "범위를 넘었습니다");
     expectRuntimeErrorOnBoth("정수 최소 = -9223372036854775807 - 1\n정수 결과 = 최소\n결과 /= -1\n결과",

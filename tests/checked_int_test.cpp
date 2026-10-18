@@ -46,3 +46,35 @@ TEST(CheckedIntTest, PowHandlesHugeExponentsWithoutLooping) {
     EXPECT_EQ(checked_int::pow(-2, kHuge + 1), std::nullopt);
     EXPECT_EQ(checked_int::pow(5, 0), 1);
 }
+
+TEST(CheckedIntTest, AddSubNegDetectOverflowExactlyAtTheLimits) {
+    constexpr long long kMax = std::numeric_limits<long long>::max();
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    EXPECT_EQ(checked_int::add(kMax - 1, 1), kMax);
+    EXPECT_EQ(checked_int::add(kMax, 1), std::nullopt);
+    EXPECT_EQ(checked_int::add(kMin, -1), std::nullopt);
+    EXPECT_EQ(checked_int::add(kMin, kMax), -1);
+    EXPECT_EQ(checked_int::sub(kMin + 1, 1), kMin);
+    EXPECT_EQ(checked_int::sub(kMin, 1), std::nullopt);
+    EXPECT_EQ(checked_int::sub(kMax, -1), std::nullopt);
+    EXPECT_EQ(checked_int::sub(-1, kMax), kMin);
+    EXPECT_EQ(checked_int::neg(kMax), kMin + 1);
+    EXPECT_EQ(checked_int::neg(kMin), std::nullopt);
+}
+
+TEST(CheckedIntTest, MulDetectsOverflowAndKeepsExactMinimum) {
+    constexpr long long kMax = std::numeric_limits<long long>::max();
+    constexpr long long kMin = std::numeric_limits<long long>::min();
+    EXPECT_EQ(checked_int::mul(3037000499LL, 3037000499LL), 9223372030926249001LL);
+    EXPECT_EQ(checked_int::mul(3037000500LL, 3037000500LL), std::nullopt);
+    EXPECT_EQ(checked_int::mul(-4611686018427387904LL, 2), kMin);
+    EXPECT_EQ(checked_int::mul(2, -4611686018427387904LL), kMin);
+    EXPECT_EQ(checked_int::mul(4611686018427387904LL, 2), std::nullopt);
+    EXPECT_EQ(checked_int::mul(kMin, -1), std::nullopt);
+    EXPECT_EQ(checked_int::mul(-1, kMin), std::nullopt);
+    EXPECT_EQ(checked_int::mul(kMin, 1), kMin);
+    EXPECT_EQ(checked_int::mul(kMax, -1), kMin + 1);
+    EXPECT_EQ(checked_int::mul(-3, -5), 15);
+    EXPECT_EQ(checked_int::mul(0, kMin), 0);
+    EXPECT_EQ(checked_int::mul(kMin, 0), 0);
+}

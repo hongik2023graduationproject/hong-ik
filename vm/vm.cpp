@@ -140,11 +140,20 @@ VMValue VM::binaryOp(OpCode op, const VMValue& left, const VMValue& right, long 
         long long lv = left.asInt(), rv = right.asInt();
         switch (op) {
         case OpCode::OP_ADD:
-            return VMValue::Int(lv + rv);
+            if (auto sum = checked_int::add(lv, rv)) {
+                return VMValue::Int(*sum);
+            }
+            throw RuntimeException(checked_int::kOverflowMessage, line);
         case OpCode::OP_SUB:
-            return VMValue::Int(lv - rv);
+            if (auto difference = checked_int::sub(lv, rv)) {
+                return VMValue::Int(*difference);
+            }
+            throw RuntimeException(checked_int::kOverflowMessage, line);
         case OpCode::OP_MUL:
-            return VMValue::Int(lv * rv);
+            if (auto product = checked_int::mul(lv, rv)) {
+                return VMValue::Int(*product);
+            }
+            throw RuntimeException(checked_int::kOverflowMessage, line);
         case OpCode::OP_DIV:
             if (rv == 0) {
                 throw RuntimeException("0으로 나눌 수 없습니다.", line);

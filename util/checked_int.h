@@ -10,6 +10,47 @@ namespace checked_int {
     // 정수 연산 결과가 long long 범위를 넘을 때의 런타임 오류 문구. 두 백엔드가 같은 문구를 쓴다.
     inline constexpr const char* kOverflowMessage = "정수 연산 결과가 범위를 넘었습니다.";
 
+    // a + b, a - b, a * b, -a. 결과가 long long을 넘으면 nullopt — 두 백엔드가 kOverflowMessage 런타임 오류로 바꾼다.
+    // GCC·Clang은 내장 검사를 쓰고, 그 내장이 없는 MSVC는 직접 계산한다.
+    inline std::optional<long long> add(long long a, long long b) {
+#if defined(__GNUC__) || defined(__clang__)
+        long long result;
+        if (__builtin_add_overflow(a, b, &result)) {
+            return std::nullopt;
+        }
+        return result;
+#else
+        if ((b > 0 && a > std::numeric_limits<long long>::max() - b)
+            || (b < 0 && a < std::numeric_limits<long long>::min() - b)) {
+            return std::nullopt;
+        }
+        return a + b;
+#endif
+    }
+
+    inline std::optional<long long> sub(long long a, long long b) {
+#if defined(__GNUC__) || defined(__clang__)
+        long long result;
+        if (__builtin_sub_overflow(a, b, &result)) {
+            return std::nullopt;
+        }
+        return result;
+#else
+        if ((b < 0 && a > std::numeric_limits<long long>::max() + b)
+            || (b > 0 && a < std::numeric_limits<long long>::min() + b)) {
+            return std::nullopt;
+        }
+        return a - b;
+#endif
+    }
+
+    inline std::optional<long long> neg(long long a) {
+        if (a == std::numeric_limits<long long>::min()) {
+            return std::nullopt;
+        }
+        return -a;
+    }
+
     // a / b (b != 0). LLONG_MIN / -1은 결과가 범위를 넘으므로 nullopt — x86에서는 하드웨어 예외로 프로세스가 죽는다.
     inline std::optional<long long> div(long long a, long long b) {
         if (a == std::numeric_limits<long long>::min() && b == -1) {
@@ -56,6 +97,30 @@ namespace checked_int {
         long long absA = a < 0 ? -a : a;
         long long absB = b < 0 ? -b : b;
         return absA > kMax / absB;
+    }
+
+    // a * b. mulOverflows와 달리 결과가 정확히 LLONG_MIN인 곱(예: -2^62 * 2)도 정수로 둔다.
+    inline std::optional<long long> mul(long long a, long long b) {
+#if defined(__GNUC__) || defined(__clang__)
+        long long result;
+        if (__builtin_mul_overflow(a, b, &result)) {
+            return std::nullopt;
+        }
+        return result;
+#else
+        constexpr long long kMax = std::numeric_limits<long long>::max();
+        constexpr long long kMin = std::numeric_limits<long long>::min();
+        if (a > 0) {
+            if (b > 0 ? a > kMax / b : b < kMin / a) {
+                return std::nullopt;
+            }
+        } else if (a < 0) {
+            if (b > 0 ? a < kMin / b : (b != 0 && a < kMax / b)) {
+                return std::nullopt;
+            }
+        }
+        return a * b;
+#endif
     }
 
     // base ** exp (exp >= 0)를 정수로 계산한다. 결과가 long long을 넘으면 nullopt — 호출측이 실수로 폴백한다.

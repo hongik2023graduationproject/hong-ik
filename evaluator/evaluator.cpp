@@ -101,6 +101,31 @@ string Evaluator::interpolateString(const string& str, Environment* environment)
     return result;
 }
 
+namespace {
+#if defined(_MSC_VER)
+#define HONGIK_NOINLINE __declspec(noinline)
+#else
+#define HONGIK_NOINLINE __attribute__((noinline))
+#endif
+    // 정수 넘침 검사와 오류 생성은 재귀 경로(eval·중위식 평가) 밖의 함수에서 한다. ASan 빌드는 지역 변수와
+    // 임시 객체마다 스택을 따로 잡아서, 이 코드가 eval 프레임에 들어가면 16MB 스택에서 재귀 한도(1000)보다
+    // 먼저 스택이 넘친다.
+    HONGIK_NOINLINE long long checkedIntegerArithmetic(TokenType op, long long lv, long long rv, long long line) {
+        auto result = op == TokenType::PLUS    ? checked_int::add(lv, rv)
+                      : op == TokenType::MINUS ? checked_int::sub(lv, rv)
+                                               : checked_int::mul(lv, rv);
+        if (!result) throw RuntimeException(checked_int::kOverflowMessage, line);
+        return *result;
+    }
+
+    HONGIK_NOINLINE long long checkedIntegerNegate(long long value, long long line) {
+        auto result = checked_int::neg(value);
+        if (!result) throw RuntimeException(checked_int::kOverflowMessage, line);
+        return *result;
+    }
+#undef HONGIK_NOINLINE
+} // namespace
+
 shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     // 샌드박스 제한 체크 (시간 초과)
     checkLimits();
@@ -693,7 +718,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             throw RuntimeException("증감 연산자는 정수 변수에만 사용할 수 있습니다.", current_line);
         }
         long long delta = (postfix_expression->token->type == TokenType::INCREMENT) ? 1 : -1;
-        auto newVal = make_shared<Integer>(intVal->value + delta);
+        auto newVal = make_shared<Integer>(checkedIntegerArithmetic(TokenType::PLUS, intVal->value, delta, current_line));
         environment->Update(ident->name, newVal);
         return before; // 후위 연산: 변경 전 값 반환
     }
@@ -831,9 +856,9 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
     long long lv = left_integer->value;
     long long rv = right_integer->value;
 
-    if (token->type == TokenType::PLUS) return make_shared<Integer>(lv + rv);
-    if (token->type == TokenType::MINUS) return make_shared<Integer>(lv - rv);
-    if (token->type == TokenType::ASTERISK) return make_shared<Integer>(lv * rv);
+    if (token->type == TokenType::PLUS || token->type == TokenType::MINUS || token->type == TokenType::ASTERISK) {
+        return make_shared<Integer>(checkedIntegerArithmetic(token->type, lv, rv, token->line));
+    }
     if (token->type == TokenType::SLASH) {
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
         if (auto quotient = checked_int::div(lv, rv)) return make_shared<Integer>(*quotient);
@@ -1032,7 +1057,9 @@ shared_ptr<Object> Evaluator::evalPrefixExpression(Token* token, shared_ptr<Obje
 }
 
 shared_ptr<Object> Evaluator::evalMinusPrefixExpression(shared_ptr<Object> right) {
-    if (auto integer = dynamic_cast<Integer*>(right.get())) return make_shared<Integer>(-integer->value);
+    if (auto integer = dynamic_cast<Integer*>(right.get())) {
+        return make_shared<Integer>(checkedIntegerNegate(integer->value, current_line));
+    }
     if (auto float_obj = dynamic_cast<Float*>(right.get())) return make_shared<Float>(-float_obj->value);
     throw RuntimeException("'-' 전위 연산자가 지원되지 않는 타입입니다.", current_line);
 }

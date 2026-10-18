@@ -15,6 +15,10 @@ std::shared_ptr<Object> Abs::function(const std::vector<std::shared_ptr<Object>>
         throw runtime_error("절대값 함수는 인자를 1개만 받습니다.");
     }
     if (auto* i = dynamic_cast<Integer*>(parameters[0].get())) {
+        // |LLONG_MIN|은 정수 범위를 넘는다 (std::abs에 넘기면 UB).
+        if (i->value == std::numeric_limits<long long>::min()) {
+            throw runtime_error(checked_int::kOverflowMessage);
+        }
         return make_shared<Integer>(std::abs(i->value));
     }
     if (auto* f = dynamic_cast<Float*>(parameters[0].get())) {

@@ -4,6 +4,7 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/checked_int.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include "compiler.h"
@@ -23,7 +24,11 @@ using vm_internal::vmValueToObjectType;
 void VM::opNegate() {
     auto operand = pop();
     if (operand.isInt()) {
-        push(VMValue::Int(-operand.asInt()));
+        auto negated = checked_int::neg(operand.asInt());
+        if (!negated) {
+            throw RuntimeException(checked_int::kOverflowMessage, currentLine());
+        }
+        push(VMValue::Int(*negated));
     } else if (operand.isFloat()) {
         push(VMValue::Float(-operand.asFloat()));
     } else {
