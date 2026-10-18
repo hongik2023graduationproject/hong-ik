@@ -229,6 +229,7 @@ else()
             tests/peephole_test.cpp
             tests/boundary_test.cpp
             tests/checked_int_test.cpp
+            tests/expression_depth_test.cpp
             benchmarks/runner.cpp
             # WasmInterface는 EMSCRIPTEN 빌드의 일부이지만 클래스 자체는 plain C++.
             # 백엔드 parity 테스트에서 직접 인스턴스화하므로 native 테스트에서도 빌드한다.

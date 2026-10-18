@@ -17,11 +17,19 @@ struct ParseDiagnostic {
 
 class Parser {
 public:
+    // 식 AST의 최대 깊이. 파서·컴파일러·평가기·소멸자가 AST 깊이만큼 재귀하므로 이보다 깊으면 파스 오류로 거절한다.
+    static constexpr int kMaxExpressionDepth = 3000;
+
     std::shared_ptr<Program> Parsing(const std::vector<std::shared_ptr<Token>>& tokens);
     const std::vector<std::string>& getErrors() const { return errors; }
     const std::vector<ParseDiagnostic>& getDiagnostics() const { return diagnostics; }
 
 private:
+    // parseExpression 재귀 진입 수 (괄호·단항 연산자 등). 한도를 넘으면 더 내려가기 전에 멈춘다.
+    int expressionNesting_ = 0;
+    // 방금 끝난 하위 parseExpression들이 만든 AST 깊이의 최댓값. 왼쪽 결합 체인처럼 루프로 깊어지는 식까지 센다.
+    int nestedExpressionDepth_ = 0;
+
     std::vector<ParseDiagnostic> diagnostics;
     std::vector<std::shared_ptr<Token>> tokens;
 

@@ -2,6 +2,7 @@
 
 #include "../ast/literals.h"
 #include "../exception/exception.h"
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <set>
@@ -43,6 +44,8 @@ void Parser::initialization() {
     current_read_position = 0;
     errors.clear();
     diagnostics.clear();
+    expressionNesting_     = 0;
+    nestedExpressionDepth_ = 0;
     setToken();
 }
 
@@ -701,8 +704,22 @@ shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
         throw UnknownPrefixParseFunctionException(current_token->type, *current_token);
     }
 
+    if (++expressionNesting_ > kMaxExpressionDepth) {
+        --expressionNesting_;
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    struct NestingGuard {
+        int& nesting;
+        ~NestingGuard() { --nesting; }
+    } nestingGuard{expressionNesting_};
+
+    // 식의 AST 깊이 = max(왼쪽, 오른쪽 하위 식) + 1. 하위 parseExpression이 nestedExpressionDepth_에 남긴 값으로 계산한다.
+    const int outerNestedDepth = nestedExpressionDepth_;
+    nestedExpressionDepth_     = 0;
+
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
     shared_ptr<Expression> expression       = (this->*prefixParseFunction)();
+    int depth                               = nestedExpressionDepth_ + 1;
 
     while (next_token != nullptr) {
         auto precIt = getPrecedence.find(next_token->type);
@@ -713,9 +730,18 @@ shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
         }
         InfixParseFunction infixParseFunction = infixParseFunctions[next_token->type];
         setNextToken();
-        expression = (this->*infixParseFunction)(expression);
+        nestedExpressionDepth_ = 0;
+        expression             = (this->*infixParseFunction)(expression);
+        depth                  = std::max(depth, nestedExpressionDepth_) + 1;
+        if (depth > kMaxExpressionDepth) {
+            throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+        }
     }
 
+    if (depth > kMaxExpressionDepth) {
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    nestedExpressionDepth_ = std::max(outerNestedDepth, depth);
     return expression;
 }
 

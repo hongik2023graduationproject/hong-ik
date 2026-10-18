@@ -64,6 +64,14 @@ public:
                      tok.line, tok.column, tok.endColumn) {}
 };
 
+class ExpressionTooDeepException : public ParseError {
+public:
+    ExpressionTooDeepException(const Token& tok, int maxDepth)
+        : ParseError("[줄 " + std::to_string(tok.line) + "] 식이 너무 깊게 중첩되었습니다 (최대 깊이 "
+                         + std::to_string(maxDepth) + ").",
+              tok.line, tok.column, tok.endColumn) {}
+};
+
 class NoTokenException : public ParseError {
 public:
     NoTokenException(const Token& lastTok, TokenType expected)
