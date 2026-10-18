@@ -23,14 +23,25 @@ namespace checked_int {
         return absA > kMax / absB;
     }
 
-    // base ** exp (exp >= 0)를 정수로 계산한다. 중간 곱이 넘치면 nullopt — 호출측이 실수로 폴백한다.
+    // base ** exp (exp >= 0)를 정수로 계산한다. 결과가 long long을 넘으면 nullopt — 호출측이 실수로 폴백한다.
+    // 제곱을 거듭해 O(log exp)로 계산한다. base를 제곱하는 것은 남은 지수 비트가 있을 때뿐이라
+    // 중간값의 크기가 최종값 이하이고, 넘침 판정은 최종값이 범위를 넘는지와 같다.
     inline std::optional<long long> pow(long long base, long long exp) {
         long long result = 1;
-        for (long long i = 0; i < exp; i++) {
-            if (mulOverflows(result, base)) {
-                return std::nullopt;
+        while (exp > 0) {
+            if (exp & 1) {
+                if (mulOverflows(result, base)) {
+                    return std::nullopt;
+                }
+                result *= base;
             }
-            result *= base;
+            exp >>= 1;
+            if (exp > 0) {
+                if (mulOverflows(base, base)) {
+                    return std::nullopt;
+                }
+                base *= base;
+            }
         }
         return result;
     }

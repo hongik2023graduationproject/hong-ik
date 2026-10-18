@@ -78,6 +78,19 @@ TEST(BoundaryTest, PowerKeepsIntegerWhenItFitsAndFallsBackToFloatOtherwise) {
     expectFloatOnBoth("2 ** -1");
 }
 
+TEST(BoundaryTest, PowerWithHugeExponentFinishesOnBothBackends) {
+    expectIntegerOnBoth("1 ** 100000000000", 1);
+    expectIntegerOnBoth("0 ** 100000000000", 0);
+    expectIntegerOnBoth("(-1) ** 100000000000", 1);
+    expectIntegerOnBoth("(-1) ** 100000000001", -1);
+    expectFloatOnBoth("2 ** 100000000000");
+    expectFloatOnBoth("(-2) ** 100000000001");
+    // 리터럴은 VM 컴파일러가 상수로 접으므로, 변수로 런타임 경로(VM::binaryOp)도 확인한다.
+    expectIntegerOnBoth("정수 밑 = -1\n정수 지수 = 100000000001\n밑 ** 지수", -1);
+    expectIntegerOnBoth("정수 밑 = 3\n정수 지수 = 39\n밑 ** 지수", 4052555153018976267LL);
+    expectFloatOnBoth("정수 밑 = 2\n정수 지수 = 100000000000\n밑 ** 지수");
+}
+
 TEST(BoundaryTest, ModerateNestingRunsOnBothBackends) {
     expectIntegerOnBoth(nestedParens(200), 1);
     expectIntegerOnBoth(plusChain(300), 300);
