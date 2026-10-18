@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-**hong-ik**은 한글 키워드 기반의 프로그래밍 언어 인터프리터입니다. C++17/26으로 작성되었으며, CMake + Google Test를 사용합니다.
+**hong-ik**은 한글 키워드 기반의 프로그래밍 언어 인터프리터입니다. 네이티브 빌드는 C++26, WASM(Emscripten) 빌드는 C++20으로 컴파일하며, CMake + Google Test를 사용합니다.
 
 ## 빌드 및 테스트 명령어
 
@@ -30,14 +30,33 @@ cmake-build-debug/HongIkTests --gtest_filter="LexerTest.*"
 
 코드 포맷: `.clang-format` 기준 (LLVM 스타일, 4칸 들여쓰기, 120자 제한)
 
+### Sanitizer
+
+CI(`.github/workflows/sanitizers.yml`)는 Linux clang에서 ASan+UBSan과 TSan을 따로 돌립니다. 로컬 Windows에서 재현할 수 있는 범위는 아래와 같습니다.
+
+```bash
+# MSVC ASan (UBSan·TSan·LeakSanitizer는 MSVC 미지원)
+cmake -B build-asan -G "Visual Studio 17 2022" -A x64 -DHONGIK_ENABLE_SANITIZERS=ON -DHONGIK_SANITIZERS=address
+cmake --build build-asan --config RelWithDebInfo
+# 실행 전 ASan 런타임 DLL 폴더를 PATH에 넣는다. 없으면 각 테스트가 0xc0000135 오류 창을 띄우고 멈춘다.
+export PATH="/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/<버전>/bin/Hostx64/x64:$PATH"
+ctest --test-dir build-asan --build-config RelWithDebInfo --output-on-failure --timeout 120
+
+# MinGW g++ UBSan: 런타임이 없어 trap 모드만 가능 (메시지 없이 0xC000001D로 종료)
+cmake -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLAGS=-fsanitize=undefined -fsanitize-trap=undefined"
+```
+
+- ctest에는 `--timeout`을 준다.
+- Git Bash에서 `/O2`처럼 `/`로 시작하는 MSVC 옵션을 넘기면 MSYS가 경로로 바꾼다. `-O2` 형식을 쓴다.
+
 ## 아키텍처
 
 전형적인 인터프리터 파이프라인을 따릅니다:
 
 ```
-소스코드(한글) → Lexer → Parser → Evaluator → 결과
-                  ↓        ↓          ↓
-               Tokens     AST    Environment
+소스코드(한글) → Lexer → Parser → Compiler → VM (기본)      → 결과
+                  ↓        ↓    └→ Evaluator (--eval, 트리워킹) ↗
+               Tokens     AST
 ```
 
 ### 주요 컴포넌트
@@ -90,6 +109,6 @@ cmake-build-debug/HongIkTests --gtest_filter="LexerTest.*"
 ### 핵심 데이터 흐름
 
 - `main.cpp`: UTF-8 콘솔 설정 후 파일/REPL 모드 분기
-- `repl/repl.h`: Lexer → Parser → Evaluator 파이프라인 구동
+- `repl/repl.h`: Lexer → Parser → Compiler → VM 파이프라인 구동 (`--eval`이면 Evaluator)
 - `object/object.h`: 런타임 값 표현 (Integer, Boolean, String, Function, Array, ReturnValue, Builtin)
 - `environment/environment.h`: 외부 스코프 참조를 포함한 중첩 환경 구현
