@@ -22,10 +22,8 @@ function(hongik_apply_sanitizers target)
     set(_flags "")
     if(MSVC)
         # MSVC supports ASan only; UBSan/TSan/MSan are unavailable.
-        list(FIND HONGIK_SANITIZERS "address" _has_asan)
-        if(_has_asan GREATER -1)
-            list(APPEND _flags /fsanitize=address)
-        endif()
+        # /fsanitize=address는 네이티브 빌드 시작부에서 전역으로 건다 (FetchContent 의존성과 LNK2038 방지).
+        return()
     else()
         foreach(_san IN LISTS HONGIK_SANITIZERS)
             list(APPEND _flags -fsanitize=${_san})
@@ -118,6 +116,13 @@ else()
 
     # For visual studio — 모든 타깃 정의보다 앞에 있어야 적용된다
     add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
+    # MSVC ASan은 같은 링크 단위의 모든 오브젝트가 STL 주석(annotate_vector/annotate_string) 설정이 같아야 한다.
+    # 타깃별로만 걸면 FetchContent로 받은 gtest·benchmark와 LNK2038이 나므로 MSVC에서는 전역으로 건다.
+    # 실행 시 clang_rt.asan_dynamic-x86_64.dll(MSVC bin\Hostx64\x64)이 PATH에 있어야 한다.
+    if(MSVC AND HONGIK_ENABLE_SANITIZERS AND "address" IN_LIST HONGIK_SANITIZERS)
+        add_compile_options(/fsanitize=address)
+    endif()
 
     # Google Test
     include(FetchContent)
