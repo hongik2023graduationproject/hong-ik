@@ -131,3 +131,18 @@ jobs:
             wasm-dist/manifest.json
           fail_on_unmatched_files: true
           generate_release_notes: false
+
+      # SHA 릴리스는 푸시마다 하나씩 쌓이므로 최근 10개만 남기고 태그와 함께 지운다.
+      # wasm-latest는 이름이 패턴(wasm-<40자 SHA>)과 달라 대상이 아니다.
+      - name: 오래된 SHA 릴리스 정리 (최근 10개 유지)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: 10
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 500 --json tagName,createdAt \
+            --jq "[.[] | select(.tagName | test(\"^wasm-[0-9a-f]{40}\$\"))] | sort_by(.createdAt) | reverse | .[${KEEP}:] | .[].tagName" \
+          | while read -r tag; do
+              echo "삭제: $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            done
