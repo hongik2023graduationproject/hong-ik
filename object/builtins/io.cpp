@@ -1,5 +1,5 @@
+#include "../../util/path_utils.h"
 #include "../built_in.h"
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -10,7 +10,7 @@ using namespace std;
 
 // ===== I/O 내장함수 =====
 
-std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Print::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     string output;
     for (size_t i = 0; i < parameters.size(); i++) {
         if (auto str = dynamic_cast<String*>(parameters[i].get())) {
@@ -53,7 +53,7 @@ std::shared_ptr<Object> Print::function(std::vector<std::shared_ptr<Object>> par
     return make_shared<Null>();
 }
 
-std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Input::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() > 1) {
         throw runtime_error("입력 함수는 인자를 0개 또는 1개 받습니다.");
     }
@@ -78,7 +78,7 @@ std::shared_ptr<Object> Input::function(std::vector<std::shared_ptr<Object>> par
     return make_shared<String>(input);
 }
 
-std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> FileRead::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("파일읽기 함수는 인자를 1개 받습니다.");
     }
@@ -96,14 +96,8 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
 
     // 기본 파일 I/O
     // 경로 탐색 방지 (완전한 샌드박스는 아님)
-    if (filename->value.find("..") != string::npos) {
-        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
-    }
-    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
-    }
-    if (filename->value.size() >= 2 && filename->value[1] == ':') {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    if (const char* pathError = path_utils::userPathError(filename->value)) {
+        throw runtime_error(pathError);
     }
 
     ifstream file(filename->value);
@@ -116,7 +110,7 @@ std::shared_ptr<Object> FileRead::function(std::vector<std::shared_ptr<Object>> 
     return make_shared<String>(buffer.str());
 }
 
-std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> FileWrite::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("파일쓰기 함수는 인자를 2개 받습니다 (파일 경로, 내용).");
     }
@@ -138,14 +132,8 @@ std::shared_ptr<Object> FileWrite::function(std::vector<std::shared_ptr<Object>>
 
     // 기본 파일 I/O
     // 경로 탐색 방지 (완전한 샌드박스는 아님)
-    if (filename->value.find("..") != string::npos) {
-        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
-    }
-    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
-    }
-    if (filename->value.size() >= 2 && filename->value[1] == ':') {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    if (const char* pathError = path_utils::userPathError(filename->value)) {
+        throw runtime_error(pathError);
     }
 
     ofstream file(filename->value);

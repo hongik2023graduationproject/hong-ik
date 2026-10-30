@@ -18,6 +18,8 @@ EMSCRIPTEN_BINDINGS(hongik_module) {
         }))
         .function("getTokens", &WasmInterface::GetTokens)
         .function("reset", &WasmInterface::Reset)
+        .function("setBackend", &WasmInterface::SetBackend)
+        .function("getBackend", &WasmInterface::GetBackend)
         .function("writeFile", &WasmInterface::WriteFile)
         .function("readFile", &WasmInterface::ReadFile)
         .function("fileExists", &WasmInterface::FileExists)

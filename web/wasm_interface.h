@@ -10,6 +10,8 @@
 #include "../lexer/lexer.h"
 #include "../parser/parser.h"
 #include "../evaluator/evaluator.h"
+#include "../vm/compiler.h"
+#include "../vm/vm.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "memory_filesystem.h"
 
@@ -33,6 +35,13 @@ public:
     // 인터프리터 상태 초기화
     void Reset();
 
+    // 백엔드 선택: "vm" 또는 "evaluator". 알 수 없는 값은 무시.
+    // VM은 5–10x 빠르지만, evaluator 경로가 fallback으로 남아 있다.
+    void SetBackend(const std::string& name);
+
+    // 현재 백엔드 이름 ("vm" 또는 "evaluator"). 디버깅/JS 측 확인용.
+    std::string GetBackend() const;
+
     // 인메모리 파일시스템 접근
     MemoryFileSystem& GetFileSystem() { return memFs; }
 
@@ -53,8 +62,18 @@ private:
     // 출력 캡처 버퍼
     std::string outputBuffer;
 
+    // 백엔드 선택. VM은 5–10x 빠르고 S1/S4를 거치며 IOContext와 ExecutionLimiter가
+    // 완전히 와이어업됐다. evaluator 경로는 SetBackend("evaluator")로 명시할 때만 사용.
+    bool useVM = true;
+
     // I/O 컨텍스트 초기화 (MemoryFileSystem 연동)
     void setupIOContext();
+
+    // 백엔드별 실행 helper. 각각 outputBuffer를 채우고 result를 반환한다.
+    std::shared_ptr<Object> executeWithEvaluator(std::shared_ptr<Program> program,
+                                                  ExecutionLimiter& limiter);
+    std::shared_ptr<Object> executeWithVM(std::shared_ptr<Program> program,
+                                           ExecutionLimiter& limiter);
 };
 
 #endif // WASM_INTERFACE_H

@@ -9,7 +9,7 @@ using namespace std;
 
 // ===== 배열 내장함수 =====
 
-std::shared_ptr<Object> Push::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Push::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("추가 함수는 인자를 2개 받습니다.");
     }
@@ -21,7 +21,7 @@ std::shared_ptr<Object> Push::function(std::vector<std::shared_ptr<Object>> para
     throw runtime_error("추가 함수의 첫 번째 인자는 배열이어야 합니다.");
 }
 
-std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Sort::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("정렬 함수는 인자를 1개만 받습니다.");
     }
@@ -48,7 +48,7 @@ std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> para
     return result;
 }
 
-std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Reverse::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("뒤집기 함수는 인자를 1개만 받습니다.");
     }
@@ -65,7 +65,7 @@ std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> p
     throw runtime_error("뒤집기 함수는 배열 또는 문자열만 지원합니다.");
 }
 
-std::shared_ptr<Object> Find::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Find::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("찾기 함수는 인자를 2개 받습니다 (배열, 값).");
     }
@@ -81,7 +81,7 @@ std::shared_ptr<Object> Find::function(std::vector<std::shared_ptr<Object>> para
     return make_shared<Integer>(-1);
 }
 
-std::shared_ptr<Object> Slice::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Slice::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("조각 함수는 인자를 3개 받습니다 (배열, 시작, 끝).");
     }

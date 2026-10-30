@@ -15,7 +15,7 @@ assignees: ''
 버그를 재현하는 단계를 알려주세요:
 
 1. 아래 코드를 `test.hik` 파일에 저장합니다.
-2. `./hong-ik test.hik` 명령어로 실행합니다.
+2. `./cmake-build-debug/HongIk test.hik` 명령어로 실행합니다. (트리워킹으로 재현하려면 `--eval` 추가)
 3. 오류가 발생합니다.
 
 ### 재현 코드
@@ -41,7 +41,7 @@ assignees: ''
 - **OS**: (예: Windows 11, Ubuntu 22.04, macOS 14)
 - **컴파일러**: (예: MSVC 2022, GCC 13, Clang 17)
 - **CMake 버전**: (예: 3.28)
-- **실행 모드**: (인터프리터 / VM)
+- **실행 모드**: (VM(기본) / 트리워킹 `--eval`)
 
 ## 추가 정보
 

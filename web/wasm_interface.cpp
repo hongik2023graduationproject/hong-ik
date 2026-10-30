@@ -32,6 +32,22 @@ void WasmInterface::setupIOContext() {
     };
 }
 
+std::shared_ptr<Object> WasmInterface::executeWithEvaluator(std::shared_ptr<Program> program,
+                                                              ExecutionLimiter& limiter) {
+    // 매 호출마다 리미터 결합 새 evaluator 생성 (Evaluator는 ctor 시점에만 limiter를 받음).
+    evaluator = std::make_unique<Evaluator>(&ioCtx, &limiter);
+    return evaluator->Evaluate(program);
+}
+
+std::shared_ptr<Object> WasmInterface::executeWithVM(std::shared_ptr<Program> program,
+                                                      ExecutionLimiter& limiter) {
+    // VM은 호출마다 새로 만든다 (호출 간 전역 상태 공유 없음, evaluator 경로와 동일).
+    Compiler compiler;
+    auto bytecode = compiler.Compile(program);
+    VM vm(&ioCtx, &limiter);
+    return vm.Execute(bytecode);
+}
+
 std::string WasmInterface::Execute(const std::string& code, long long timeoutMs) {
     outputBuffer.clear();
 
@@ -39,9 +55,6 @@ std::string WasmInterface::Execute(const std::string& code, long long timeoutMs)
 
     try {
         ExecutionLimiter limiter(timeoutMs);
-
-        // 기존 evaluator를 리미터와 함께 재생성
-        evaluator = std::make_unique<Evaluator>(&ioCtx, &limiter);
 
         auto utf8Strings = Utf8Converter::Convert(code + "\n");
         auto tokens = lexer->Tokenize(utf8Strings);
@@ -53,7 +66,9 @@ std::string WasmInterface::Execute(const std::string& code, long long timeoutMs)
         if (!parser->getErrors().empty()) {
             throw RuntimeException(parser->getErrors().front());
         }
-        auto result = evaluator->Evaluate(program);
+
+        auto result = useVM ? executeWithVM(program, limiter)
+                            : executeWithEvaluator(program, limiter);
 
         json << "{\"success\":true";
         json << ",\"output\":\"" << json_util::escape(outputBuffer) << "\"";
@@ -85,6 +100,16 @@ std::string WasmInterface::Execute(const std::string& code, long long timeoutMs)
     evaluator = std::make_unique<Evaluator>(&ioCtx, nullptr);
 
     return json.str();
+}
+
+void WasmInterface::SetBackend(const std::string& name) {
+    if (name == "vm")        useVM = true;
+    else if (name == "evaluator") useVM = false;
+    // 그 외 값은 무시 (호출자 오타로 silent flip되는 것을 막는다).
+}
+
+std::string WasmInterface::GetBackend() const {
+    return useVM ? "vm" : "evaluator";
 }
 
 std::string WasmInterface::GetTokens(const std::string& code) {

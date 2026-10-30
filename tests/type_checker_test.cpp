@@ -1,0 +1,881 @@
+#include "analyzer/type_checker.h"
+#include "lexer/lexer.h"
+#include "object/builtin_registry.h"
+#include "object/builtin_signatures.h"
+#include "parser/parser.h"
+#include "utf8_converter/utf8_converter.h"
+#include "util/token_utils.h"
+#include "util/type.h"
+#include <gtest/gtest.h>
+#include <sstream>
+#include <string>
+#include <unordered_set>
+
+namespace {
+
+// 소스 문자열 → AST → TypeChecker 진단. 파일 모드와 동일하게 전체를 한 번에
+// 토크나이즈 (Tokenize는 호출마다 line을 리셋하므로 줄 단위 호출은 줄 번호를 잃는다)
+// 후 블록 클로저 보정 (repl.cpp FileMode 파이프라인 준용).
+TypeChecker::Result checkSource(TypeChecker& tc, const std::string& source) {
+    Lexer lexer;
+    auto utf8 = Utf8Converter::Convert(source);
+    auto tokens = lexer.Tokenize(utf8);
+    token_utils::appendMissingBlockClosers(tokens);
+    Parser parser;
+    auto program = parser.Parsing(tokens);
+    if (!parser.getErrors().empty()) {
+        ADD_FAILURE() << "parse error: " << parser.getErrors().front();
+    }
+    return tc.check(program);
+}
+
+// 단일 진단 검증 헬퍼
+void expectSingleDiagnostic(const TypeChecker::Result& result, const std::string& code) {
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, code);
+}
+
+} // namespace
+
+// Phase A 정적 타입 시스템 — Type 계층 단위 테스트
+// spec: docs/superpowers/specs/2026-05-19-static-type-system-design.md (1.1)
+
+TEST(TypeTest, AssignabilityRules) {
+    auto integer = makePrim(ObjectType::INTEGER);
+    auto floating = makePrim(ObjectType::FLOAT);
+    auto str = makePrim(ObjectType::STRING);
+    auto nullObj = makePrim(ObjectType::NULL_OBJ);
+    auto optInteger = makeOptional(makePrim(ObjectType::INTEGER));
+    auto any = makeAny();
+    auto never = makeNever();
+
+    // T <- T 동일 OK
+    EXPECT_TRUE(integer->isAssignableFrom(*integer));
+
+    // T <- U (다른 Prim) 거부
+    EXPECT_FALSE(integer->isAssignableFrom(*str));
+
+    // 실수 <- 정수 자동 승격 거부 (spec 1.1, Task 0 결과 박제)
+    EXPECT_FALSE(floating->isAssignableFrom(*integer));
+
+    // T? <- T 좁히기 OK
+    EXPECT_TRUE(optInteger->isAssignableFrom(*integer));
+
+    // T? <- 없음 OK
+    EXPECT_TRUE(optInteger->isAssignableFrom(*nullObj));
+
+    // T <- 없음 거부
+    EXPECT_FALSE(integer->isAssignableFrom(*nullObj));
+
+    // any <- * / * <- any 항상 OK
+    EXPECT_TRUE(any->isAssignableFrom(*integer));
+    EXPECT_TRUE(any->isAssignableFrom(*optInteger));
+    EXPECT_TRUE(integer->isAssignableFrom(*any));
+    EXPECT_TRUE(optInteger->isAssignableFrom(*any));
+
+    // never 양방향 통과 (cascade 차단)
+    EXPECT_TRUE(never->isAssignableFrom(*integer));
+    EXPECT_TRUE(integer->isAssignableFrom(*never));
+    EXPECT_TRUE(optInteger->isAssignableFrom(*never));
+}
+
+// plan B-2 Task 1: InstanceType 서브타이핑 (spec D5)
+TEST(TypeTest, InstanceSubtyping) {
+    auto animal = makeInstance("동물", {});
+    auto dog = makeInstance("강아지", {"동물"});
+    auto cat = makeInstance("고양이", {"동물"});
+
+    EXPECT_TRUE(animal->isAssignableFrom(*dog));   // 부모 <- 자식
+    EXPECT_FALSE(dog->isAssignableFrom(*animal));  // 자식 <- 부모 거부
+    EXPECT_FALSE(dog->isAssignableFrom(*cat));     // 형제 거부
+    EXPECT_TRUE(dog->isAssignableFrom(*dog));      // 동일
+    EXPECT_TRUE(makeAny()->isAssignableFrom(*dog));
+    EXPECT_TRUE(dog->isAssignableFrom(*makeNever()));
+    EXPECT_FALSE(dog->isAssignableFrom(*makePrim(ObjectType::INTEGER)));
+    // Optional 래핑: 동물? <- 강아지
+    EXPECT_TRUE(makeOptional(makeInstance("동물", {}))->isAssignableFrom(*dog));
+}
+
+// plan Task 3 게이트: 시그니처 테이블 ↔ BuiltinRegistry 1:1 매칭.
+// `반복`은 lexer 키워드 충돌로 호출 불가능한 dead builtin — 레지스트리에는
+// 있지만 시그니처 테이블에서는 의도적으로 제외 (spec D2.1).
+TEST(BuiltinSignaturesTest, MatchesRegistry) {
+    const auto& registryNames = BuiltinRegistry::names();
+
+    std::unordered_set<std::string> tableNames;
+    for (const auto& sig : kBuiltinSignatures) {
+        EXPECT_TRUE(tableNames.insert(sig.name).second) << "시그니처 중복: " << sig.name;
+        EXPECT_TRUE(registryNames.count(sig.name)) << "레지스트리에 없는 시그니처: " << sig.name;
+        EXPECT_LE(sig.minArity, sig.maxArity) << sig.name;
+        EXPECT_GE(sig.minArity, 0) << sig.name;
+    }
+
+    for (const auto& name : registryNames) {
+        if (name == "반복") continue;  // dead builtin (spec D2.1)
+        EXPECT_TRUE(tableNames.count(name)) << "시그니처 누락: " << name;
+    }
+
+    EXPECT_EQ(tableNames.size(), registryNames.size() - 1);  // 반복 1건 제외
+}
+
+// plan Task 4 게이트
+TEST(TypeCheckerTest, EmptyProgram) {
+    TypeChecker tc;
+    auto result = tc.check(std::make_shared<Program>());
+    EXPECT_TRUE(result.diagnostics.empty());
+    EXPECT_FALSE(result.hasErrors());
+}
+
+TEST(TypeCheckerTest, BuiltinResolved) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "출력(\"안녕\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());  // 빌트인 prepopulate로 TC006 미발화
+}
+
+// ---- plan Task 6: TC001/TC002 + Z2 AST 노드 6종 ----
+
+TEST(TypeCheckerTest, TC001_DeclTypeMismatch) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = \"hello\"\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC001_DeclTypeMatch) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 10\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_OptionalAcceptsNull) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수? z = 없음\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_NonNullRejectsNull) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 y = 없음\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC001_EmptyArray) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "배열 a = []\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC001_MixedArrayFlat) {
+    TypeChecker tc;
+    // Phase A: 원소 타입 무시, 평면 ARRAY 처리 (spec D2.2)
+    EXPECT_TRUE(checkSource(tc, "배열 a = [1, \"x\"]\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_ReassignMismatch) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1\nx = \"a\"\n"), "TC002");
+}
+
+TEST(TypeCheckerTest, TC002_ReassignMatch) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\nx = 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_ForEachNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "각각 정수 원소 [1, 2, 3] 에서:\n"
+        "    출력(원소)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_ForRangeNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = 0 부터 10 까지:\n"
+        "    출력(i)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_TryCatchNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "시도:\n"
+        "    정수 x = 1 / 0\n"
+        "실패 오류:\n"
+        "    출력(오류)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_MatchNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수 x = 1\n"
+        "비교 x:\n"
+        "    경우 1:\n"
+        "        출력(\"일\")\n"
+        "    기본:\n"
+        "        출력(\"기타\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, Z2_IndexAssignmentNoCheck) {
+    TypeChecker tc;
+    // IndexAssignment는 타입 일치 검사 안 함 (spec D6.5)
+    auto result = checkSource(tc,
+        "배열 a = [1, 2, 3]\n"
+        "a[0] = \"x\"\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+// ---- plan Task 7: TC006 미선언 식별자 + 식별자 추론 ----
+
+TEST(TypeCheckerTest, TC006_UndeclaredIdentifier) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = foo\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, TC006_UndeclaredInBinaryNoCascade) {
+    TypeChecker tc;
+    // NeverType 전파로 이항 연산·대입에서 추가 진단 없음 (spec 1.1.2)
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 미선언 + 1\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, IdentifierInfersDeclaredType) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1\n문자 s = x\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, IdentifierMatchingTypeOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\n정수 y = x\n").diagnostics.empty());
+}
+
+// ---- plan Task 8: TC101/TC102/TC103 함수 호출/리턴 (top-down) ----
+
+TEST(TypeCheckerTest, TC102_ArgTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "f(\"x\")\n");
+    expectSingleDiagnostic(result, "TC102");
+}
+
+TEST(TypeCheckerTest, TC101_ArgCountMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "f()\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
+TEST(TypeCheckerTest, TC103_ReturnTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f() -> 정수:\n"
+        "    리턴 \"a\"\n");
+    expectSingleDiagnostic(result, "TC103");
+}
+
+TEST(TypeCheckerTest, FunctionCallOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f() -> 정수:\n"
+        "    리턴 1\n"
+        "정수 x = f()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, RecursionOk) {
+    TypeChecker tc;
+    // 본문 진입 직전 declare → 재귀 호출 가능 (spec 2.3)
+    auto result = checkSource(tc,
+        "함수 사실() -> 정수:\n"
+        "    리턴 사실()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ForwardReferenceIsTC006) {
+    TypeChecker tc;
+    // hoisting 미지원 (spec D3.1) — evaluator도 런타임 실패하는 케이스
+    auto result = checkSource(tc,
+        "정수 x = 나중에()\n"
+        "함수 나중에() -> 정수:\n"
+        "    리턴 1\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, UndeclaredFunctionCallSingleTC006) {
+    TypeChecker tc;
+    // NeverType 차단으로 TC101/TC102 추가 발화 없음
+    expectSingleDiagnostic(checkSource(tc, "없는함수(1)\n"), "TC006");
+}
+
+TEST(TypeCheckerTest, TC101_BuiltinArity) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "길이()\n"), "TC101");
+}
+
+TEST(TypeCheckerTest, HigherOrderSpecialOpsResolved) {
+    TypeChecker tc;
+    // 매핑/걸러내기/줄이기는 빌트인 맵에 없는 특수 연산자 — TC006 미발화
+    auto result = checkSource(tc,
+        "함수 두배(정수 x) -> 정수:\n"
+        "    리턴 x * 2\n"
+        "배열 a = [1, 2, 3]\n"
+        "배열 b = 매핑(a, 두배)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+// ---- plan Task 9: TC501 Nullable 미해제 ----
+
+TEST(TypeCheckerTest, TC501_BinaryOnOptional) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수? x = 10\nx + 1\n"), "TC501");
+}
+
+TEST(TypeCheckerTest, TC501_EqualityExempt) {
+    TypeChecker tc;
+    // null 체크 패턴 `x == 없음`은 예외 (spec 3 TC501)
+    auto result = checkSource(tc, "정수? x = 10\n논리 b = x == 없음\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC501_IndexOnOptional) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "배열? a = [1, 2]\na[0]\n"), "TC501");
+}
+
+TEST(TypeCheckerTest, TC501_OptionalToNonNullIsTC001) {
+    TypeChecker tc;
+    // 대입 검사가 먼저 — TC501 아님 (plan Task 9)
+    expectSingleDiagnostic(checkSource(tc, "정수? x = 10\n정수 y = x\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, NarrowingInThenBranch) {
+    TypeChecker tc;
+    // Phase B-1: x != 없음 분기 안에서 inner 타입으로 좁힘 (spec D3)
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    정수 y = x + 1\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingEqNullInElseBranch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x == 없음 라면:\n"
+        "    출력(\"널\")\n"
+        "아니면:\n"
+        "    정수 y = x + 1\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingAndCombination) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? a = 1\n"
+        "정수? b = 2\n"
+        "만약 a != 없음 && b != 없음 라면:\n"
+        "    정수 c = a + b\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, NarrowingCanceledByReassign) {
+    TypeChecker tc;
+    // 분기 내 재대입은 원(Optional) 타입 기준 + 좁힘 해제 (spec D3)
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    x = 없음\n"
+        "    x + 1\n");
+    expectSingleDiagnostic(result, "TC501");  // 재대입 자체는 TC002 아님 (원타입 Optional)
+}
+
+TEST(TypeCheckerTest, NoNarrowingOutsideBranch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    출력(\"ok\")\n"
+        "x + 1\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
+TEST(TypeCheckerTest, NoNarrowingInElseOfNeq) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "정수? x = 10\n"
+        "만약 x != 없음 라면:\n"
+        "    출력(\"ok\")\n"
+        "아니면:\n"
+        "    x + 1\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
+// ---- plan Task 10: 클래스 처리 (spec D6) ----
+
+namespace {
+const char* kPointClass =
+    "클래스 점:\n"
+    "    정수 x\n"
+    "    정수 y\n"
+    "    생성(정수 a, 정수 b):\n"
+    "        자기.x = a\n"
+    "        자기.y = b\n"
+    "    함수 합() -> 정수:\n"
+    "        리턴 자기.x + 자기.y\n";
+} // namespace
+
+TEST(TypeCheckerTest, ClassConstructorOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(3, 4)\n출력(p.x)\n출력(p.합())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC101_ConstructorArity) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, std::string(kPointClass) + "점 p = 점(3)\n"), "TC101");
+}
+
+TEST(TypeCheckerTest, MethodBodyNowTraversed) {
+    TypeChecker tc;
+    // Phase B-2: 본문 진입 — `자기.이름 + 1`(문자+정수)은 TC601 (Phase A의 미진입 의도 반전)
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "    함수 인사() -> 정수:\n"
+        "        리턴 자기.이름 + 1\n");
+    ASSERT_FALSE(result.diagnostics.empty());
+    EXPECT_EQ(result.diagnostics[0].code, "TC601");
+}
+
+TEST(TypeCheckerTest, TC002_SelfFieldTypeMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 점:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = \"문자\"\n");
+    expectSingleDiagnostic(result, "TC002");
+}
+
+TEST(TypeCheckerTest, TC103_MethodReturnMismatch) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 점:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 이름() -> 문자:\n"
+        "        리턴 자기.x\n");
+    expectSingleDiagnostic(result, "TC103");
+}
+
+TEST(TypeCheckerTest, DynamicFieldRegistered) {
+    TypeChecker tc;
+    // 부록 C: 동적 필드는 양 런타임 허용 — 진단 없이 등록되고 메서드에서 보임
+    auto result = checkSource(tc,
+        "클래스 동적:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "        자기.y = a + 1\n"
+        "    함수 와이() -> 정수:\n"
+        "        리턴 자기.y\n"
+        "동적 d = 동적(5)\n"
+        "출력(d.와이())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC006_DirectMethodCallInBody) {
+    TypeChecker tc;
+    // 자기 없는 메서드 직접 호출은 양 런타임 거부 (부록 C) — TC006 정당
+    auto result = checkSource(tc,
+        "클래스 직접:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 첫째() -> 정수:\n"
+        "        리턴 둘째()\n"
+        "    함수 둘째() -> 정수:\n"
+        "        리턴 9\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, MethodMutualReferenceViaSelf) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 상호:\n"
+        "    정수 x\n"
+        "    생성(정수 a):\n"
+        "        자기.x = a\n"
+        "    함수 첫째() -> 정수:\n"
+        "        리턴 자기.둘째()\n"
+        "    함수 둘째() -> 정수:\n"
+        "        리턴 7\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC006_UndeclaredParentClass) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 강아지 < 모름:\n"
+        "    정수 나이\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, InheritanceDeclaredParentOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    정수 나이\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, InheritedConstructorArity) {
+    TypeChecker tc;
+    // 자식이 생성자를 정의하지 않으면 부모 생성자를 상속 (런타임 실측 2026-06-11)
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "강아지 뽀삐 = 강아지(\"뽀삐\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, OwnConstructorOverridesInherited) {
+    TypeChecker tc;
+    // 자식이 자체 생성자를 정의하면 그 arity 사용
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 로봇개 < 동물:\n"
+        "    정수 버전\n"
+        "    생성(문자 이름, 정수 버전):\n"
+        "        자기.이름 = 이름\n"
+        "        자기.버전 = 버전\n"
+        "로봇개 r = 로봇개(\"알파\")\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
+// ---- plan B-2 Task 2: InstanceType 적용 + 서브타이핑 ----
+
+TEST(TypeCheckerTest, SubtypeAssignmentOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "동물 a = 강아지(\"뽀삐\")\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, SiblingAssignmentRejected) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    정수 나이\n"
+        "클래스 고양이 < 동물:\n"
+        "    정수 나이\n"
+        "강아지 d = 고양이()\n");
+    expectSingleDiagnostic(result, "TC001");
+}
+
+// ---- plan B-2 Task 3: TC201 미지 멤버 + 멤버 타입 추론 ----
+
+TEST(TypeCheckerTest, TC201_UnknownField) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n출력(p.없는것)\n");
+    expectSingleDiagnostic(result, "TC201");
+}
+
+TEST(TypeCheckerTest, TC201_UnknownMethod) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\np.없는것()\n");
+    expectSingleDiagnostic(result, "TC201");
+}
+
+TEST(TypeCheckerTest, FieldTypeInferred) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n문자 s = p.x\n");
+    expectSingleDiagnostic(result, "TC001");  // x는 정수 필드
+}
+
+TEST(TypeCheckerTest, MethodReturnTypeInferred) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\n문자 s = p.합()\n");
+    expectSingleDiagnostic(result, "TC001");  // 합() -> 정수
+}
+
+TEST(TypeCheckerTest, TC101_MethodArity) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점 p = 점(1, 2)\np.합(1)\n");
+    expectSingleDiagnostic(result, "TC101");
+}
+
+TEST(TypeCheckerTest, InheritedMemberOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "클래스 동물:\n"
+        "    문자 이름\n"
+        "    생성(문자 이름):\n"
+        "        자기.이름 = 이름\n"
+        "    함수 소개() -> 문자:\n"
+        "        리턴 자기.이름\n"
+        "클래스 강아지 < 동물:\n"
+        "    함수 소리() -> 문자:\n"
+        "        리턴 \"멍멍\"\n"
+        "강아지 d = 강아지(\"뽀삐\")\n"
+        "문자 n = d.이름\n"
+        "문자 s = d.소개()\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BuiltinMethodChainingSilent) {
+    TypeChecker tc;
+    // 내장 타입 메서드 체이닝 (evaluator methodMap) — 좌항이 InstanceType이 아니므로 침묵
+    auto result = checkSource(tc, "문자 s = \"가나\"\n출력(s.길이())\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC501_MemberAccessOnOptionalClass) {
+    TypeChecker tc;
+    auto result = checkSource(tc, std::string(kPointClass) + "점? p = 없음\np.x\n");
+    expectSingleDiagnostic(result, "TC501");
+}
+
+// ---- plan Task 12: 종합 보강 ----
+
+TEST(TypeCheckerTest, TC102_ArgTypeMatchOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 f(정수 a) -> 정수:\n"
+        "    리턴 a\n"
+        "정수 x = f(10)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_OptionalReassignNullOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수? x = 10\nx = 없음\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC002_NonNullReassignNullRejected) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 10\nx = 없음\n"), "TC002");
+}
+
+TEST(TypeCheckerTest, Z2_YieldNoFalsePositive) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 숫자들() -> 정수:\n"
+        "    생산 1\n"
+        "    생산 2\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC103_ReturnOkSecondCase) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "함수 g(실수 v) -> 실수:\n"
+        "    리턴 v\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ReplAccumulatesGlobalsAcrossChecks) {
+    TypeChecker tc;
+    // REPL 시나리오: 같은 인스턴스로 두 번 check — 첫 입력의 선언이 둘째에 보임
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1\n").diagnostics.empty());
+    expectSingleDiagnostic(checkSource(tc, "x = \"a\"\n"), "TC002");
+}
+
+// ---- plan B-1 Task 1: AST 줄 번호 (spec D1) ----
+
+TEST(TypeCheckerTest, DiagnosticLineNumberIdentifier) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "출력(1)\n출력(미선언변수)\n");
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, "TC006");
+    EXPECT_EQ(result.diagnostics[0].line, 2);
+}
+
+TEST(TypeCheckerTest, DiagnosticLineNumberAssignment) {
+    TypeChecker tc;
+    auto result = checkSource(tc, "정수 x = 1\n출력(x)\nx = \"a\"\n");
+    ASSERT_EQ(result.diagnostics.size(), 1u);
+    EXPECT_EQ(result.diagnostics[0].code, "TC002");
+    EXPECT_EQ(result.diagnostics[0].line, 3);
+}
+
+// ---- plan B-1 Task 2: 이항 연산자 결과 추론 (spec 부록 A.2) ----
+
+TEST(TypeCheckerTest, BinaryResultIntInt) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "정수 x = 1 + 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultIntIntRejectedAsString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "문자 s = 1 + 2\n"), "TC001");  // 결과 정수
+}
+
+TEST(TypeCheckerTest, BinaryResultMixedNumericIsFloat) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "정수 x = 1 + 1.5\n"), "TC001");  // 결과 실수
+}
+
+TEST(TypeCheckerTest, BinaryResultFloatOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "실수 x = 1 + 1.5\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultStringConcat) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "문자 s = \"a\" + \"b\"\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultComparisonIsBool) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "논리 b = 1 < 2\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, BinaryResultLogicalAndIsBool) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "논리 b = true && false\n").diagnostics.empty());
+}
+
+// ---- plan B-1 Task 3: TC601 (spec 부록 A.1) ----
+
+TEST(TypeCheckerTest, TC601_IntPlusString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "1 + \"a\"\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_StringMinusString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "\"a\" - \"b\"\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_EqualityIntString) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(1 == \"a\")\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_EqualityNullAlwaysOk) {
+    TypeChecker tc;
+    EXPECT_TRUE(checkSource(tc, "출력([1] == 없음)\n").diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, TC601_LogicalLeftNonBool) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(1 && true)\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, TC601_LogicalRightNowChecked) {
+    TypeChecker tc;
+    // 런타임 통일(D4)로 평가되는 우항도 논리 강제 — 면제 해제 (런타임 일관성 D7)
+    expectSingleDiagnostic(checkSource(tc, "출력(true && 1)\n"), "TC601");
+}
+
+TEST(TypeCheckerTest, StringComparisonAllowedAndBool) {
+    TypeChecker tc;
+    // 문자쌍 비교는 정식 허용 (양 런타임 지원) — 결과는 논리로 정밀 추론
+    EXPECT_TRUE(checkSource(tc, "논리 b = \"a\" < \"b\"\n").diagnostics.empty());
+    TypeChecker tc2;
+    expectSingleDiagnostic(checkSource(tc2, "정수 n = \"a\" < \"b\"\n"), "TC001");
+}
+
+TEST(TypeCheckerTest, TC302_NonIterableForeach) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "각각 정수 n 5 에서:\n"
+        "    출력(n)\n");
+    expectSingleDiagnostic(result, "TC302");
+}
+
+TEST(TypeCheckerTest, TC302_HashMapForeach) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "사전 d = {\"k\": 1}\n"
+        "각각 문자 k d 에서:\n"
+        "    출력(k)\n");
+    expectSingleDiagnostic(result, "TC302");
+}
+
+TEST(TypeCheckerTest, TC601_BoolComparisonRejected) {
+    TypeChecker tc;
+    expectSingleDiagnostic(checkSource(tc, "출력(true < false)\n"), "TC601");
+}
+
+// ---- plan B-1 Task 4: TC301 (spec D4) ----
+
+TEST(TypeCheckerTest, TC301_StringBound) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = \"a\" 부터 3 까지:\n"
+        "    출력(i)\n");
+    expectSingleDiagnostic(result, "TC301");
+}
+
+TEST(TypeCheckerTest, TC006_IfBlockScopedDeclaration) {
+    TypeChecker tc;
+    // 런타임 블록 스코프 통일(D2)로 체커도 블록 스코프 모델 — 블록 밖 사용은 TC006
+    auto result = checkSource(tc,
+        "만약 true 라면:\n"
+        "    정수 안쪽 = 1\n"
+        "출력(안쪽)\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, TC006_TryBlockScopedDeclaration) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "시도:\n"
+        "    정수 티 = 1\n"
+        "실패 오류:\n"
+        "    출력(오류)\n"
+        "출력(티)\n");
+    expectSingleDiagnostic(result, "TC006");
+}
+
+TEST(TypeCheckerTest, TC301_FloatBoundNowChecked) {
+    TypeChecker tc;
+    // 런타임 통일(2026-06-12, range_strict 골든)로 실수 경계도 양 백엔드 거부 — 면제 해제
+    auto result = checkSource(tc,
+        "반복 정수 i = 0.5 부터 3 까지:\n"
+        "    출력(i)\n");
+    expectSingleDiagnostic(result, "TC301");
+}
+
+TEST(TypeCheckerTest, TC301_IntBoundsOk) {
+    TypeChecker tc;
+    auto result = checkSource(tc,
+        "반복 정수 i = 0 부터 10 까지:\n"
+        "    출력(i)\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}
+
+TEST(TypeCheckerTest, ScopePopAfterForEach) {
+    TypeChecker tc;
+    // 루프 변수는 루프 스코프에만 존재 — 바깥 재선언과 충돌하지 않아야 함
+    auto result = checkSource(tc,
+        "각각 정수 원소 [1, 2, 3] 에서:\n"
+        "    출력(원소)\n"
+        "문자 원소 = \"바깥\"\n");
+    EXPECT_TRUE(result.diagnostics.empty());
+}

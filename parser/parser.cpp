@@ -2,6 +2,7 @@
 
 #include "../ast/literals.h"
 #include "../exception/exception.h"
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <set>
@@ -23,8 +24,13 @@ shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& t
             if (statement != nullptr) {
                 program->statements.push_back(statement);
             }
+        } catch (const ParseError& e) {
+            errors.push_back(e.what());
+            diagnostics.push_back({e.line, e.column, e.endColumn, e.what()});
+            skipToNextLine();
         } catch (const std::exception& e) {
             errors.push_back(e.what());
+            diagnostics.push_back({current_token ? current_token->line : 0, 0, 0, e.what()});
             skipToNextLine();
         }
     }
@@ -37,6 +43,9 @@ void Parser::initialization() {
     program               = make_shared<Program>();
     current_read_position = 0;
     errors.clear();
+    diagnostics.clear();
+    expressionNesting_     = 0;
+    nestedExpressionDepth_ = 0;
     setToken();
 }
 
@@ -66,20 +75,20 @@ void Parser::setNextToken() {
 
 void Parser::skipToken(const TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
     setNextToken();
 }
 
 void Parser::checkToken(TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
 }
 
@@ -135,6 +144,7 @@ shared_ptr<Statement> Parser::parseStatement() {
             && tokens[pos + 3]->type == TokenType::ASSIGN) {
             // 멤버 대입문: 자기.필드 = 값
             auto stmt = make_shared<AssignmentStatement>();
+            stmt->line = current_token->line;
             skipToken(TokenType::자기);
             skipToken(TokenType::DOT);
             stmt->name = "자기." + current_token->text;
@@ -201,14 +211,20 @@ shared_ptr<Statement> Parser::parseStatement() {
         return parseTryCatchStatement();
     }
     if (current_token->type == TokenType::중단) {
+        const long long startLine = current_token->line;
         skipToken(TokenType::중단);
         skipToken(TokenType::NEW_LINE);
-        return make_shared<BreakStatement>();
+        auto stmt = make_shared<BreakStatement>();
+        stmt->line = startLine;
+        return stmt;
     }
     if (current_token->type == TokenType::계속) {
+        const long long startLine = current_token->line;
         skipToken(TokenType::계속);
         skipToken(TokenType::NEW_LINE);
-        return make_shared<ContinueStatement>();
+        auto stmt = make_shared<ContinueStatement>();
+        stmt->line = startLine;
+        return stmt;
     }
     if (current_token->type == TokenType::함수 && next_token != nullptr
         && next_token->type == TokenType::IDENTIFIER) {
@@ -234,6 +250,7 @@ shared_ptr<Statement> Parser::parseStatement() {
 // 정수 x = 10 또는 정수? x = 없음
 shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
     auto statement = make_shared<InitializationStatement>();
+    statement->line = current_token ? current_token->line : 0;
 
     statement->type = current_token;
     setNextToken();
@@ -246,6 +263,7 @@ shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
     skipToken(TokenType::ASSIGN);
     statement->value = parseExpression(Precedence::LOWEST);
@@ -256,6 +274,7 @@ shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
 
 shared_ptr<AssignmentStatement> Parser::parseAssignmentStatement() {
     auto statement = make_shared<AssignmentStatement>();
+    statement->line = current_token ? current_token->line : 0;
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -271,10 +290,13 @@ shared_ptr<AssignmentStatement> Parser::parseAssignmentStatement() {
 
 shared_ptr<IndexAssignmentStatement> Parser::parseIndexAssignmentStatement() {
     auto stmt = make_shared<IndexAssignmentStatement>();
+    stmt->line = current_token ? current_token->line : 0;
 
     // Parse collection (identifier)
     auto ident = make_shared<IdentifierExpression>();
+    ident->line = stmt->line;
     ident->name = current_token->text;
+    ident->token = current_token;
     stmt->collection = ident;
     skipToken(TokenType::IDENTIFIER);
 
@@ -295,6 +317,7 @@ shared_ptr<IndexAssignmentStatement> Parser::parseIndexAssignmentStatement() {
 
 shared_ptr<CompoundAssignmentStatement> Parser::parseCompoundAssignmentStatement() {
     auto statement = make_shared<CompoundAssignmentStatement>();
+    statement->line = current_token ? current_token->line : 0;
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
@@ -311,6 +334,7 @@ shared_ptr<CompoundAssignmentStatement> Parser::parseCompoundAssignmentStatement
 
 shared_ptr<ExpressionStatement> Parser::parseExpressionStatement() {
     auto expressionStatement       = make_shared<ExpressionStatement>();
+    expressionStatement->line       = current_token ? current_token->line : 0;
     expressionStatement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::NEW_LINE);
@@ -319,8 +343,10 @@ shared_ptr<ExpressionStatement> Parser::parseExpressionStatement() {
 
 
 shared_ptr<ReturnStatement> Parser::parseReturnStatement() {
+    const long long startLine = current_token ? current_token->line : 0;
     skipToken(TokenType::리턴);
     auto statement       = make_shared<ReturnStatement>();
+    statement->line      = startLine;
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::NEW_LINE);
@@ -329,6 +355,7 @@ shared_ptr<ReturnStatement> Parser::parseReturnStatement() {
 
 shared_ptr<BlockStatement> Parser::parseBlockStatement() {
     auto statement = make_shared<BlockStatement>();
+    statement->line = current_token ? current_token->line : 0;
     skipToken(TokenType::START_BLOCK);
 
     while (current_token != nullptr && current_token->type != TokenType::END_BLOCK) {
@@ -345,6 +372,7 @@ shared_ptr<BlockStatement> Parser::parseBlockStatement() {
 // 만약 조건 라면:
 shared_ptr<IfStatement> Parser::parseIfStatement() {
     auto statement = make_shared<IfStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::만약);
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -367,6 +395,7 @@ shared_ptr<IfStatement> Parser::parseIfStatement() {
 // 반복 조건 동안:
 shared_ptr<WhileStatement> Parser::parseWhileStatement() {
     auto statement = make_shared<WhileStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::반복);
     statement->condition = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -382,6 +411,7 @@ shared_ptr<WhileStatement> Parser::parseWhileStatement() {
 // 각각 정수 원소 배열 에서:
 shared_ptr<ForEachStatement> Parser::parseForEachStatement() {
     auto statement = make_shared<ForEachStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::각각);
 
     // 타입 원소명
@@ -390,6 +420,7 @@ shared_ptr<ForEachStatement> Parser::parseForEachStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->elementName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 반복 대상 표현식
@@ -411,6 +442,7 @@ shared_ptr<ForEachStatement> Parser::parseForEachStatement() {
 //     ...
 shared_ptr<TryCatchStatement> Parser::parseTryCatchStatement() {
     auto statement = make_shared<TryCatchStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::시도);
     skipToken(TokenType::COLON);
     skipToken(TokenType::NEW_LINE);
@@ -432,10 +464,12 @@ shared_ptr<TryCatchStatement> Parser::parseTryCatchStatement() {
 // 함수 이름(타입 파라미터, 타입 파라미터2) -> 리턴타입:
 shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
     auto statement = make_shared<FunctionStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::함수);
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::LPAREN);
@@ -458,7 +492,9 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
             // 파라미터 이름
             checkToken(TokenType::IDENTIFIER);
             auto ident = make_shared<IdentifierExpression>();
+            ident->line = current_token->line;
             ident->name = current_token->text;
+            ident->token = current_token;
             statement->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
 
@@ -503,6 +539,7 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
 //         ...
 shared_ptr<MatchStatement> Parser::parseMatchStatement() {
     auto statement = make_shared<MatchStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::비교);
     statement->subject = parseExpression(Precedence::LOWEST);
     setNextToken();
@@ -527,6 +564,7 @@ shared_ptr<MatchStatement> Parser::parseMatchStatement() {
                  current_token->type == TokenType::사전) &&
                 next_token != nullptr && next_token->type == TokenType::COLON) {
                 auto typePattern = std::make_shared<TypePatternExpression>();
+                typePattern->line = current_token->line;
                 typePattern->typeToken = current_token;
                 caseValue = typePattern;
                 setNextToken(); // skip type keyword
@@ -539,6 +577,7 @@ shared_ptr<MatchStatement> Parser::parseMatchStatement() {
                     setNextToken(); // skip ~
                     auto endExpr = parseExpression(Precedence::LOWEST);
                     auto rangePattern = std::make_shared<RangePatternExpression>();
+                    rangePattern->line = caseValue ? caseValue->line : 0;
                     rangePattern->start = caseValue;
                     rangePattern->end = endExpr;
                     caseValue = rangePattern;
@@ -583,10 +622,12 @@ shared_ptr<MatchStatement> Parser::parseMatchStatement() {
 //         ...
 shared_ptr<ClassStatement> Parser::parseClassStatement() {
     auto statement = make_shared<ClassStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::클래스);
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 상속: 클래스 자식 < 부모:
@@ -615,6 +656,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
             statement->fieldTypes.push_back(current_token);
             setNextToken();
             statement->fieldNames.push_back(current_token->text);
+            statement->fieldNameTokens.push_back(current_token);
             skipToken(TokenType::IDENTIFIER);
             skipToken(TokenType::NEW_LINE);
             continue;
@@ -630,7 +672,9 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
                     setNextToken();
                     checkToken(TokenType::IDENTIFIER);
                     auto ident = make_shared<IdentifierExpression>();
+                    ident->line = current_token->line;
                     ident->name = current_token->text;
+                    ident->token = current_token;
                     statement->constructorParams.push_back(ident);
                     skipToken(TokenType::IDENTIFIER);
                 } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -657,29 +701,53 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
 
 shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
-        throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
+        throw UnknownPrefixParseFunctionException(current_token->type, *current_token);
     }
+
+    if (++expressionNesting_ > kMaxExpressionDepth) {
+        --expressionNesting_;
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    struct NestingGuard {
+        int& nesting;
+        ~NestingGuard() { --nesting; }
+    } nestingGuard{expressionNesting_};
+
+    // 식의 AST 깊이 = max(왼쪽, 오른쪽 하위 식) + 1. 하위 parseExpression이 nestedExpressionDepth_에 남긴 값으로 계산한다.
+    const int outerNestedDepth = nestedExpressionDepth_;
+    nestedExpressionDepth_     = 0;
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
     shared_ptr<Expression> expression       = (this->*prefixParseFunction)();
+    int depth                               = nestedExpressionDepth_ + 1;
 
     while (next_token != nullptr) {
         auto precIt = getPrecedence.find(next_token->type);
         Precedence nextPrec = (precIt != getPrecedence.end()) ? precIt->second : Precedence::LOWEST;
         if (precedence >= nextPrec) break;
         if (!infixParseFunctions.contains(next_token->type)) {
-            throw UnknownInfixParseFunctionException(next_token->type, next_token->line);
+            throw UnknownInfixParseFunctionException(next_token->type, *next_token);
         }
         InfixParseFunction infixParseFunction = infixParseFunctions[next_token->type];
         setNextToken();
-        expression = (this->*infixParseFunction)(expression);
+        nestedExpressionDepth_ = 0;
+        expression             = (this->*infixParseFunction)(expression);
+        depth                  = std::max(depth, nestedExpressionDepth_) + 1;
+        if (depth > kMaxExpressionDepth) {
+            throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+        }
     }
 
+    if (depth > kMaxExpressionDepth) {
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    nestedExpressionDepth_ = std::max(outerNestedDepth, depth);
     return expression;
 }
 
 shared_ptr<Expression> Parser::parseInfixExpression(shared_ptr<Expression> left) {
     auto infixExpression   = make_shared<InfixExpression>();
+    infixExpression->line  = current_token->line;
     infixExpression->token = current_token;
     infixExpression->left  = std::move(left);
 
@@ -697,6 +765,7 @@ shared_ptr<Expression> Parser::parseInfixExpression(shared_ptr<Expression> left)
 
 shared_ptr<Expression> Parser::parsePrefixExpression() {
     auto prefixExpression   = make_shared<PrefixExpression>();
+    prefixExpression->line  = current_token->line;
     prefixExpression->token = current_token;
     setNextToken();
 
@@ -713,6 +782,7 @@ shared_ptr<Expression> Parser::parseGroupedExpression() {
     // 튜플 체크: (a, b, c)
     if (next_token != nullptr && next_token->type == TokenType::COMMA) {
         auto tuple = make_shared<TupleLiteral>();
+        tuple->line = expression ? expression->line : 0;
         tuple->elements.push_back(expression);
         setNextToken(); // expression 뒤로
         while (current_token->type == TokenType::COMMA) {
@@ -733,19 +803,25 @@ shared_ptr<Expression> Parser::parseIdentifierExpression() {
     checkToken(TokenType::IDENTIFIER);
 
     auto identifier_expression  = make_shared<IdentifierExpression>();
+    identifier_expression->line = current_token->line;
     identifier_expression->name = current_token->text;
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
 shared_ptr<Expression> Parser::parseSelfExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
+    identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "자기";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
 shared_ptr<Expression> Parser::parseParentExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
+    identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "부모";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -759,6 +835,7 @@ shared_ptr<Expression> Parser::parseMemberAccessExpression(shared_ptr<Expression
     // 메서드 호출 체크: object.method(args)
     if (next_token != nullptr && next_token->type == TokenType::LPAREN) {
         auto methodCall = make_shared<MethodCallExpression>();
+        methodCall->line = current_token->line;
         methodCall->object = std::move(left);
         methodCall->method = memberName;
         skipToken(TokenType::IDENTIFIER);
@@ -774,6 +851,7 @@ shared_ptr<Expression> Parser::parseMemberAccessExpression(shared_ptr<Expression
     }
 
     auto memberAccess = make_shared<MemberAccessExpression>();
+    memberAccess->line = current_token->line;
     memberAccess->object = std::move(left);
     memberAccess->member = memberName;
     return memberAccess;
@@ -783,6 +861,8 @@ shared_ptr<Expression> Parser::parseMemberAccessExpression(shared_ptr<Expression
 shared_ptr<Expression> Parser::parseCallInfixExpression(shared_ptr<Expression> left) {
     auto call_expression = make_shared<CallExpression>();
     call_expression->function = std::move(left);
+    call_expression->line = call_expression->function ? call_expression->function->line
+                                                      : (current_token ? current_token->line : 0);
 
     skipToken(TokenType::LPAREN);
     if (current_token != nullptr && current_token->type != TokenType::RPAREN) {
@@ -803,6 +883,7 @@ shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left)
     if (current_token && current_token->type == TokenType::COLON) {
         auto slice = make_shared<SliceExpression>();
         slice->object = std::move(left);
+        slice->line = slice->object ? slice->object->line : 0;
         slice->start = nullptr;
         setNextToken(); // skip ':'
         if (current_token && current_token->type != TokenType::RBRACKET) {
@@ -820,6 +901,7 @@ shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left)
     if (current_token && current_token->type == TokenType::COLON) {
         auto slice = make_shared<SliceExpression>();
         slice->object = std::move(left);
+        slice->line = slice->object ? slice->object->line : 0;
         slice->start = std::move(expr);
         setNextToken(); // skip ':'
         if (current_token && current_token->type != TokenType::RBRACKET) {
@@ -833,6 +915,7 @@ shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left)
     // Regular index expression
     auto index_expression  = make_shared<IndexExpression>();
     index_expression->name = std::move(left);
+    index_expression->line = index_expression->name ? index_expression->name->line : 0;
     index_expression->index = std::move(expr);
     checkToken(TokenType::RBRACKET);
 
@@ -842,6 +925,7 @@ shared_ptr<Expression> Parser::parseIndexExpression(shared_ptr<Expression> left)
 
 shared_ptr<Expression> Parser::parseIntegerLiteral() {
     auto integerLiteral  = make_shared<IntegerLiteral>();
+    integerLiteral->line  = current_token->line;
     integerLiteral->token = current_token;
     try {
         integerLiteral->value = stoll(current_token->text);
@@ -853,6 +937,7 @@ shared_ptr<Expression> Parser::parseIntegerLiteral() {
 
 shared_ptr<Expression> Parser::parseFloatLiteral() {
     auto floatLiteral  = make_shared<FloatLiteral>();
+    floatLiteral->line  = current_token->line;
     floatLiteral->token = current_token;
     try {
         floatLiteral->value = stod(current_token->text);
@@ -864,6 +949,7 @@ shared_ptr<Expression> Parser::parseFloatLiteral() {
 
 shared_ptr<Expression> Parser::parseBooleanLiteral() {
     auto booleanLiteral  = make_shared<BooleanLiteral>();
+    booleanLiteral->line  = current_token->line;
     booleanLiteral->token = current_token;
     booleanLiteral->value = current_token->type == TokenType::TRUE;
     return booleanLiteral;
@@ -871,6 +957,7 @@ shared_ptr<Expression> Parser::parseBooleanLiteral() {
 
 shared_ptr<Expression> Parser::parseStringLiteral() {
     auto stringLiteral  = make_shared<StringLiteral>();
+    stringLiteral->line  = current_token->line;
     stringLiteral->token = current_token;
     stringLiteral->value = current_token->text;
     return stringLiteral;
@@ -878,6 +965,7 @@ shared_ptr<Expression> Parser::parseStringLiteral() {
 
 shared_ptr<Expression> Parser::parseArrayLiteral() {
     auto arrayLiteral = make_shared<ArrayLiteral>();
+    arrayLiteral->line = current_token ? current_token->line : 0;
 
     skipToken(TokenType::LBRACKET);
     if (current_token != nullptr && current_token->type != TokenType::RBRACKET) {
@@ -894,6 +982,7 @@ shared_ptr<Expression> Parser::parseArrayLiteral() {
 
 shared_ptr<Expression> Parser::parseHashMapLiteral() {
     auto hashMapLiteral = make_shared<HashMapLiteral>();
+    hashMapLiteral->line = current_token ? current_token->line : 0;
 
     skipToken(TokenType::LBRACE);
     if (current_token != nullptr && current_token->type != TokenType::RBRACE) {
@@ -914,16 +1003,19 @@ shared_ptr<Expression> Parser::parseHashMapLiteral() {
 
 shared_ptr<Expression> Parser::parseNullLiteral() {
     auto nullLiteral = make_shared<NullLiteral>();
+    nullLiteral->line  = current_token->line;
     nullLiteral->token = current_token;
     return nullLiteral;
 }
 
 // 람다: 함수(타입 이름, ...) 표현식
 shared_ptr<Expression> Parser::parseLambdaExpression() {
+    const long long startLine = current_token ? current_token->line : 0;
     skipToken(TokenType::함수);
     skipToken(TokenType::LPAREN);
 
     auto lambda = make_shared<LambdaExpression>();
+    lambda->line = startLine;
 
     // 파라미터 파싱
     if (current_token->type != TokenType::RPAREN) {
@@ -934,6 +1026,7 @@ shared_ptr<Expression> Parser::parseLambdaExpression() {
             checkToken(TokenType::IDENTIFIER);
             auto ident = make_shared<IdentifierExpression>();
             ident->name = current_token->text;
+            ident->token = current_token;
             lambda->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
         } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -956,6 +1049,7 @@ shared_ptr<Expression> Parser::parseLambdaExpression() {
 // 반복 정수 i = 0 부터 10 까지:
 shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
     auto statement = make_shared<ForRangeStatement>();
+    statement->line = current_token->line;
     skipToken(TokenType::반복);
 
     statement->varType = current_token;
@@ -963,6 +1057,7 @@ shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->varName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::ASSIGN);
@@ -987,6 +1082,7 @@ shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
 // 후위 표현식: 변수++ 또는 변수--
 shared_ptr<Expression> Parser::parsePostfixExpression(shared_ptr<Expression> left) {
     auto postfix = make_shared<PostfixExpression>();
+    postfix->line  = current_token->line;
     postfix->token = current_token;
     postfix->left = std::move(left);
     return postfix;
@@ -995,6 +1091,7 @@ shared_ptr<Expression> Parser::parsePostfixExpression(shared_ptr<Expression> lef
 // 가져오기 "파일명.hik"
 shared_ptr<ImportStatement> Parser::parseImportStatement() {
     auto statement = make_shared<ImportStatement>();
+    statement->line = current_token ? current_token->line : 0;
     skipToken(TokenType::가져오기);
     checkToken(TokenType::STRING);
     statement->filename = current_token->text;
@@ -1004,8 +1101,10 @@ shared_ptr<ImportStatement> Parser::parseImportStatement() {
 }
 
 shared_ptr<YieldStatement> Parser::parseYieldStatement() {
+    const long long startLine = current_token ? current_token->line : 0;
     skipToken(TokenType::생산);
     auto statement = make_shared<YieldStatement>();
+    statement->line = startLine;
     statement->expression = parseExpression(Precedence::LOWEST);
     setNextToken();
     skipToken(TokenType::NEW_LINE);

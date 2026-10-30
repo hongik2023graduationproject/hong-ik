@@ -171,7 +171,7 @@ public:
 
 class Builtin : public Object {
 public:
-    virtual std::shared_ptr<Object> function(std::vector<std::shared_ptr<Object>> args) = 0;
+    virtual std::shared_ptr<Object> function(const std::vector<std::shared_ptr<Object>>& args) = 0;
     std::vector<std::shared_ptr<Token>> parameterTypes;
     std::shared_ptr<Token> returnType;
 
