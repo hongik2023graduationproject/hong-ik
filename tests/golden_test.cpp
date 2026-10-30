@@ -64,7 +64,22 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"func_recursion"},
         GoldenCase{"builtins"},
         GoldenCase{"utf8_strings"},
-        GoldenCase{"error_undefined"}
+        GoldenCase{"error_undefined"},
+        // S2 — VM unification parity coverage
+        GoldenCase{"classes_basic"},
+        GoldenCase{"closures"},
+        GoldenCase{"for_each"},
+        // 런타임 일관성 (2026-06-12 spec) — 시맨틱 통일 패리티
+        GoldenCase{"decl_check"},
+        GoldenCase{"subtype_assign"},
+        GoldenCase{"binary_strict"},
+        GoldenCase{"string_compare"},
+        GoldenCase{"logical_bool"},
+        GoldenCase{"foreach_strict"},
+        GoldenCase{"range_strict"},
+        GoldenCase{"block_scope"},
+        GoldenCase{"try_catch"},
+        GoldenCase{"ops_misc"}
     ),
     [](const ::testing::TestParamInfo<GoldenCase>& info) {
         return info.param.name;

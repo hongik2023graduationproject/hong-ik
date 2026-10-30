@@ -4,3 +4,9 @@ cmake-build-debug
 .vscode
 build
 build-wasm
+cmake-build-*/
+build-*/
+wasm-dist/
+dist/
+.DS_Store
+Thumbs.db

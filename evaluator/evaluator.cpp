@@ -5,14 +5,19 @@
 #include "../environment/environment.h"
 #include "../exception/exception.h"
 #include "../lexer/lexer.h"
+#include "../object/builtin_registry.h"
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
+#include "../util/checked_int.h"
+#include "../util/path_utils.h"
+#include "../util/slice_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
 
@@ -21,60 +26,29 @@ using namespace std;
 Evaluator::Evaluator(IOContext* ioCtx, ExecutionLimiter* limiter)
     : ioCtx(ioCtx), limiter(limiter) {
     environment = make_shared<Environment>();
-    builtins = {
-        {"길이", make_shared<Length>()},
-        {"출력", make_shared<Print>(ioCtx)},
-        {"추가", make_shared<Push>()},
-        {"타입", make_shared<TypeOf>()},
-        {"정수변환", make_shared<ToInteger>()},
-        {"실수변환", make_shared<ToFloat>()},
-        {"문자변환", make_shared<ToString_>()},
-        {"입력", make_shared<Input>(ioCtx)},
-        {"키목록", make_shared<Keys>()},
-        {"포함", make_shared<Contains>()},
-        {"설정", make_shared<MapSet>()},
-        {"삭제", make_shared<Remove>()},
-        {"파일읽기", make_shared<FileRead>(ioCtx)},
-        {"파일쓰기", make_shared<FileWrite>(ioCtx)},
-        {"절대값", make_shared<Abs>()},
-        {"제곱근", make_shared<Sqrt>()},
-        {"최대", make_shared<Max>()},
-        {"최소", make_shared<Min>()},
-        {"난수", make_shared<Random>()},
-        {"사인", make_shared<Sin>()},
-        {"코사인", make_shared<Cos>()},
-        {"탄젠트", make_shared<Tan>()},
-        {"로그", make_shared<Log>()},
-        {"자연로그", make_shared<Ln>()},
-        {"거듭제곱", make_shared<Power>()},
-        {"파이", make_shared<Pi>()},
-        {"자연수e", make_shared<EulerE>()},
-        {"반올림", make_shared<Round>()},
-        {"올림", make_shared<Ceil>()},
-        {"내림", make_shared<Floor>()},
-        {"분리", make_shared<Split>()},
-        {"대문자", make_shared<ToUpper>()},
-        {"소문자", make_shared<ToLower>()},
-        {"치환", make_shared<Replace>()},
-        {"자르기", make_shared<Trim>()},
-        {"시작확인", make_shared<StartsWith>()},
-        {"끝확인", make_shared<EndsWith>()},
-        {"반복", make_shared<Repeat>()},
-        {"채우기", make_shared<Pad>()},
-        {"부분문자", make_shared<Substring>()},
-        {"정렬", make_shared<Sort>()},
-        {"뒤집기", make_shared<Reverse>()},
-        {"찾기", make_shared<Find>()},
-        {"조각", make_shared<Slice>()},
-        {"JSON_파싱", make_shared<JsonParse>()},
-        {"JSON_직렬화", make_shared<JsonSerialize>()},
-    };
+    builtins = BuiltinRegistry::build(ioCtx);
 }
 
-// 소멸자에서 환경을 명시적으로 정리하여 순환 참조(Environment ↔ Function)로 인한
-// shared_ptr 메모리 누수를 줄임. 근본적 해결은 weak_ptr 또는 GC가 필요함.
+// 함수·클래스는 자기가 정의된 환경을 shared_ptr로 잡고, 그 환경은 다시 함수를 변수로 잡는다
+// (Environment ↔ Function 순환). 참조 카운트만으로는 풀리지 않으므로, 함수가 잡은 환경을 모두
+// 기록해 두었다가 소멸자에서 비워 순환을 끊는다. 실행 중에는 회수하지 않는다 (GC 없음).
 Evaluator::~Evaluator() {
     environment->store.clear();
+    for (auto& weak : capturedEnvs) {
+        if (auto env = weak.lock()) env->store.clear();
+    }
+}
+
+shared_ptr<Environment> Evaluator::captureEnvironment(Environment* env) {
+    auto shared = env->shared_from_this();
+    if (env == environment.get()) return shared; // 전역 환경은 소멸자에서 따로 비운다
+    // 루프 안에서 클로저를 계속 만들어도 목록이 무한히 자라지 않도록 이미 해제된 항목을 가끔 걷어낸다.
+    if (capturedEnvs.size() >= capturedEnvsPruneAt) {
+        std::erase_if(capturedEnvs, [](const std::weak_ptr<Environment>& w) { return w.expired(); });
+        capturedEnvsPruneAt = std::max<size_t>(64, capturedEnvs.size() * 2);
+    }
+    capturedEnvs.push_back(shared);
+    return shared;
 }
 
 void Evaluator::checkLimits() {
@@ -145,6 +119,31 @@ string Evaluator::interpolateString(const string& str, Environment* environment)
     return result;
 }
 
+namespace {
+#if defined(_MSC_VER)
+#define HONGIK_NOINLINE __declspec(noinline)
+#else
+#define HONGIK_NOINLINE __attribute__((noinline))
+#endif
+    // 정수 넘침 검사와 오류 생성은 재귀 경로(eval·중위식 평가) 밖의 함수에서 한다. ASan 빌드는 지역 변수와
+    // 임시 객체마다 스택을 따로 잡아서, 이 코드가 eval 프레임에 들어가면 16MB 스택에서 재귀 한도(1000)보다
+    // 먼저 스택이 넘친다.
+    HONGIK_NOINLINE long long checkedIntegerArithmetic(TokenType op, long long lv, long long rv, long long line) {
+        auto result = op == TokenType::PLUS    ? checked_int::add(lv, rv)
+                      : op == TokenType::MINUS ? checked_int::sub(lv, rv)
+                                               : checked_int::mul(lv, rv);
+        if (!result) throw RuntimeException(checked_int::kOverflowMessage, line);
+        return *result;
+    }
+
+    HONGIK_NOINLINE long long checkedIntegerNegate(long long value, long long line) {
+        auto result = checked_int::neg(value);
+        if (!result) throw RuntimeException(checked_int::kOverflowMessage, line);
+        return *result;
+    }
+#undef HONGIK_NOINLINE
+} // namespace
+
 shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     // 샌드박스 제한 체크 (시간 초과)
     checkLimits();
@@ -203,7 +202,17 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             auto classDef = environment->Get(initialization_statement->type->text);
             if (classDef && dynamic_cast<ClassDef*>(classDef.get())) {
                 auto* inst = dynamic_cast<Instance*>(value.get());
-                if (!inst || inst->classDef->name != initialization_statement->type->text) {
+                // 자손 클래스 인스턴스 허용 (런타임 일관성 D1/#6 — VM opDeclCheck와 동일 규칙)
+                bool matched = false;
+                if (inst) {
+                    for (auto def = inst->classDef; def; def = def->parent) {
+                        if (def->name == initialization_statement->type->text) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matched) {
                     throw RuntimeException("선언에서 자료형과 값의 타입이 일치하지 않습니다.", current_line);
                 }
                 environment->Set(initialization_statement->name, value);
@@ -319,10 +328,13 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         auto condition = eval(if_statement->condition.get(), environment);
 
         if (auto* boolean = dynamic_cast<Boolean*>(condition.get())) {
+            // 블록 스코프 (런타임 일관성 D2 — VM 시맨틱 합치): 분기 내 선언은 밖에서 안 보임
             if (boolean->value) {
-                return eval(if_statement->consequence.get(), environment);
+                auto blockEnv = make_shared<Environment>(environment->shared_from_this());
+                return eval(if_statement->consequence.get(), blockEnv.get());
             } else if (if_statement->then != nullptr) {
-                return eval(if_statement->then.get(), environment);
+                auto blockEnv = make_shared<Environment>(environment->shared_from_this());
+                return eval(if_statement->then.get(), blockEnv.get());
             }
         }
         return nullptr;
@@ -421,7 +433,9 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     }
     if (auto* trycatch = dynamic_cast<TryCatchStatement*>(node)) {
         try {
-            return eval(trycatch->tryBody.get(), environment);
+            // 블록 스코프 (런타임 일관성 D2): 시도 블록 내 선언은 밖에서 안 보임
+            auto tryEnv = make_shared<Environment>(environment->shared_from_this());
+            return eval(trycatch->tryBody.get(), tryEnv.get());
         } catch (const std::exception& e) {
             auto catchEnv = make_shared<Environment>(environment->shared_from_this());
             catchEnv->Set(trycatch->errorName, make_shared<String>(string(e.what())));
@@ -450,7 +464,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         function->parameters     = function_statement->parameters;
         function->defaultValues  = function_statement->defaultValues;
         function->parameterOptionals = function_statement->parameterOptionals;
-        function->env            = environment->shared_from_this();
+        function->env            = captureEnvironment(environment);
         function->returnType     = function_statement->returnType;
         function->returnTypeOptional = function_statement->returnTypeOptional;
         environment->Set(function_statement->name, function);
@@ -533,7 +547,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     if (auto* class_statement = dynamic_cast<ClassStatement*>(node)) {
         auto classDef = make_shared<ClassDef>();
         classDef->name = class_statement->name;
-        classDef->env = environment->shared_from_this();
+        classDef->env = captureEnvironment(environment);
 
         // 상속 처리
         if (!class_statement->parentName.empty()) {
@@ -592,7 +606,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             fn->defaultValues = methodStmt->defaultValues;
             fn->body = methodStmt->body;
             fn->returnType = methodStmt->returnType;
-            fn->env = environment->shared_from_this();
+            fn->env = captureEnvironment(environment);
 
             bool overridden = false;
             for (size_t i = 0; i < classDef->methodNames.size(); i++) {
@@ -698,7 +712,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         auto function = make_shared<Function>();
         function->parameterTypes = lambda_expression->parameterTypes;
         function->parameters = lambda_expression->parameters;
-        function->env = environment->shared_from_this();
+        function->env = captureEnvironment(environment);
         function->returnType = lambda_expression->returnType;
         // Wrap the body expression in a return statement inside a block
         auto returnStmt = make_shared<ReturnStatement>();
@@ -722,7 +736,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             throw RuntimeException("증감 연산자는 정수 변수에만 사용할 수 있습니다.", current_line);
         }
         long long delta = (postfix_expression->token->type == TokenType::INCREMENT) ? 1 : -1;
-        auto newVal = make_shared<Integer>(intVal->value + delta);
+        auto newVal = make_shared<Integer>(checkedIntegerArithmetic(TokenType::PLUS, intVal->value, delta, current_line));
         environment->Update(ident->name, newVal);
         return before; // 후위 연산: 변경 전 값 반환
     }
@@ -860,24 +874,24 @@ shared_ptr<Object> Evaluator::evalIntegerInfixExpression(Token* token, shared_pt
     long long lv = left_integer->value;
     long long rv = right_integer->value;
 
-    if (token->type == TokenType::PLUS) return make_shared<Integer>(lv + rv);
-    if (token->type == TokenType::MINUS) return make_shared<Integer>(lv - rv);
-    if (token->type == TokenType::ASTERISK) return make_shared<Integer>(lv * rv);
+    if (token->type == TokenType::PLUS || token->type == TokenType::MINUS || token->type == TokenType::ASTERISK) {
+        return make_shared<Integer>(checkedIntegerArithmetic(token->type, lv, rv, token->line));
+    }
     if (token->type == TokenType::SLASH) {
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
-        return make_shared<Integer>(lv / rv);
+        if (auto quotient = checked_int::div(lv, rv)) return make_shared<Integer>(*quotient);
+        throw RuntimeException(checked_int::kOverflowMessage, token->line);
     }
     if (token->type == TokenType::PERCENT) {
         if (rv == 0) throw RuntimeException("0으로 나눌 수 없습니다.", token->line);
-        return make_shared<Integer>(lv % rv);
+        return make_shared<Integer>(checked_int::mod(lv, rv));
     }
     if (token->type == TokenType::POWER) {
-        long long result = 1;
-        long long base = lv;
-        long long exp = rv;
-        if (exp < 0) return make_shared<Float>(std::pow(static_cast<double>(base), static_cast<double>(exp)));
-        for (long long i = 0; i < exp; i++) result *= base;
-        return make_shared<Integer>(result);
+        // 음수 지수이거나 정수로 넘치면 double 경로로 폴백한다 (VM::binaryOp와 같은 checked_int::pow).
+        if (rv >= 0) {
+            if (auto exact = checked_int::pow(lv, rv)) return make_shared<Integer>(*exact);
+        }
+        return make_shared<Float>(std::pow(static_cast<double>(lv), static_cast<double>(rv)));
     }
     if (token->type == TokenType::BITWISE_AND) return make_shared<Integer>(lv & rv);
     if (token->type == TokenType::BITWISE_OR) return make_shared<Integer>(lv | rv);
@@ -931,6 +945,11 @@ shared_ptr<Object> Evaluator::evalStringInfixExpression(Token* token, shared_ptr
     if (token->type == TokenType::PLUS) return make_shared<String>(ls->value + rs->value);
     if (token->type == TokenType::EQUAL) return make_shared<Boolean>(ls->value == rs->value);
     if (token->type == TokenType::NOT_EQUAL) return make_shared<Boolean>(ls->value != rs->value);
+    // 문자열 사전순 비교 (런타임 일관성 D3 — VM binaryOp와 동일: std::string byte-wise)
+    if (token->type == TokenType::LESS_THAN) return make_shared<Boolean>(ls->value < rs->value);
+    if (token->type == TokenType::GREATER_THAN) return make_shared<Boolean>(ls->value > rs->value);
+    if (token->type == TokenType::LESS_EQUAL) return make_shared<Boolean>(ls->value <= rs->value);
+    if (token->type == TokenType::GREATER_EQUAL) return make_shared<Boolean>(ls->value >= rs->value);
 
     throw RuntimeException("문자열 연산을 지원하지 않는 연산자입니다.", token->line);
 }
@@ -992,26 +1011,13 @@ shared_ptr<Object> Evaluator::evalHashMapIndexExpression(shared_ptr<Object> hash
 }
 
 shared_ptr<Object> Evaluator::evalSliceExpression(shared_ptr<Object> object, shared_ptr<Object> startObj, shared_ptr<Object> endObj) {
+    long long s = 0;
+    long long e = 0;
     if (object->type == ObjectType::ARRAY) {
         auto* arr = dynamic_cast<Array*>(object.get());
         long long len = static_cast<long long>(arr->elements.size());
-
-        long long s = 0;
-        long long e = len;
-
-        if (startObj) {
-            auto* startInt = dynamic_cast<Integer*>(startObj.get());
-            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
-            s = startInt->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
-        }
-        if (endObj) {
-            auto* endInt = dynamic_cast<Integer*>(endObj.get());
-            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
-            e = endInt->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+        if (const char* err = slice_utils::normalizeSliceBounds(startObj.get(), endObj.get(), len, s, e)) {
+            throw RuntimeException(err, current_line);
         }
         if (s >= e) return make_shared<Array>();
 
@@ -1024,23 +1030,8 @@ shared_ptr<Object> Evaluator::evalSliceExpression(shared_ptr<Object> object, sha
     if (object->type == ObjectType::STRING) {
         auto* str = dynamic_cast<String*>(object.get());
         long long len = static_cast<long long>(utf8::codePointCount(str->value));
-
-        long long s = 0;
-        long long e = len;
-
-        if (startObj) {
-            auto* startInt = dynamic_cast<Integer*>(startObj.get());
-            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
-            s = startInt->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
-        }
-        if (endObj) {
-            auto* endInt = dynamic_cast<Integer*>(endObj.get());
-            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
-            e = endInt->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+        if (const char* err = slice_utils::normalizeSliceBounds(startObj.get(), endObj.get(), len, s, e)) {
+            throw RuntimeException(err, current_line);
         }
         if (s >= e) return make_shared<String>("");
 
@@ -1056,7 +1047,9 @@ shared_ptr<Object> Evaluator::evalPrefixExpression(Token* token, shared_ptr<Obje
 }
 
 shared_ptr<Object> Evaluator::evalMinusPrefixExpression(shared_ptr<Object> right) {
-    if (auto integer = dynamic_cast<Integer*>(right.get())) return make_shared<Integer>(-integer->value);
+    if (auto integer = dynamic_cast<Integer*>(right.get())) {
+        return make_shared<Integer>(checkedIntegerNegate(integer->value, current_line));
+    }
     if (auto float_obj = dynamic_cast<Float*>(right.get())) return make_shared<Float>(-float_obj->value);
     throw RuntimeException("'-' 전위 연산자가 지원되지 않는 타입입니다.", current_line);
 }
@@ -1309,6 +1302,12 @@ shared_ptr<Object> Evaluator::evalGeneratorBlockStatement(const vector<shared_pt
 }
 
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {
+    // 경로 탐색 방지: VM::opImport / FileRead·FileWrite와 동일한 정책을 적용해
+    // 트리워킹 경로(및 WASM 기본 경로)에서도 호스트 파일시스템에 임의 접근이 일어나지 않도록 한다.
+    if (const char* pathError = path_utils::userPathError(filename)) {
+        throw RuntimeException(pathError, current_line);
+    }
+
     if (importedFiles.contains(filename)) return nullptr;
     importedFiles.insert(filename);
 
@@ -1372,6 +1371,9 @@ shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* en
 
     Parser importParser;
     auto program = importParser.Parsing(allTokens);
+    if (!importParser.getErrors().empty()) {
+        throw RuntimeException("임포트 파싱 오류: " + importParser.getErrors().front(), current_line);
+    }
 
     shared_ptr<Object> result = nullptr;
     for (const auto& statement : program->statements) {

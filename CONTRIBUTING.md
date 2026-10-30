@@ -22,8 +22,8 @@ hong-ik 프로젝트에 관심을 가져주셔서 감사합니다! 한글 프로
 
 ### 필요한 도구
 
-- **C++17 이상** 지원 컴파일러 (GCC 9+, Clang 10+, MSVC 2019+)
-- **CMake** 3.x 이상
+- **C++26**을 지원하는 최신 컴파일러 (네이티브 빌드는 `CMAKE_CXX_STANDARD 26`, WASM 빌드는 Emscripten으로 C++20)
+- **CMake** 3.28 이상
 - **Git**
 
 ### 저장소 클론
@@ -73,14 +73,17 @@ build/HongIkTests --gtest_filter="LexerTest.*"
 ### 인터프리터 실행
 
 ```bash
-# 파일 실행
+# 파일 실행 (기본: 바이트코드 VM)
 ./build/HongIk filename.hik
 
 # REPL 모드
 ./build/HongIk
 
-# 바이트코드 VM 모드
-./build/HongIk --vm filename.hik
+# 트리워킹 인터프리터로 실행 (--vm은 호환용 no-op)
+./build/HongIk --eval filename.hik
+
+# 정적 타입 검사 모드 (off|warn|strict, 기본 warn)
+./build/HongIk --type-check=strict filename.hik
 ```
 
 ---
@@ -183,22 +186,32 @@ docs: README에 바이트코드 VM 설명 추가
 
 ```
 hong-ik/
-├── lexer/          # 소스코드 → 토큰 변환
-├── token/          # 토큰 타입 정의
-├── parser/         # 토큰 → AST 변환
-├── ast/            # AST 노드 정의
-├── evaluator/      # AST 순회 및 실행
-├── environment/    # 변수/스코프 관리
-├── object/         # 런타임 객체 및 내장 함수
-├── utf8_converter/ # UTF-8 인코딩 처리
-├── repl/           # REPL 및 파일 실행
-├── exception/      # 예외 정의
-├── compiler/       # 바이트코드 컴파일러
-├── vm/             # 바이트코드 가상 머신
-└── tests/          # Google Test 단위 테스트
+├── lexer/            # 소스코드 → 토큰 변환
+├── token/            # 토큰 타입 정의
+├── parser/           # 토큰 → AST 변환
+├── ast/              # AST 노드 정의
+├── analyzer/         # 신택스 하이라이팅, 심볼 수집, 정적 타입 검사기
+├── vm/               # 바이트코드 컴파일러(compiler*.cpp) + 피홀 최적화 + 가상 머신 (기본 백엔드)
+├── evaluator/        # AST 순회 및 실행 (--eval)
+├── environment/      # 변수/스코프 관리
+├── object/           # 런타임 객체 및 내장 함수
+├── error/            # 구조화된 에러 타입(HongIkError, 위치 정보)
+├── exception/        # 예외 정의
+├── io/               # 콜백 기반 I/O 인터페이스(IOContext: 콘솔/웹)
+├── sandbox/          # 실행 시간·루프 반복 제한(ExecutionLimiter)
+├── util/             # 공용 유틸(오버플로 검사 정수 연산, 정적 타입 모델, JSON, UTF-8)
+├── utf8_converter/   # UTF-8 인코딩 처리
+├── repl/             # REPL 및 파일 실행
+├── lsp/              # Language Server(hongik-lsp) 구현
+├── web/              # WASM(Emscripten) 바인딩과 인메모리 파일시스템
+├── vscode-extension/ # VSCode 확장 (문법 하이라이팅, 스니펫, LSP 클라이언트)
+├── benchmarks/       # Google Benchmark 벤치마크 스위트(HongIkBenchmarks)
+├── scripts/          # 빌드 스크립트 (build-wasm.sh)
+├── docs/             # 설계 문서·벤치마크 결과
+└── tests/            # Google Test 단위 테스트
 ```
 
-인터프리터 파이프라인은 `소스코드 → Lexer → Parser → Evaluator → 결과` 순서로 진행됩니다. VM 모드에서는 `소스코드 → Lexer → Parser → Compiler → VM → 결과`입니다.
+기본 파이프라인은 `소스코드 → Lexer → Parser → Compiler → VM → 결과`입니다. `--eval`을 주면 `소스코드 → Lexer → Parser → Evaluator → 결과`(트리워킹)로 실행합니다.
 
 ---
 
