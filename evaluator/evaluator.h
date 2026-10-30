@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <vector>
 
 class Evaluator {
 public:
@@ -22,6 +23,10 @@ public:
 
 private:
     std::shared_ptr<Environment> environment;
+    // 함수·클래스가 잡은 환경 — 소멸자에서 비워 Environment ↔ Function 순환을 끊는다.
+    std::vector<std::weak_ptr<Environment>> capturedEnvs;
+    size_t capturedEnvsPruneAt = 64;
+    std::shared_ptr<Environment> captureEnvironment(Environment* env);
     IOContext* ioCtx = nullptr;
     ExecutionLimiter* limiter = nullptr;
 

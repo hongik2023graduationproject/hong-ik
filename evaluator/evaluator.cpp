@@ -29,10 +29,26 @@ Evaluator::Evaluator(IOContext* ioCtx, ExecutionLimiter* limiter)
     builtins = BuiltinRegistry::build(ioCtx);
 }
 
-// 소멸자에서 환경을 명시적으로 정리하여 순환 참조(Environment ↔ Function)로 인한
-// shared_ptr 메모리 누수를 줄임. 근본적 해결은 weak_ptr 또는 GC가 필요함.
+// 함수·클래스는 자기가 정의된 환경을 shared_ptr로 잡고, 그 환경은 다시 함수를 변수로 잡는다
+// (Environment ↔ Function 순환). 참조 카운트만으로는 풀리지 않으므로, 함수가 잡은 환경을 모두
+// 기록해 두었다가 소멸자에서 비워 순환을 끊는다. 실행 중에는 회수하지 않는다 (GC 없음).
 Evaluator::~Evaluator() {
     environment->store.clear();
+    for (auto& weak : capturedEnvs) {
+        if (auto env = weak.lock()) env->store.clear();
+    }
+}
+
+shared_ptr<Environment> Evaluator::captureEnvironment(Environment* env) {
+    auto shared = env->shared_from_this();
+    if (env == environment.get()) return shared; // 전역 환경은 소멸자에서 따로 비운다
+    // 루프 안에서 클로저를 계속 만들어도 목록이 무한히 자라지 않도록 이미 해제된 항목을 가끔 걷어낸다.
+    if (capturedEnvs.size() >= capturedEnvsPruneAt) {
+        std::erase_if(capturedEnvs, [](const std::weak_ptr<Environment>& w) { return w.expired(); });
+        capturedEnvsPruneAt = std::max<size_t>(64, capturedEnvs.size() * 2);
+    }
+    capturedEnvs.push_back(shared);
+    return shared;
 }
 
 void Evaluator::checkLimits() {
@@ -448,7 +464,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         function->parameters     = function_statement->parameters;
         function->defaultValues  = function_statement->defaultValues;
         function->parameterOptionals = function_statement->parameterOptionals;
-        function->env            = environment->shared_from_this();
+        function->env            = captureEnvironment(environment);
         function->returnType     = function_statement->returnType;
         function->returnTypeOptional = function_statement->returnTypeOptional;
         environment->Set(function_statement->name, function);
@@ -531,7 +547,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
     if (auto* class_statement = dynamic_cast<ClassStatement*>(node)) {
         auto classDef = make_shared<ClassDef>();
         classDef->name = class_statement->name;
-        classDef->env = environment->shared_from_this();
+        classDef->env = captureEnvironment(environment);
 
         // 상속 처리
         if (!class_statement->parentName.empty()) {
@@ -590,7 +606,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
             fn->defaultValues = methodStmt->defaultValues;
             fn->body = methodStmt->body;
             fn->returnType = methodStmt->returnType;
-            fn->env = environment->shared_from_this();
+            fn->env = captureEnvironment(environment);
 
             bool overridden = false;
             for (size_t i = 0; i < classDef->methodNames.size(); i++) {
@@ -696,7 +712,7 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         auto function = make_shared<Function>();
         function->parameterTypes = lambda_expression->parameterTypes;
         function->parameters = lambda_expression->parameters;
-        function->env = environment->shared_from_this();
+        function->env = captureEnvironment(environment);
         function->returnType = lambda_expression->returnType;
         // Wrap the body expression in a return statement inside a block
         auto returnStmt = make_shared<ReturnStatement>();
