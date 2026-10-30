@@ -2,6 +2,7 @@
 #include "exception/exception.h"
 #include "io/io_interface.h"
 #include "lexer/lexer.h"
+#include "object/built_in.h"
 #include "parser/parser.h"
 #include "sandbox/execution_limiter.h"
 #include "utf8_converter/utf8_converter.h"
@@ -700,6 +701,38 @@ TEST_F(VMTest, ImportRejectsAbsoluteBackslashPath) {
 
 TEST_F(VMTest, ImportRejectsWindowsDriveLetter) {
     EXPECT_THROW({ runVM("가져오기 \"C:/Windows/System32/cmd.exe\"\n"); }, RuntimeException);
+}
+
+// 파일읽기·파일쓰기도 가져오기와 같은 경로 검사(util/path_utils.h)를 쓴다 — null 바이트 거절 포함.
+TEST(FileBuiltinPathTest, FileReadRejectsNullByte) {
+    FileRead fileRead;
+    std::vector<std::shared_ptr<Object>> args{std::make_shared<String>(std::string("a\0b.txt", 7))};
+    try {
+        fileRead.function(args);
+        FAIL() << "null 바이트 경로가 거절되지 않았다";
+    } catch (const std::runtime_error& e) {
+        EXPECT_STREQ(e.what(), "파일 경로에 null 바이트를 사용할 수 없습니다.");
+    }
+}
+
+TEST(FileBuiltinPathTest, FileWriteRejectsNullByte) {
+    FileWrite fileWrite;
+    std::vector<std::shared_ptr<Object>> args{
+        std::make_shared<String>(std::string("a\0b.txt", 7)), std::make_shared<String>("내용")};
+    try {
+        fileWrite.function(args);
+        FAIL() << "null 바이트 경로가 거절되지 않았다";
+    } catch (const std::runtime_error& e) {
+        EXPECT_STREQ(e.what(), "파일 경로에 null 바이트를 사용할 수 없습니다.");
+    }
+}
+
+TEST(FileBuiltinPathTest, FileReadRejectsParentAndAbsolutePaths) {
+    FileRead fileRead;
+    for (const char* path : {"../secret.txt", "/etc/passwd", "\\windows\\path", "C:/x.txt"}) {
+        std::vector<std::shared_ptr<Object>> args{std::make_shared<String>(path)};
+        EXPECT_THROW(fileRead.function(args), std::runtime_error) << path;
+    }
 }
 
 // ===== 제너레이터/생산 =====

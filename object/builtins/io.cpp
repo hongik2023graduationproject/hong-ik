@@ -1,5 +1,5 @@
+#include "../../util/path_utils.h"
 #include "../built_in.h"
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -96,14 +96,8 @@ std::shared_ptr<Object> FileRead::function(const std::vector<std::shared_ptr<Obj
 
     // 기본 파일 I/O
     // 경로 탐색 방지 (완전한 샌드박스는 아님)
-    if (filename->value.find("..") != string::npos) {
-        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
-    }
-    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
-    }
-    if (filename->value.size() >= 2 && filename->value[1] == ':') {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    if (const char* pathError = path_utils::userPathError(filename->value)) {
+        throw runtime_error(pathError);
     }
 
     ifstream file(filename->value);
@@ -138,14 +132,8 @@ std::shared_ptr<Object> FileWrite::function(const std::vector<std::shared_ptr<Ob
 
     // 기본 파일 I/O
     // 경로 탐색 방지 (완전한 샌드박스는 아님)
-    if (filename->value.find("..") != string::npos) {
-        throw runtime_error("파일 경로에 '..'을 사용할 수 없습니다.");
-    }
-    if (!filename->value.empty() && (filename->value[0] == '/' || filename->value[0] == '\\')) {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
-    }
-    if (filename->value.size() >= 2 && filename->value[1] == ':') {
-        throw runtime_error("절대 경로는 사용할 수 없습니다.");
+    if (const char* pathError = path_utils::userPathError(filename->value)) {
+        throw runtime_error(pathError);
     }
 
     ofstream file(filename->value);

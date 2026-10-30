@@ -5,6 +5,7 @@
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/checked_int.h"
+#include "../util/path_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include "compiler.h"
@@ -939,17 +940,8 @@ void VM::opImport() {
 
     // 경로 탐색 방지 (FileRead/FileWrite와 동일한 정책; 완전한 샌드박스는 아님)
     const string& path = filename->value;
-    if (path.find('\0') != string::npos) {
-        throw RuntimeException("파일 경로에 null 바이트를 사용할 수 없습니다.", currentLine());
-    }
-    if (path.find("..") != string::npos) {
-        throw RuntimeException("파일 경로에 '..'을 사용할 수 없습니다.", currentLine());
-    }
-    if (!path.empty() && (path[0] == '/' || path[0] == '\\')) {
-        throw RuntimeException("절대 경로는 사용할 수 없습니다.", currentLine());
-    }
-    if (path.size() >= 2 && path[1] == ':') {
-        throw RuntimeException("절대 경로는 사용할 수 없습니다.", currentLine());
+    if (const char* pathError = path_utils::userPathError(path)) {
+        throw RuntimeException(pathError, currentLine());
     }
 
     // Canonicalize path for dedup

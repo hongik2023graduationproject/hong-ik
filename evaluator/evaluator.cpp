@@ -9,6 +9,7 @@
 #include "../parser/parser.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/checked_int.h"
+#include "../util/path_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
@@ -1314,17 +1315,8 @@ shared_ptr<Object> Evaluator::evalGeneratorBlockStatement(const vector<shared_pt
 shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* environment) {
     // 경로 탐색 방지: VM::opImport / FileRead·FileWrite와 동일한 정책을 적용해
     // 트리워킹 경로(및 WASM 기본 경로)에서도 호스트 파일시스템에 임의 접근이 일어나지 않도록 한다.
-    if (filename.find('\0') != string::npos) {
-        throw RuntimeException("파일 경로에 null 바이트를 사용할 수 없습니다.", current_line);
-    }
-    if (filename.find("..") != string::npos) {
-        throw RuntimeException("파일 경로에 '..'을 사용할 수 없습니다.", current_line);
-    }
-    if (!filename.empty() && (filename[0] == '/' || filename[0] == '\\')) {
-        throw RuntimeException("절대 경로는 사용할 수 없습니다.", current_line);
-    }
-    if (filename.size() >= 2 && filename[1] == ':') {
-        throw RuntimeException("절대 경로는 사용할 수 없습니다.", current_line);
+    if (const char* pathError = path_utils::userPathError(filename)) {
+        throw RuntimeException(pathError, current_line);
     }
 
     if (importedFiles.contains(filename)) return nullptr;
