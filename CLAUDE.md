@@ -63,8 +63,8 @@ cmake -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLA
 
 | 디렉토리 | 역할 |
 |----------|------|
-| `analyzer/` | 신택스 하이라이팅 + 정적 타입 검사기(`type_checker*` — `--type-check=off\|warn\|strict`, 기본 warn) |
-| `vm/` | 바이트코드 컴파일러 + VM — **기본 실행 백엔드** (트리워킹은 `--eval`) |
+| `analyzer/` | 신택스 하이라이팅 + 심볼 수집 + 정적 타입 검사기(`type_checker*` — `--type-check=off\|warn\|strict`, 기본 warn) |
+| `vm/` | 바이트코드 컴파일러(`compiler*.cpp`) + 피홀 최적화 + VM — **기본 실행 백엔드** (트리워킹은 `--eval`) |
 | `lexer/` | 소스코드를 토큰으로 변환 |
 | `token/` | 토큰 타입 정의 (`token_type.h`) |
 | `parser/` | 토큰 → AST 변환 |
@@ -75,6 +75,16 @@ cmake -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLA
 | `utf8_converter/` | 한글(UTF-8) 인코딩 처리 |
 | `repl/` | 파일 실행 및 REPL 진입점, 파이프라인 조율 |
 | `exception/` | 예외 정의 |
+| `error/` | 구조화된 에러 타입 (`HongIkError` — 종류·위치 정보) |
+| `io/` | 콜백 기반 I/O 인터페이스 (`IOContext` — 콘솔/웹 출력·입력·파일) |
+| `sandbox/` | 실행 시간·루프 반복 제한 (`ExecutionLimiter`) |
+| `util/` | 공용 유틸 (`checked_int.h` 정수 넘침 검사, `path_utils.h` 경로 탐색 방지, `slice_utils.h` 슬라이스 경계, 정적 타입 모델 `type.*`, JSON·UTF-8·토큰 헬퍼) |
+| `lsp/` | Language Server (`hongik-lsp` 타깃 — 진단·호버·자동완성·정의 이동·심볼) |
+| `web/` | WASM(Emscripten) 바인딩 + 인메모리 파일시스템 (`hongik-wasm` 타깃) |
+| `vscode-extension/` | VSCode 확장 (문법 하이라이팅·스니펫·LSP 클라이언트, TypeScript) |
+| `benchmarks/` | Google Benchmark 스위트 (`HongIkBenchmarks` 타깃, 시나리오 `.hik`) |
+| `scripts/` | 빌드 스크립트 (`build-wasm.sh`) |
+| `docs/` | 설계 스펙·계획(`superpowers/`), 벤치마크 결과(`benchmarks/`) |
 | `tests/` | Google Test 기반 단위 테스트 |
 
 ### 언어 문법 요약
@@ -104,11 +114,11 @@ cmake -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLA
         리턴 자기.x
 ```
 
-내장 함수 45종 — 단일 진실의 원천은 `object/builtin_registry.cpp` (정적 검사용 시그니처는 `object/builtin_signatures.h`).
+내장 함수 45종(호출 가능 기준) + 고차 함수 3종(`매핑`·`걸러내기`·`줄이기` — 평가기 특수 처리, 현재 `--eval` 전용) — 단일 진실의 원천은 `object/builtin_registry.cpp` (정적 검사용 시그니처는 `object/builtin_signatures.h`). 레지스트리에는 46개가 등록돼 있으나 `반복`은 렉서 키워드와 충돌해 호출 불가라 제외.
 
 ### 핵심 데이터 흐름
 
 - `main.cpp`: UTF-8 콘솔 설정 후 파일/REPL 모드 분기
 - `repl/repl.h`: Lexer → Parser → Compiler → VM 파이프라인 구동 (`--eval`이면 Evaluator)
-- `object/object.h`: 런타임 값 표현 (Integer, Boolean, String, Function, Array, ReturnValue, Builtin)
+- `object/object.h`: 런타임 값 표현 (Integer, Float, Boolean, String, Null, Array, HashMap, Tuple, Function, Builtin, ClassDef, Instance, GeneratorObject, 제어 신호 ReturnValue·BreakSignal·ContinueSignal·YieldSignal). VM 전용 값은 `vm/chunk.h`(CompiledFunction, Closure, CompiledClassDef)·`vm/vm_value.h`
 - `environment/environment.h`: 외부 스코프 참조를 포함한 중첩 환경 구현
