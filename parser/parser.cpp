@@ -2,6 +2,7 @@
 
 #include "../ast/literals.h"
 #include "../exception/exception.h"
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <set>
@@ -23,8 +24,13 @@ shared_ptr<Program> Parser::Parsing(const std::vector<std::shared_ptr<Token>>& t
             if (statement != nullptr) {
                 program->statements.push_back(statement);
             }
+        } catch (const ParseError& e) {
+            errors.push_back(e.what());
+            diagnostics.push_back({e.line, e.column, e.endColumn, e.what()});
+            skipToNextLine();
         } catch (const std::exception& e) {
             errors.push_back(e.what());
+            diagnostics.push_back({current_token ? current_token->line : 0, 0, 0, e.what()});
             skipToNextLine();
         }
     }
@@ -37,6 +43,9 @@ void Parser::initialization() {
     program               = make_shared<Program>();
     current_read_position = 0;
     errors.clear();
+    diagnostics.clear();
+    expressionNesting_     = 0;
+    nestedExpressionDepth_ = 0;
     setToken();
 }
 
@@ -66,20 +75,20 @@ void Parser::setNextToken() {
 
 void Parser::skipToken(const TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
     setNextToken();
 }
 
 void Parser::checkToken(TokenType type) {
     if (current_token == nullptr) {
-        throw NoTokenException(tokens[current_read_position - 1]->line, type);
+        throw NoTokenException(*tokens[current_read_position - 1], type);
     }
     if (current_token->type != type) {
-        throw UnexpectedTokenException(current_token->type, type, current_token->line);
+        throw UnexpectedTokenException(current_token->type, type, *current_token);
     }
 }
 
@@ -254,6 +263,7 @@ shared_ptr<InitializationStatement> Parser::parseInitializationStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
     skipToken(TokenType::ASSIGN);
     statement->value = parseExpression(Precedence::LOWEST);
@@ -286,6 +296,7 @@ shared_ptr<IndexAssignmentStatement> Parser::parseIndexAssignmentStatement() {
     auto ident = make_shared<IdentifierExpression>();
     ident->line = stmt->line;
     ident->name = current_token->text;
+    ident->token = current_token;
     stmt->collection = ident;
     skipToken(TokenType::IDENTIFIER);
 
@@ -409,6 +420,7 @@ shared_ptr<ForEachStatement> Parser::parseForEachStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->elementName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 반복 대상 표현식
@@ -457,6 +469,7 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::LPAREN);
@@ -481,6 +494,7 @@ shared_ptr<FunctionStatement> Parser::parseFunctionStatement() {
             auto ident = make_shared<IdentifierExpression>();
             ident->line = current_token->line;
             ident->name = current_token->text;
+            ident->token = current_token;
             statement->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
 
@@ -613,6 +627,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->name = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     // 상속: 클래스 자식 < 부모:
@@ -641,6 +656,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
             statement->fieldTypes.push_back(current_token);
             setNextToken();
             statement->fieldNames.push_back(current_token->text);
+            statement->fieldNameTokens.push_back(current_token);
             skipToken(TokenType::IDENTIFIER);
             skipToken(TokenType::NEW_LINE);
             continue;
@@ -658,6 +674,7 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
                     auto ident = make_shared<IdentifierExpression>();
                     ident->line = current_token->line;
                     ident->name = current_token->text;
+                    ident->token = current_token;
                     statement->constructorParams.push_back(ident);
                     skipToken(TokenType::IDENTIFIER);
                 } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -684,24 +701,47 @@ shared_ptr<ClassStatement> Parser::parseClassStatement() {
 
 shared_ptr<Expression> Parser::parseExpression(Precedence precedence) {
     if (!prefixParseFunctions.contains(current_token->type)) {
-        throw UnknownPrefixParseFunctionException(current_token->type, current_token->line);
+        throw UnknownPrefixParseFunctionException(current_token->type, *current_token);
     }
+
+    if (++expressionNesting_ > kMaxExpressionDepth) {
+        --expressionNesting_;
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    struct NestingGuard {
+        int& nesting;
+        ~NestingGuard() { --nesting; }
+    } nestingGuard{expressionNesting_};
+
+    // 식의 AST 깊이 = max(왼쪽, 오른쪽 하위 식) + 1. 하위 parseExpression이 nestedExpressionDepth_에 남긴 값으로 계산한다.
+    const int outerNestedDepth = nestedExpressionDepth_;
+    nestedExpressionDepth_     = 0;
 
     PrefixParseFunction prefixParseFunction = prefixParseFunctions[current_token->type];
     shared_ptr<Expression> expression       = (this->*prefixParseFunction)();
+    int depth                               = nestedExpressionDepth_ + 1;
 
     while (next_token != nullptr) {
         auto precIt = getPrecedence.find(next_token->type);
         Precedence nextPrec = (precIt != getPrecedence.end()) ? precIt->second : Precedence::LOWEST;
         if (precedence >= nextPrec) break;
         if (!infixParseFunctions.contains(next_token->type)) {
-            throw UnknownInfixParseFunctionException(next_token->type, next_token->line);
+            throw UnknownInfixParseFunctionException(next_token->type, *next_token);
         }
         InfixParseFunction infixParseFunction = infixParseFunctions[next_token->type];
         setNextToken();
-        expression = (this->*infixParseFunction)(expression);
+        nestedExpressionDepth_ = 0;
+        expression             = (this->*infixParseFunction)(expression);
+        depth                  = std::max(depth, nestedExpressionDepth_) + 1;
+        if (depth > kMaxExpressionDepth) {
+            throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+        }
     }
 
+    if (depth > kMaxExpressionDepth) {
+        throw ExpressionTooDeepException(*current_token, kMaxExpressionDepth);
+    }
+    nestedExpressionDepth_ = std::max(outerNestedDepth, depth);
     return expression;
 }
 
@@ -765,6 +805,7 @@ shared_ptr<Expression> Parser::parseIdentifierExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token->line;
     identifier_expression->name = current_token->text;
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -772,6 +813,7 @@ shared_ptr<Expression> Parser::parseSelfExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "자기";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -779,6 +821,7 @@ shared_ptr<Expression> Parser::parseParentExpression() {
     auto identifier_expression  = make_shared<IdentifierExpression>();
     identifier_expression->line = current_token ? current_token->line : 0;
     identifier_expression->name = "부모";
+    identifier_expression->token = current_token;
     return identifier_expression;
 }
 
@@ -983,6 +1026,7 @@ shared_ptr<Expression> Parser::parseLambdaExpression() {
             checkToken(TokenType::IDENTIFIER);
             auto ident = make_shared<IdentifierExpression>();
             ident->name = current_token->text;
+            ident->token = current_token;
             lambda->parameters.push_back(ident);
             skipToken(TokenType::IDENTIFIER);
         } while (current_token->type == TokenType::COMMA && (skipToken(TokenType::COMMA), true));
@@ -1013,6 +1057,7 @@ shared_ptr<ForRangeStatement> Parser::parseForRangeStatement() {
 
     checkToken(TokenType::IDENTIFIER);
     statement->varName = current_token->text;
+    statement->nameToken = current_token;
     skipToken(TokenType::IDENTIFIER);
 
     skipToken(TokenType::ASSIGN);

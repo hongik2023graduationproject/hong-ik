@@ -13,6 +13,9 @@ public:
 
     std::vector<std::shared_ptr<Token>> Tokenize(const std::vector<std::string>& characters);
 
+    // 키워드 목록의 단일 진실의 원천 (LSP completion 공유)
+    static const std::unordered_map<std::string, TokenType>& Keywords();
+
 private:
     bool at_line_start = true;
     int indent = 0;

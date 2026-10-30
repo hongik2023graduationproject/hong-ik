@@ -81,16 +81,4 @@ inline std::string opToSymbol(OpCode op) {
     }
 }
 
-// ValueTag → 한글 타입명 (VM용)
-inline std::string valueTagToKorean(uint8_t tag) {
-    // ValueTag enum values: INT=0, FLOAT=1, BOOL=2, NULL_V=3, OBJECT=4
-    switch (tag) {
-    case 0: return "정수";
-    case 1: return "실수";
-    case 2: return "논리";
-    case 3: return "없음";
-    default: return "객체";
-    }
-}
-
 #endif // TYPE_UTILS_H

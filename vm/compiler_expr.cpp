@@ -1,6 +1,7 @@
 // Compiler — 표현식 컴파일 (Phase 3 분할: 코어·문장은 compiler.cpp / compiler_stmt.cpp 참조)
 #include "compiler.h"
 #include "../exception/exception.h"
+#include "../util/checked_int.h"
 #include "../util/type_utils.h"
 #include <cmath>
 #include <limits>
@@ -320,22 +321,20 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
             }
             result = leftInt * rightInt;
             break;
-        case TokenType::SLASH: result = leftInt / rightInt; break;
-        case TokenType::PERCENT: result = leftInt % rightInt; break;
+        case TokenType::SLASH: {
+            // 범위를 넘는 몫(LLONG_MIN / -1)은 폴딩하지 않고 런타임 오류에 맡긴다.
+            auto quotient = checked_int::div(leftInt, rightInt);
+            if (!quotient) return false;
+            result = *quotient;
+            break;
+        }
+        case TokenType::PERCENT: result = checked_int::mod(leftInt, rightInt); break;
         case TokenType::POWER: {
-            // 간단한 거듭제곱 (음수 지수는 폴딩하지 않음)
+            // 음수 지수이거나 정수로 넘치면 폴딩하지 않고 런타임(실수 폴백)에 맡긴다.
             if (rightInt < 0) return false;
-            long long base = leftInt;
-            long long exp = rightInt;
-            result = 1;
-            for (long long e = 0; e < exp; e++) {
-                // 오버플로우 검사
-                if (result != 0 && base != 0) {
-                    if (std::abs(result) > std::numeric_limits<long long>::max() / std::abs(base))
-                        return false;
-                }
-                result *= base;
-            }
+            auto exact = checked_int::pow(leftInt, rightInt);
+            if (!exact) return false;
+            result = *exact;
             break;
         }
         default: return false;

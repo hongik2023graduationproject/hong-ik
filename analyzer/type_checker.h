@@ -46,8 +46,6 @@ public:
     // 한 Program AST를 검사. 글로벌/클래스 스코프는 누적 보존됨 (REPL 다중 호출 대응).
     Result check(const std::shared_ptr<Program>& program);
 
-    void clearDiagnostics();
-
 private:
     struct Scope {
         std::map<std::string, std::shared_ptr<Type>> vars;

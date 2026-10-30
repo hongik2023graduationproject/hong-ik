@@ -169,20 +169,10 @@ std::shared_ptr<Type> makeOptional(std::shared_ptr<Type> inner) {
     return std::make_shared<OptionalType>(std::move(inner));
 }
 
-std::shared_ptr<Type> makeFunction(std::vector<std::shared_ptr<Type>> params,
-                                   std::shared_ptr<Type> ret,
-                                   std::vector<bool> paramHasDefault) {
-    return std::make_shared<FunctionType>(std::move(params), std::move(ret), std::move(paramHasDefault));
-}
-
 std::shared_ptr<Type> makeBuiltin(std::string name, int minArity, int maxArity,
                                   bool skipArgTypeCheck, std::shared_ptr<Type> ret) {
     return std::make_shared<BuiltinFunctionType>(std::move(name), minArity, maxArity,
                                                  skipArgTypeCheck, std::move(ret));
-}
-
-std::shared_ptr<Type> makeClass(std::string name, int constructorArity) {
-    return std::make_shared<ClassType>(std::move(name), constructorArity);
 }
 
 std::shared_ptr<Type> makeInstance(std::string className, std::vector<std::string> ancestors) {

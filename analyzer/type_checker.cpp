@@ -29,10 +29,6 @@ TypeChecker::Result TypeChecker::check(const std::shared_ptr<Program>& program) 
     return Result{diagnostics_};
 }
 
-void TypeChecker::clearDiagnostics() {
-    diagnostics_.clear();
-}
-
 void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     if (!stmt) {
         return;

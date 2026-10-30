@@ -19,10 +19,6 @@ public:
     // strict 모드에서 타입 진단 발생 시 1, 그 외 0 반환.
     int FileMode(const std::string& filename);
 
-    void TestLexer();
-
-    void TestParser();
-
 private:
     static constexpr const char* EXIT_COMMAND = "종료하기";
 
