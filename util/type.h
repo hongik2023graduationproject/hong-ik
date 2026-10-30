@@ -136,12 +136,8 @@ public:
 
 std::shared_ptr<Type> makePrim(ObjectType kind);
 std::shared_ptr<Type> makeOptional(std::shared_ptr<Type> inner);
-std::shared_ptr<Type> makeFunction(std::vector<std::shared_ptr<Type>> params,
-                                   std::shared_ptr<Type> ret,
-                                   std::vector<bool> paramHasDefault);
 std::shared_ptr<Type> makeBuiltin(std::string name, int minArity, int maxArity,
                                   bool skipArgTypeCheck, std::shared_ptr<Type> ret);
-std::shared_ptr<Type> makeClass(std::string name, int constructorArity);
 std::shared_ptr<Type> makeInstance(std::string className, std::vector<std::string> ancestors);
 std::shared_ptr<Type> makeAny();
 std::shared_ptr<Type> makeNever();

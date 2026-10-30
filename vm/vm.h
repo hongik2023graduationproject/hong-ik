@@ -110,9 +110,6 @@ private:
     // 이항 연산
     VMValue binaryOp(OpCode op, const VMValue& left, const VMValue& right, long long line);
 
-    // 함수 호출
-    bool callValue(VMValue callee, int argCount);
-
     // 기본 매개변수 채우기
     void fillDefaults(CompiledFunction* fn, int argCount);
 
