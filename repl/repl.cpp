@@ -123,72 +123,15 @@ void Repl::Run() {
 }
 
 int Repl::FileMode(const string& filename) {
-    vector<shared_ptr<Token>> tokens;
-
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cout << "Error: cannot open file: " << filename << std::endl;
         return 0;
     }
 
-    if (useVM) {
-        // VM 모드: 파일 전체를 한 번에 토크나이즈/파싱 후 컴파일/실행.
-        // (Tokenize는 호출마다 line을 리셋하는 REPL 지향 동작이라, 줄 단위 호출은
-        //  톱레벨 문장의 줄 번호를 전부 1로 만든다 — 진단/에러 줄 번호 보존 목적)
-        string code;
-        vector<string> sourceLines;
-        string fileLine;
-        while (getline(file, fileLine)) {
-            sourceLines.push_back(fileLine);
-            code += fileLine;
-            code += "\n";
-        }
-        auto utf8 = Utf8Converter::Convert(code);
-        tokens = lexer->Tokenize(utf8);
-        token_utils::appendMissingBlockClosers(tokens);
-        if (tokens.empty()) return 0;
-
-        try {
-            auto program = parser->Parsing(tokens);
-            if (!parser->getErrors().empty()) {
-                throw RuntimeException(parser->getErrors().front());
-            }
-            if (typeCheckMode != TypeCheckMode::Off) {
-                auto result = typeChecker->check(program);
-                printTypeDiagnostics(result.diagnostics, typeCheckMode == TypeCheckMode::Strict);
-                if (typeCheckMode == TypeCheckMode::Strict && !result.diagnostics.empty()) {
-                    return 1;
-                }
-            }
-            Compiler compiler;
-            auto bytecode = compiler.Compile(program);
-            VM vm;
-            auto object = vm.Execute(bytecode);
-            if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
-                cout << object->ToString() << endl;
-            }
-        } catch (const RuntimeException& e) {
-            string msg = e.what();
-            // 줄 번호 추출 시도: "[줄 N] ..." 형식
-            long long errorLine = 0;
-            std::regex lineRegex("\\[줄 ([0-9]+)\\]");
-            std::smatch match;
-            if (std::regex_search(msg, match, lineRegex)) {
-                errorLine = std::stoll(match[1].str());
-            }
-            if (errorLine > 0 && errorLine <= static_cast<long long>(sourceLines.size())) {
-                cout << HongIkError::formatError(
-                    msg, errorLine, sourceLines[errorLine - 1]) << endl;
-            } else {
-                cout << "Error: " << msg << endl;
-            }
-        } catch (const exception& e) {
-            cout << "Error: " << e.what() << endl;
-        }
-        return 0;
-    }
-
-    // 트리워킹 모드: 파일 전체를 한 번에 토큰화 → 파싱 → 실행 (줄 번호 보존 — 위 VM 모드 주석 참조)
+    // 파일 전체를 한 번에 토크나이즈/파싱한다.
+    // (Tokenize는 호출마다 line을 리셋하는 REPL 지향 동작이라, 줄 단위 호출은
+    //  톱레벨 문장의 줄 번호를 전부 1로 만든다 — 진단/에러 줄 번호 보존 목적)
     string code;
     vector<string> sourceLines;
     string fileLine;
@@ -197,8 +140,8 @@ int Repl::FileMode(const string& filename) {
         code += fileLine;
         code += "\n";
     }
-    auto utf8 = Utf8Converter::Convert(code);
-    tokens = lexer->Tokenize(utf8);
+    auto utf8   = Utf8Converter::Convert(code);
+    auto tokens = lexer->Tokenize(utf8);
     token_utils::appendMissingBlockClosers(tokens);
     if (tokens.empty()) return 0;
 
@@ -214,13 +157,23 @@ int Repl::FileMode(const string& filename) {
                 return 1;
             }
         }
-        auto object = evaluator->Evaluate(program);
-        // VM 모드와 일관되게: Null 객체는 출력하지 않는다 (builtin 부수효과 호출의 결과).
+        // 실행 단계만 백엔드별로 다르다.
+        shared_ptr<Object> object;
+        if (useVM) {
+            Compiler compiler;
+            auto bytecode = compiler.Compile(program);
+            VM vm;
+            object = vm.Execute(bytecode);
+        } else {
+            object = evaluator->Evaluate(program);
+        }
+        // Null 객체는 출력하지 않는다 (builtin 부수효과 호출의 결과).
         if (object != nullptr && !dynamic_cast<Null*>(object.get())) {
             cout << object->ToString() << endl;
         }
     } catch (const RuntimeException& e) {
         string msg = e.what();
+        // 줄 번호 추출 시도: "[줄 N] ..." 형식
         long long errorLine = 0;
         std::regex lineRegex("\\[줄 ([0-9]+)\\]");
         std::smatch match;

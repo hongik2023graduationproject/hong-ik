@@ -220,3 +220,30 @@ TEST(BoundaryTest, VmReportsFrameLimitInsteadOfCrashing) {
         EXPECT_NE(std::string(e.what()).find("최대 호출 프레임 수"), std::string::npos) << e.what();
     }
 }
+
+// 슬라이스 인덱스 정규화(util/slice_utils.h)를 두 백엔드가 공유한다 — 범위 밖·음수·역순 경계를 고정.
+TEST(BoundaryTest, SliceBoundsNormalizeIdenticallyOnBothBackends) {
+    const std::pair<const char*, const char*> cases[] = {
+        {"[1, 2, 3][5:]", "[]"},
+        {"[1, 2, 3][-10:2]", "[1, 2]"},
+        {"[1, 2, 3][2:1]", "[]"},
+        {"[1, 2, 3][:-10]", "[]"},
+        {"[1, 2, 3][1:100]", "[2, 3]"},
+        {"[1, 2, 3][-2:]", "[2, 3]"},
+        {"\"한글문자\"[-2:]", "문자"},
+        {"\"abc\"[5:9]", ""},
+        {"\"abc\"[2:1]", ""},
+    };
+    for (const auto& [source, expected] : cases) {
+        auto r = runBoth(source);
+        ASSERT_NE(r.vm, nullptr) << source;
+        ASSERT_NE(r.eval, nullptr) << source;
+        EXPECT_EQ(r.vm->ToString(), expected) << "VM: " << source;
+        EXPECT_EQ(r.eval->ToString(), expected) << "트리워킹: " << source;
+    }
+}
+
+TEST(BoundaryTest, SliceRejectsNonIntegerIndexOnBothBackends) {
+    expectRuntimeErrorOnBoth("[1, 2, 3][\"a\":]", "슬라이스 시작 인덱스는 정수여야 합니다.");
+    expectRuntimeErrorOnBoth("\"abc\"[:1.5]", "슬라이스 끝 인덱스는 정수여야 합니다.");
+}

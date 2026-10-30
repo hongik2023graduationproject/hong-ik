@@ -10,6 +10,7 @@
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/checked_int.h"
 #include "../util/path_utils.h"
+#include "../util/slice_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
@@ -994,26 +995,13 @@ shared_ptr<Object> Evaluator::evalHashMapIndexExpression(shared_ptr<Object> hash
 }
 
 shared_ptr<Object> Evaluator::evalSliceExpression(shared_ptr<Object> object, shared_ptr<Object> startObj, shared_ptr<Object> endObj) {
+    long long s = 0;
+    long long e = 0;
     if (object->type == ObjectType::ARRAY) {
         auto* arr = dynamic_cast<Array*>(object.get());
         long long len = static_cast<long long>(arr->elements.size());
-
-        long long s = 0;
-        long long e = len;
-
-        if (startObj) {
-            auto* startInt = dynamic_cast<Integer*>(startObj.get());
-            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
-            s = startInt->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
-        }
-        if (endObj) {
-            auto* endInt = dynamic_cast<Integer*>(endObj.get());
-            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
-            e = endInt->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+        if (const char* err = slice_utils::normalizeSliceBounds(startObj.get(), endObj.get(), len, s, e)) {
+            throw RuntimeException(err, current_line);
         }
         if (s >= e) return make_shared<Array>();
 
@@ -1026,23 +1014,8 @@ shared_ptr<Object> Evaluator::evalSliceExpression(shared_ptr<Object> object, sha
     if (object->type == ObjectType::STRING) {
         auto* str = dynamic_cast<String*>(object.get());
         long long len = static_cast<long long>(utf8::codePointCount(str->value));
-
-        long long s = 0;
-        long long e = len;
-
-        if (startObj) {
-            auto* startInt = dynamic_cast<Integer*>(startObj.get());
-            if (!startInt) throw RuntimeException("슬라이스 시작 인덱스는 정수여야 합니다.", current_line);
-            s = startInt->value;
-            if (s < 0) s = len + s;
-            if (s < 0) s = 0;
-        }
-        if (endObj) {
-            auto* endInt = dynamic_cast<Integer*>(endObj.get());
-            if (!endInt) throw RuntimeException("슬라이스 끝 인덱스는 정수여야 합니다.", current_line);
-            e = endInt->value;
-            if (e < 0) e = len + e;
-            if (e > len) e = len;
+        if (const char* err = slice_utils::normalizeSliceBounds(startObj.get(), endObj.get(), len, s, e)) {
+            throw RuntimeException(err, current_line);
         }
         if (s >= e) return make_shared<String>("");
 
