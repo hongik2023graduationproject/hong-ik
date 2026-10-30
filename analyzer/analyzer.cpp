@@ -1,17 +1,8 @@
 #include "analyzer.h"
+#include "../object/builtin_registry.h"
 #include "../utf8_converter/utf8_converter.h"
 #include "../util/json_util.h"
 #include <sstream>
-#include <unordered_set>
-
-// 내장 함수 목록
-static const std::unordered_set<std::string> BUILTINS = {
-    "출력",     "입력",     "길이",     "추가",     "타입",     "정수변환", "실수변환",
-    "문자변환", "키목록",   "포함",     "설정",     "삭제",     "파일읽기", "파일쓰기",
-    "절대값",   "제곱근",   "최대",     "최소",     "난수",     "분리",     "대문자",
-    "소문자",   "치환",     "자르기",   "정렬",     "뒤집기",   "찾기",     "조각",
-    "매핑",     "걸러내기", "줄이기",
-};
 
 std::string Analyzer::getSemanticType(const std::shared_ptr<Token>& token) {
     if (!token) return "unknown";
@@ -62,7 +53,8 @@ std::string Analyzer::getSemanticType(const std::shared_ptr<Token>& token) {
 
     // 식별자 (내장 함수인지 확인)
     case TokenType::IDENTIFIER:
-        if (BUILTINS.count(token->text)) {
+        if (BuiltinRegistry::names().count(token->text)
+            || BuiltinRegistry::specialOperatorNames().count(token->text)) {
             return "builtin";
         }
         return "variable";

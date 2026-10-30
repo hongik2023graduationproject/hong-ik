@@ -1,5 +1,6 @@
 #include "../built_in.h"
 
+#include "../../util/checked_int.h"
 #include "../../util/json_util.h"
 
 #include <sstream>
@@ -156,10 +157,17 @@ private:
             while (pos < src.size() && src[pos] >= '0' && src[pos] <= '9') pos++;
         }
         string numStr = src.substr(start, pos - start);
-        if (isFloat) {
-            return make_shared<Float>(stod(numStr));
+        // 범위 밖 숫자는 실수로 바꾸거나 잘라 받지 않고 거절한다. stoll/stod의 내부 메시지는 노출하지 않는다.
+        try {
+            if (isFloat) {
+                return make_shared<Float>(stod(numStr));
+            }
+            return make_shared<Integer>(stoll(numStr));
+        } catch (const std::out_of_range&) {
+            throw runtime_error(string(checked_int::kJsonNumberOutOfRangeMessage) + ": " + numStr);
+        } catch (const std::invalid_argument&) {
+            throw runtime_error("JSON 파싱 오류: 잘못된 숫자입니다: " + numStr);
         }
-        return make_shared<Integer>(stoll(numStr));
     }
 
     shared_ptr<Object> parseObject() {
@@ -275,7 +283,7 @@ string serializeToJson(const shared_ptr<Object>& obj) {
 
 } // anonymous namespace
 
-std::shared_ptr<Object> JsonParse::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> JsonParse::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("JSON_파싱 함수는 인자를 1개만 받습니다.");
     }
@@ -287,7 +295,7 @@ std::shared_ptr<Object> JsonParse::function(std::vector<std::shared_ptr<Object>>
     return parser.parse();
 }
 
-std::shared_ptr<Object> JsonSerialize::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> JsonSerialize::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("JSON_직렬화 함수는 인자를 1개만 받습니다.");
     }

@@ -1,8 +1,10 @@
 #ifndef VM_H
 #define VM_H
 
-#include "../object/object.h"
+#include "../io/io_interface.h"
 #include "../object/built_in.h"
+#include "../object/object.h"
+#include "../sandbox/execution_limiter.h"
 #include "chunk.h"
 #include "opcode.h"
 #include "vm_value.h"
@@ -18,10 +20,10 @@
 // VM 호출 프레임
 struct CallFrame {
     CompiledFunction* function;
-    size_t ip;                      // 명령 포인터
-    size_t slotOffset;              // 스택 내 로컬 시작 위치
-    bool hasCallee = true;          // OP_CALL은 true, OP_INVOKE는 false
-    Closure* closure = nullptr;     // 클로저인 경우 업밸류 접근용
+    size_t ip; // 명령 포인터
+    size_t slotOffset; // 스택 내 로컬 시작 위치
+    bool hasCallee   = true; // OP_CALL은 true, OP_INVOKE는 false
+    Closure* closure = nullptr; // 클로저인 경우 업밸류 접근용
     bool isGenerator = false;
     std::vector<VMValue> yieldBuffer;
 };
@@ -39,29 +41,39 @@ struct IteratorState : public Object {
     size_t index = 0;
     std::vector<std::string> codePoints; // UTF-8 code points for string iteration
 
-    IteratorState() { type = ObjectType::ITERATOR; }
-    std::string ToString() override { return "<이터레이터>"; }
+    IteratorState() {
+        type = ObjectType::ITERATOR;
+    }
+    std::string ToString() override {
+        return "<이터레이터>";
+    }
 };
 
 class VM {
 public:
-    VM();
+    // ioCtx와 limiter 둘 다 옵션이며 nullptr이면 각각 기본 stdio / 제한 없음.
+    // 인자 순서는 Evaluator(IOContext*, ExecutionLimiter*)와 동일하다.
+    explicit VM(IOContext* ioCtx = nullptr, ExecutionLimiter* limiter = nullptr);
 
     std::shared_ptr<Object> Execute(std::shared_ptr<CompiledFunction> topLevel);
 
     // REPL 세션용: 전역 상태 접근 (external interface stays shared_ptr based)
     std::map<std::string, std::shared_ptr<Object>> getGlobals() {
         std::map<std::string, std::shared_ptr<Object>> result;
-        for (auto& [k, v] : globals) result[k] = v.toObject();
+        for (auto& [k, v] : globals) {
+            result[k] = v.toObject();
+        }
         return result;
     }
     void setGlobals(const std::map<std::string, std::shared_ptr<Object>>& g) {
         globals.clear();
-        for (auto& [k, v] : g) globals[k] = VMValue::fromObject(v);
+        for (auto& [k, v] : g) {
+            globals[k] = VMValue::fromObject(v);
+        }
     }
 
 private:
-    static constexpr size_t STACK_MAX = 65536;
+    static constexpr size_t STACK_MAX  = 65536;
     static constexpr size_t FRAMES_MAX = 256;
 
     std::shared_ptr<CompiledFunction> topLevelFn; // 소유권 유지
@@ -69,12 +81,21 @@ private:
     std::vector<CallFrame> frames;
     std::unordered_map<std::string, VMValue> globals;
     std::unordered_map<std::string, std::shared_ptr<Builtin>> builtins;
+    // 빌트인 경계 최적화 (spec D2·D3)
+    std::shared_ptr<Builtin> lengthBuiltin_; // '길이' fast path 식별용 (identity 비교)
+    std::vector<std::shared_ptr<Object>> builtinArgs_; // 빌트인 인자 버퍼 재사용 — 빌트인은 VM 재진입 없는 leaf 함수
+    bool tryLengthOf(const VMValue& arg, long long& out);
     std::vector<ExceptionHandler> exceptionHandlers;
     std::set<std::string> importedFiles;
     std::vector<std::shared_ptr<CompiledFunction>> importedModules; // keep compiled imports alive
+    IOContext* ioCtx          = nullptr;
+    ExecutionLimiter* limiter = nullptr;
 
     // 실행 루프
     std::shared_ptr<Object> run();
+
+    // 실행 제한 검사 (limiter가 null이면 no-op)
+    void checkLimits();
 
     // 스택 연산
     void push(VMValue value);
@@ -88,9 +109,6 @@ private:
 
     // 이항 연산
     VMValue binaryOp(OpCode op, const VMValue& left, const VMValue& right, long long line);
-
-    // 함수 호출
-    bool callValue(VMValue callee, int argCount);
 
     // 기본 매개변수 채우기
     void fillDefaults(CompiledFunction* fn, int argCount);
@@ -128,6 +146,8 @@ private:
     void opSetUpvalue();
     void opRangeCheck();
     void opTypeCheck();
+    void opDeclCheck();
+    void opAssertBool();
     void opImport();
     void opYield();
     void opInterpolate();

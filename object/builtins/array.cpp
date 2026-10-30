@@ -9,7 +9,7 @@ using namespace std;
 
 // ===== 배열 내장함수 =====
 
-std::shared_ptr<Object> Push::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Push::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("추가 함수는 인자를 2개 받습니다.");
     }
@@ -21,7 +21,7 @@ std::shared_ptr<Object> Push::function(std::vector<std::shared_ptr<Object>> para
     throw runtime_error("추가 함수의 첫 번째 인자는 배열이어야 합니다.");
 }
 
-std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Sort::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("정렬 함수는 인자를 1개만 받습니다.");
     }
@@ -31,23 +31,24 @@ std::shared_ptr<Object> Sort::function(std::vector<std::shared_ptr<Object>> para
     auto result = make_shared<Array>();
     result->elements = arr->elements;
 
+    // 정렬 비교자는 O(N log N)번 호출되므로 dynamic_cast RTTI 비용을 피하기 위해
+    // Object::type 태그로 먼저 분기한 뒤 static_cast로 값에 접근한다.
     std::sort(result->elements.begin(), result->elements.end(),
               [](const shared_ptr<Object>& a, const shared_ptr<Object>& b) {
-                  // 정수 비교
-                  auto* ai = dynamic_cast<Integer*>(a.get());
-                  auto* bi = dynamic_cast<Integer*>(b.get());
-                  if (ai && bi) return ai->value < bi->value;
-                  // 실수 비교
-                  auto* af = dynamic_cast<Float*>(a.get());
-                  auto* bf = dynamic_cast<Float*>(b.get());
-                  if (af && bf) return af->value < bf->value;
-                  // 문자열 비교
+                  if (a->type == ObjectType::INTEGER && b->type == ObjectType::INTEGER) {
+                      return static_cast<Integer*>(a.get())->value
+                             < static_cast<Integer*>(b.get())->value;
+                  }
+                  if (a->type == ObjectType::FLOAT && b->type == ObjectType::FLOAT) {
+                      return static_cast<Float*>(a.get())->value
+                             < static_cast<Float*>(b.get())->value;
+                  }
                   return a->ToString() < b->ToString();
               });
     return result;
 }
 
-std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Reverse::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 1) {
         throw runtime_error("뒤집기 함수는 인자를 1개만 받습니다.");
     }
@@ -64,7 +65,7 @@ std::shared_ptr<Object> Reverse::function(std::vector<std::shared_ptr<Object>> p
     throw runtime_error("뒤집기 함수는 배열 또는 문자열만 지원합니다.");
 }
 
-std::shared_ptr<Object> Find::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Find::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 2) {
         throw runtime_error("찾기 함수는 인자를 2개 받습니다 (배열, 값).");
     }
@@ -80,7 +81,7 @@ std::shared_ptr<Object> Find::function(std::vector<std::shared_ptr<Object>> para
     return make_shared<Integer>(-1);
 }
 
-std::shared_ptr<Object> Slice::function(std::vector<std::shared_ptr<Object>> parameters) {
+std::shared_ptr<Object> Slice::function(const std::vector<std::shared_ptr<Object>>& parameters) {
     if (parameters.size() != 3) {
         throw runtime_error("조각 함수는 인자를 3개 받습니다 (배열, 시작, 끝).");
     }

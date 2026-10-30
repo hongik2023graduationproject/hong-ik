@@ -47,7 +47,6 @@ public:
 private:
     CompilerState* current = nullptr;
 
-    void compileNode(Node* node);
     void compileStatement(Statement* stmt);
     void compileExpression(Expression* expr);
 
