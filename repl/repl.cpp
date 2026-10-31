@@ -52,7 +52,8 @@ void Repl::Run() {
     // VM REPL 세션 전역 상태 유지
     map<string, shared_ptr<Object>> vmGlobals;
 
-    while (true) {
+    bool reachedEof = false;
+    while (!reachedEof) {
         try {
             if (indent == 0) {
                 cout << ">>> ";
@@ -61,7 +62,15 @@ void Repl::Run() {
             }
 
             string code;
-            getline(cin, code);
+            if (!getline(cin, code)) {
+                // EOF(Ctrl+D, 파이프 입력 끝): 쌓인 여러 줄 입력이 있으면 빈 줄처럼 마무리해 실행하고 종료한다.
+                reachedEof = true;
+                cout << endl;
+                if (tokens.empty()) {
+                    return;
+                }
+                code.clear();
+            }
 
             if (code == EXIT_COMMAND) {
                 return;

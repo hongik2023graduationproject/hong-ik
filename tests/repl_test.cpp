@@ -1972,3 +1972,24 @@ TEST_F(ReplTest, EmptyLineStillEndsMultiLineInputBothBackends) {
         EXPECT_EQ(output.find("Error"), string::npos) << output;
     }
 }
+
+// ===== REPL EOF 종료 (회귀: 종료하기 없이 입력이 끝나면 무한 루프) =====
+
+TEST_F(ReplTest, ExitsOnEofWithoutExitCommandBothBackends) {
+    for (bool useVM : {false, true}) {
+        auto output = runRepl("1 + 2\n", useVM);
+        EXPECT_NE(output.find("3"), string::npos) << output;
+        // 마지막 줄에 개행이 없어도 실행한 뒤 종료
+        output = runRepl("40 + 2", useVM);
+        EXPECT_NE(output.find("42"), string::npos) << output;
+        output = runRepl("", useVM);
+        EXPECT_NE(output.find(">>> "), string::npos) << output;
+    }
+}
+
+TEST_F(ReplTest, EofFlushesPendingBlockBothBackends) {
+    for (bool useVM : {false, true}) {
+        auto output = runRepl("만약 1 == 1 라면:\n    출력(\"블록\")\n", useVM);
+        EXPECT_NE(output.find("블록"), string::npos) << (useVM ? "VM" : "Evaluator") << " output: " << output;
+    }
+}
