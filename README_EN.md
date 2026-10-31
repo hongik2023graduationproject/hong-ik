@@ -82,18 +82,22 @@ x = 3               // an Optional can also hold a regular value
 ```
 문자 이름 = "홍길동"
 문자 인사 = "안녕 {이름}님"    // "안녕 홍길동님" ("Hello, Hong Gil-dong")
+배열 점수 = [90, 85]
+출력("첫 점수: {점수[0]}, 합: {점수[0] + 점수[1]}")   // 첫 점수: 90, 합: 175
 ```
 
-`{...}` inside a string literal is always treated as interpolation. If you need braces in a string (e.g. a JSON object), split it and concatenate: `"{" + "\"a\": 1}"`.
+Any expression works inside `{...}` — indexing, member access, arithmetic, calls. For a literal brace write `{{`/`}}` or `\{`/`\}` (`"{{\"a\": 1}}"` → `{"a": 1}`). An unmatched `{` or an empty `{}` is printed as is.
 
 ### Conditionals
 
-`만약` (if), `라면` (then), `아니면` (else).
+`만약` (if), `라면` (then), `아니면 만약` (else if), `아니면` (else).
 
 ```
 정수 x = 7
 만약 x > 5 라면:       // if x > 5:
     출력("크다")        //     print("big")
+아니면 만약 x > 3 라면: // else if x > 3:
+    출력("중간")        //     print("medium")
 아니면:                 // else:
     출력("작다")        //     print("small")
 ```

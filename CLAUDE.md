@@ -97,8 +97,13 @@ cmake -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLA
 // 조건문 (블록 스코프 — 블록 내 선언은 밖에서 안 보임)
 만약 조건 라면:
     ...
+아니면 만약 조건2 라면:     // else-if는 파서가 아니면 블록 안의 중첩 만약으로 바꿈
+    ...
 아니면:
     ...
+
+// 문자열 보간: {식} — 파스 시점에 InterpolatedStringLiteral로 분해. 중괄호 자체는 {{ }} 또는 \{ \}
+출력("{학생.이름}: {점수[0] * 2}")
 
 // 함수 선언/호출
 함수 더하기(정수 a, 정수 b) -> 정수:
