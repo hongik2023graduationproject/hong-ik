@@ -52,6 +52,7 @@ void Compiler::compileStatement(Statement* stmt) {
     if (dynamic_cast<BreakStatement*>(stmt)) {
         if (!current->loops.empty()) {
             auto& loop = current->loops.back();
+            emitTryEndsToLoop(loop);
             size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
             loop.breakJumps.push_back(jumpOffset);
             current->isUnreachable = true;
@@ -61,6 +62,7 @@ void Compiler::compileStatement(Statement* stmt) {
     if (dynamic_cast<ContinueStatement*>(stmt)) {
         if (!current->loops.empty()) {
             auto& loop = current->loops.back();
+            emitTryEndsToLoop(loop);
             if (loop.continueTarget != 0) {
                 // For for-range loops, we need a forward jump to the increment section
                 size_t jumpOffset = chunk().emitJump(OpCode::OP_JUMP, 0);
@@ -239,7 +241,7 @@ void Compiler::compileIf(IfStatement* stmt) {
 
 void Compiler::compileWhile(WhileStatement* stmt) {
     size_t loopStart = chunk().code.size();
-    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth});
+    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth, current->tryDepth});
 
     compileExpression(stmt->condition.get());
     size_t exitJump = chunk().emitJump(OpCode::OP_JUMP_IF_FALSE, 0);
@@ -275,7 +277,7 @@ void Compiler::compileForEach(ForEachStatement* stmt) {
     (void)iterSlot;
 
     size_t loopStart = chunk().code.size();
-    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth});
+    current->loops.push_back({loopStart, 0, {}, {}, current->scopeDepth, current->tryDepth});
 
     size_t exitJump = chunk().emitJump(OpCode::OP_ITER_NEXT, 0);
 
@@ -331,7 +333,7 @@ void Compiler::compileForRange(ForRangeStatement* stmt) {
 
     size_t loopStart = chunk().code.size();
     // continueTarget = 1 is a sentinel meaning "use continueJumps for forward patching"
-    current->loops.push_back({loopStart, 1, {}, {}, current->scopeDepth});
+    current->loops.push_back({loopStart, 1, {}, {}, current->scopeDepth, current->tryDepth});
 
     // 조건: i < end
     chunk().emitOpAndUint16(OpCode::OP_GET_LOCAL, varSlot, 0);
@@ -682,14 +684,26 @@ void Compiler::compileMatch(MatchStatement* stmt) {
 }
 
 
+// 중단/계속은 OP_TRY_END를 거치지 않고 시도 블록을 빠져나가므로, 루프 안에서 열린 핸들러를 먼저 닫는다.
+void Compiler::emitTryEndsToLoop(const LoopContext& loop) {
+    for (int i = loop.tryDepth; i < current->tryDepth; i++) {
+        chunk().emitOp(OpCode::OP_TRY_END, 0);
+    }
+}
+
+
 void Compiler::compileTryCatch(TryCatchStatement* stmt) {
     size_t tryBeginOffset = chunk().emitJump(OpCode::OP_TRY_BEGIN, 0);
 
     beginScope();
+    current->tryDepth++;
     for (auto& s : stmt->tryBody->statements) {
         compileStatement(s.get());
     }
+    current->tryDepth--;
     endScope(0);
+    // 시도 블록이 리턴/중단/계속으로 끝나도 실패 블록은 예외 경로로 도달하므로 컴파일해야 한다.
+    current->isUnreachable = false;
 
     chunk().emitOp(OpCode::OP_TRY_END, 0);
     size_t skipCatch = chunk().emitJump(OpCode::OP_JUMP, 0);
@@ -705,6 +719,7 @@ void Compiler::compileTryCatch(TryCatchStatement* stmt) {
     endScope(0);
 
     chunk().patchJump(skipCatch);
+    current->isUnreachable = false;
 }
 
 

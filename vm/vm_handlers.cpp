@@ -311,6 +311,13 @@ std::optional<std::shared_ptr<Object>> VM::opReturn() {
     auto yieldValues  = std::move(currentFrame().yieldBuffer);
     frames.pop_back();
 
+    // 시도 블록 안에서 리턴하면 OP_TRY_END를 지나지 않으므로, 끝난 프레임이 등록한 핸들러를 여기서 버린다.
+    // 남겨 두면 이후 다른 프레임의 예외가 사라진 프레임의 catchIp로 점프한다.
+    while (!exceptionHandlers.empty()
+           && exceptionHandlers.back().frameDepth > static_cast<int>(frames.size())) {
+        exceptionHandlers.pop_back();
+    }
+
     // 현재 프레임의 로컬 스택 정리
     while (stack.size() > slotOffset) {
         stack.pop_back();
