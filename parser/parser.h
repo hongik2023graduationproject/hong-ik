@@ -66,6 +66,7 @@ private:
     std::shared_ptr<BlockStatement> parseBlockStatement();
 
     std::shared_ptr<IfStatement> parseIfStatement();
+    std::shared_ptr<IfStatement> parseIfHead();
 
     std::shared_ptr<WhileStatement> parseWhileStatement();
 

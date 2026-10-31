@@ -370,7 +370,57 @@ shared_ptr<BlockStatement> Parser::parseBlockStatement() {
 }
 
 // 만약 조건 라면:
+//     ...
+// 아니면 만약 조건 라면:     ← else-if 체인 (길이 제한 없음, 마지막 '아니면:'은 선택)
+//     ...
+// 아니면:
+//     ...
+//
+// '아니면 만약 …'은 문법 설탕이다. else 블록 안에 중첩 if 하나만 든 것으로 파싱하므로
+// (then = { IfStatement }) 평가기·컴파일러·타입 검사기·심볼 수집기가 따로 알 필요가 없고,
+// 블록 스코프도 기존 if/else와 같다 — 각 분기 안의 선언은 그 분기 밖에서 보이지 않는다.
+// 체인은 파서에서 반복문으로 펼쳐 만든다 (긴 체인에서도 파서 재귀가 깊어지지 않음).
 shared_ptr<IfStatement> Parser::parseIfStatement() {
+    auto head = parseIfHead();
+    auto tail = head;
+
+    while (current_token != nullptr && current_token->type == TokenType::아니면) {
+        auto elseToken = current_token;
+        setNextToken();
+
+        if (current_token != nullptr && current_token->type == TokenType::만약) {
+            auto elseIf     = parseIfHead();
+            auto elseBlock  = make_shared<BlockStatement>();
+            elseBlock->line = elseIf->line;
+            elseBlock->statements.push_back(elseIf);
+            tail->then = elseBlock;
+            tail       = elseIf;
+            continue;
+        }
+
+        if (current_token == nullptr || current_token->type != TokenType::COLON) {
+            const Token& at = current_token ? *current_token : *elseToken;
+            throw ParseError(
+                "[줄 " + to_string(at.line) + "] '아니면' 뒤에는 ':' 또는 '만약 <조건> 라면:'이 와야 합니다.", at.line,
+                at.column, at.endColumn);
+        }
+        skipToken(TokenType::COLON);
+        skipToken(TokenType::NEW_LINE);
+        tail->then = parseBlockStatement();
+        if (current_token != nullptr && current_token->type == TokenType::아니면) {
+            throw ParseError("[줄 " + to_string(current_token->line)
+                                 + "] '아니면:' 블록 뒤에는 '아니면'이 더 올 수 없습니다. "
+                                   "'아니면 만약 … 라면:' 분기는 마지막 '아니면:'보다 앞에 두세요.",
+                current_token->line, current_token->column, current_token->endColumn);
+        }
+        break;
+    }
+
+    return head;
+}
+
+// '만약 조건 라면:' + 본문 블록. else 부분은 parseIfStatement가 붙인다.
+shared_ptr<IfStatement> Parser::parseIfHead() {
     auto statement = make_shared<IfStatement>();
     statement->line = current_token->line;
     skipToken(TokenType::만약);
@@ -381,14 +431,6 @@ shared_ptr<IfStatement> Parser::parseIfStatement() {
     skipToken(TokenType::NEW_LINE);
 
     statement->consequence = parseBlockStatement();
-
-    if (current_token != nullptr && current_token->type == TokenType::아니면) {
-        skipToken(TokenType::아니면);
-        skipToken(TokenType::COLON);
-        skipToken(TokenType::NEW_LINE);
-        statement->then = parseBlockStatement();
-    }
-
     return statement;
 }
 
