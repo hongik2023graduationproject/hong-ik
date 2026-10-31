@@ -9,6 +9,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <memory>
+#include <sstream>
 
 using namespace std;
 
@@ -1896,4 +1897,78 @@ TEST_F(ReplTest, OptionalAllowsNull) {
     string user_input = "정수? x = 없음\n출력(x)\n종료하기\n";
     auto output = runRepl(user_input);
     EXPECT_TRUE(output.find("없음") != string::npos) << "Expected '없음', got: " << output;
+}
+
+// ===== 들여쓴 블록 안 빈 줄 (회귀) =====
+
+namespace {
+    // 바이트 그대로(CRLF 보존) 임시 파일에 쓰고 FileMode로 실행한 출력을 돌려준다.
+    string runSourceFile(const string& path, const string& source, bool useVM) {
+        {
+            std::ofstream f(path, std::ios::binary);
+            f << source;
+        }
+        std::ostringstream captured;
+        auto* coutbuf = std::cout.rdbuf(captured.rdbuf());
+        Repl repl(useVM);
+        repl.FileMode(path);
+        std::cout.rdbuf(coutbuf);
+        std::remove(path.c_str());
+        return captured.str();
+    }
+} // namespace
+
+TEST_F(ReplTest, BlankLinesInsideBlocksCrlfBothBackends) {
+    const string source = "함수 합(정수 n) -> 정수:\r\n"
+                          "    정수 s = 0\r\n"
+                          "\r\n"
+                          "  \t \r\n"
+                          "// 주석만 있는 줄\r\n"
+                          "    정수 i = 0\r\n"
+                          "    반복 i < n 동안:\r\n"
+                          "\r\n"
+                          "        s = s + i\r\n"
+                          "        i = i + 1\r\n"
+                          "\r\n"
+                          "    리턴 s\r\n"
+                          "\r\n"
+                          "출력(합(4))\r\n"
+                          "\r\n"
+                          "    \r\n";
+    for (bool useVM : {false, true}) {
+        auto output = runSourceFile("test_blank_lines_crlf.hik", source, useVM);
+        EXPECT_EQ(output, "6\n") << (useVM ? "VM" : "Evaluator") << " output: " << output;
+    }
+}
+
+TEST_F(ReplTest, ImportWithBlankLinesInsideBlocksBothBackends) {
+    // 가져오기는 별도 경로로 토큰화하므로 따로 확인한다
+    const string tmpFile = "test_repl_import_blank_lines.hik";
+    {
+        std::ofstream f(tmpFile);
+        f << "함수 세배(정수 x) -> 정수:\n"
+             "    정수 y = x\n"
+             "\n"
+             "    리턴 y * 3\n";
+    }
+    for (bool useVM : {false, true}) {
+        string user_input = "가져오기 \"" + tmpFile + "\"\n세배(14)\n종료하기\n";
+        auto output       = runRepl(user_input, useVM);
+        EXPECT_NE(output.find("42"), string::npos) << (useVM ? "VM" : "Evaluator") << " output: " << output;
+        EXPECT_EQ(output.find("Error"), string::npos) << output;
+    }
+    std::remove(tmpFile.c_str());
+}
+
+TEST_F(ReplTest, EmptyLineStillEndsMultiLineInputBothBackends) {
+    for (bool useVM : {false, true}) {
+        string user_input = "함수 f() -> 정수:\n"
+                            "    리턴 7\n"
+                            "\n"
+                            "f() + 1\n"
+                            "종료하기\n";
+        auto output       = runRepl(user_input, useVM);
+        EXPECT_NE(output.find("8"), string::npos) << (useVM ? "VM" : "Evaluator") << " output: " << output;
+        EXPECT_EQ(output.find("Error"), string::npos) << output;
+    }
 }

@@ -7,6 +7,7 @@
 #include "../util/checked_int.h"
 #include "../util/path_utils.h"
 #include "../util/slice_utils.h"
+#include "../util/token_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include "compiler.h"
@@ -920,29 +921,14 @@ void VM::opImport() {
     string source = importBuffer.str();
 
     // Lexer -> Parser -> Compiler pipeline
+    // 파일 전체를 한 번에 토큰화한다 (FileMode와 동일). 줄 단위로 나눠 토큰화하면
+    // 블록 안의 빈 줄이 입력 끝 빈 줄로 취급돼 블록을 닫아 버린다.
     Lexer importLexer;
-    vector<shared_ptr<Token>> allTokens;
-    istringstream importStream(source);
-    string srcLine;
-    int indent = 0;
-
-    while (getline(importStream, srcLine)) {
-        srcLine += "\n";
-        auto utf8chars = Utf8Converter::Convert(srcLine);
-        auto tokens    = importLexer.Tokenize(utf8chars);
-        allTokens.insert(allTokens.end(), tokens.begin(), tokens.end());
-        for (auto& t : tokens) {
-            if (t->type == TokenType::START_BLOCK) {
-                indent++;
-            }
-            if (t->type == TokenType::END_BLOCK) {
-                indent--;
-            }
-        }
+    if (source.empty() || source.back() != '\n') {
+        source += "\n";
     }
-    for (int i = 0; i < indent; i++) {
-        allTokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
-    }
+    auto allTokens = importLexer.Tokenize(Utf8Converter::Convert(source));
+    token_utils::appendMissingBlockClosers(allTokens);
 
     Parser importParser;
     auto program = importParser.Parsing(allTokens);

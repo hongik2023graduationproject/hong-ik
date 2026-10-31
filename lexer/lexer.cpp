@@ -133,17 +133,37 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
                 next_read_position++;
             }
 
+            // 빈 줄·공백만 있는 줄·주석만 있는 줄은 뒤에 코드가 더 이어지면 들여쓰기에 영향을 주지 않는다.
+            // (블록 안의 빈 줄이 END_BLOCK → START_BLOCK을 만들어 파싱을 깨뜨리던 문제)
+            // 입력 끝의 빈 줄은 기존대로 들여쓰기를 반영한다 — REPL이 빈 줄로 여러 줄 입력을 끝내는 동작 유지.
+            // 이런 줄은 NEW_LINE 토큰도 만들지 않고 통째로 건너뛴다 — 토큰열이 빈 줄 없는 소스와 같아진다.
+            if (isBlankLine(current_read_position) && hasCodeAfterBlankLines(current_read_position)) {
+                while (characters[current_read_position] != "\n") {
+                    current_read_position++;
+                    next_read_position++;
+                }
+                current_read_position++;
+                next_read_position++;
+                line++;
+                line_start_pos = current_read_position;
+                continue;
+            }
+
             const int current_indent = space_counter / 4;
             if (indent < current_indent) {
-                for (int i = indent; i < current_indent; i++) {
-                    addToken(TokenType::START_BLOCK, "");
+                // 입력 끝의 빈 줄은 블록을 닫기만 하고 새 블록을 열지 않는다
+                if (!isBlankLine(current_read_position)) {
+                    for (int i = indent; i < current_indent; i++) {
+                        addToken(TokenType::START_BLOCK, "");
+                    }
+                    indent = current_indent;
                 }
             } else if (indent > current_indent) {
                 for (int i = indent; i > current_indent; i--) {
                     addToken(TokenType::END_BLOCK, "");
                 }
+                indent = current_indent;
             }
-            indent        = current_indent;
             at_line_start = false;
             continue;
         }
@@ -252,6 +272,35 @@ std::vector<std::shared_ptr<Token>> Lexer::Tokenize(const std::vector<std::strin
     // M6: REPL의 들여쓰기 추적은 공백 개수 기반 휴리스틱으로, 혼합 들여쓰기 시 부정확할 수 있음.
     // M7: Lexer는 호출 간에 indent 상태를 유지하여 여러 줄 입력을 지원함.
     return tokens;
+}
+
+
+// pos부터 줄 끝까지가 비어 있는지(공백·탭·\r·한 줄 주석뿐인지) 확인한다.
+bool Lexer::isBlankLine(long long pos) const {
+    const auto size = static_cast<long long>(characters.size());
+    while (pos < size && (characters[pos] == " " || characters[pos] == "\t" || characters[pos] == "\r")) {
+        pos++;
+    }
+    return pos >= size || characters[pos] == "\n"
+        || (characters[pos] == "/" && pos + 1 < size && characters[pos + 1] == "/");
+}
+
+// pos가 속한 빈 줄 뒤로 빈 줄이 아닌 줄이 남아 있는지 확인한다.
+bool Lexer::hasCodeAfterBlankLines(long long pos) const {
+    const auto size = static_cast<long long>(characters.size());
+    while (pos < size) {
+        while (pos < size && characters[pos] != "\n") {
+            pos++;
+        }
+        if (pos >= size) {
+            return false;
+        }
+        pos++; // '\n' 다음 줄의 시작
+        if (!isBlankLine(pos)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 

@@ -39,6 +39,9 @@ private:
     std::string readLetter();
     std::string readString();
 
+    bool isBlankLine(long long pos) const;
+    bool hasCodeAfterBlankLines(long long pos) const;
+
     void skipLineComment();
     void skipBlockComment();
 

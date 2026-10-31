@@ -11,6 +11,7 @@
 #include "../util/checked_int.h"
 #include "../util/path_utils.h"
 #include "../util/slice_utils.h"
+#include "../util/token_utils.h"
 #include "../util/type_utils.h"
 #include "../util/utf8_utils.h"
 #include <cmath>
@@ -1345,28 +1346,14 @@ shared_ptr<Object> Evaluator::evalImport(const string& filename, Environment* en
         fileContent = oss.str();
     }
 
-    // 파일 내용을 토큰화
+    // 파일 전체를 한 번에 토큰화한다 (FileMode와 동일). 줄 단위로 나눠 토큰화하면
+    // 블록 안의 빈 줄이 입력 끝 빈 줄로 취급돼 블록을 닫아 버린다.
     Lexer importLexer;
-    vector<shared_ptr<Token>> allTokens;
-    int indent = 0;
-
-    // 줄 단위로 토큰화 (Lexer가 줄 단위 indent 추적을 하므로)
-    istringstream stream(fileContent);
-    string line_str;
-    while (getline(stream, line_str)) {
-        line_str += "\n";
-        auto utf8 = Utf8Converter::Convert(line_str);
-        auto newTokens = importLexer.Tokenize(utf8);
-        allTokens.insert(allTokens.end(), newTokens.begin(), newTokens.end());
-        for (auto& token : newTokens) {
-            if (token->type == TokenType::START_BLOCK) indent++;
-            if (token->type == TokenType::END_BLOCK) indent--;
-        }
+    if (fileContent.empty() || fileContent.back() != '\n') {
+        fileContent += "\n";
     }
-
-    for (int i = 0; i < indent; i++) {
-        allTokens.push_back(make_shared<Token>(Token{TokenType::END_BLOCK, "", 0}));
-    }
+    auto allTokens = importLexer.Tokenize(Utf8Converter::Convert(fileContent));
+    token_utils::appendMissingBlockClosers(allTokens);
     if (allTokens.empty()) return nullptr;
 
     Parser importParser;
