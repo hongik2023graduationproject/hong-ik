@@ -402,6 +402,46 @@ TEST_F(VMTest, TryCatch) {
     EXPECT_NE(output.find("0으로 나눌 수 없습니다"), string::npos);
 }
 
+// 시도 블록이 리턴으로 끝나도 실패 블록이 컴파일·실행돼야 한다 (함수 안)
+TEST_F(VMTest, TryCatchInFunctionWithReturnInTry) {
+    string output = runVMWithOutput("함수 나누기(정수 a, 정수 b) -> 정수:\n"
+                                    "    시도:\n"
+                                    "        리턴 a / b\n"
+                                    "    실패 오류:\n"
+                                    "        출력(\"오류 처리\")\n"
+                                    "        리턴 -1\n"
+                                    "\n"
+                                    "출력(나누기(10, 0))\n"
+                                    "출력(나누기(10, 2))\n");
+    EXPECT_EQ(output, "오류 처리\n-1\n5\n");
+}
+
+// 시도 안에서 리턴한 프레임의 핸들러가 남으면, 이후 잡히지 않은 오류가 사라진 프레임의 실패 블록으로 점프한다
+TEST_F(VMTest, ReturnInsideTryDropsFrameHandler) {
+    EXPECT_THROW_WITH_MESSAGE(runVM("함수 f(정수 d) -> 정수:\n"
+                                    "    시도:\n"
+                                    "        리턴 10 / d\n"
+                                    "    실패 e:\n"
+                                    "        리턴 -1\n"
+                                    "\n"
+                                    "f(5)\n"
+                                    "정수 z = 1 / 0\n"),
+                              "0으로 나눌 수 없습니다");
+}
+
+// 중단/계속으로 시도 블록을 빠져나가면 핸들러가 닫혀야 한다
+TEST_F(VMTest, BreakInsideTryDropsHandler) {
+    EXPECT_THROW_WITH_MESSAGE(runVM("정수 i = 0\n"
+                                    "반복 i < 3 동안:\n"
+                                    "    시도:\n"
+                                    "        i = i + 1\n"
+                                    "        중단\n"
+                                    "    실패 e:\n"
+                                    "        i = 100\n"
+                                    "정수 z = 1 / 0\n"),
+                              "0으로 나눌 수 없습니다");
+}
+
 // ===== 클래스 =====
 
 TEST_F(VMTest, ClassNoConstructor) {

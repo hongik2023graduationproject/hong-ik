@@ -28,6 +28,7 @@ struct LoopContext {
     std::vector<size_t> breakJumps;
     std::vector<size_t> continueJumps;
     int scopeDepth;
+    int tryDepth; // 루프 진입 시점의 열린 시도 블록 수 — 중단/계속이 그 사이 핸들러를 정리하는 기준
 };
 
 struct CompilerState {
@@ -38,6 +39,7 @@ struct CompilerState {
     int scopeDepth = 0;
     std::vector<LoopContext> loops;
     bool isUnreachable = false;
+    int tryDepth = 0; // 현재 함수 안에서 열려 있는 시도 블록 수
 };
 
 class Compiler {
@@ -64,6 +66,7 @@ private:
     void compileClass(ClassStatement* stmt);
     void compileMatch(MatchStatement* stmt);
     void compileTryCatch(TryCatchStatement* stmt);
+    void emitTryEndsToLoop(const LoopContext& loop);
     void compileImport(ImportStatement* stmt);
     void compileIndexAssignment(IndexAssignmentStatement* stmt);
     void compileYield(YieldStatement* stmt);

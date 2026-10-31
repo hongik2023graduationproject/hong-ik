@@ -79,6 +79,7 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"range_strict"},
         GoldenCase{"block_scope"},
         GoldenCase{"try_catch"},
+        GoldenCase{"try_catch_function"},
         GoldenCase{"ops_misc"},
         // 들여쓴 블록 안 빈 줄·공백 줄·주석 줄
         GoldenCase{"blank_lines"}
