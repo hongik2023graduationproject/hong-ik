@@ -90,8 +90,8 @@ private:
 
     std::shared_ptr<Object> evalImport(const std::string& filename, Environment* environment);
 
-    // 문자열 보간
-    std::string interpolateString(const std::string& str, Environment* environment);
+    // 문자열 보간 ("글자{식}글자" — 파서가 분해한 InterpolatedStringLiteral)
+    std::shared_ptr<Object> evalInterpolatedString(class InterpolatedStringLiteral* node, Environment* environment);
 
     // 클래스 관련
     std::shared_ptr<Object> instantiateClass(std::shared_ptr<Object> classDefObj, std::vector<std::shared_ptr<Object>> arguments, Environment* environment);

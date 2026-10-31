@@ -81,6 +81,7 @@ long long Evaluator::getLineFromNode(Node* node) {
     if (auto* e = dynamic_cast<FloatLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<BooleanLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<StringLiteral*>(node)) return e->token ? e->token->line : 0;
+    if (auto* e = dynamic_cast<InterpolatedStringLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<NullLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<ArrayLiteral*>(node)) return e->token ? e->token->line : 0;
     // Statement들에서 토큰 기반 줄 번호 추출
@@ -90,33 +91,18 @@ long long Evaluator::getLineFromNode(Node* node) {
     return 0;
 }
 
-string Evaluator::interpolateString(const string& str, Environment* environment) {
-    string result;
-    size_t i = 0;
-    while (i < str.size()) {
-        if (str[i] == '{') {
-            size_t end = str.find('}', i);
-            if (end == string::npos) {
-                result += str[i];
-                i++;
-                continue;
-            }
-            string varName = str.substr(i + 1, end - i - 1);
-            auto value = environment->Get(varName);
-            if (value != nullptr) {
-                result += value->ToString();
-            } else if (builtins.contains(varName)) {
-                result += "내장함수:" + varName;
-            } else {
-                result += "{" + varName + "}";
-            }
-            i = end + 1;
-        } else {
-            result += str[i];
-            i++;
+// "글자{식}글자" — 식을 차례로 평가해 ToString()(출력()과 같은 형식)으로 이어 붙인다.
+// 보간 분해·이스케이프 규칙은 Parser::parseStringLiteral 참조.
+shared_ptr<Object> Evaluator::evalInterpolatedString(InterpolatedStringLiteral* node, Environment* environment) {
+    string result = node->literals.empty() ? string() : node->literals[0];
+    for (size_t i = 0; i < node->expressions.size(); i++) {
+        auto value = eval(node->expressions[i].get(), environment);
+        result += value ? value->ToString() : string("없음");
+        if (i + 1 < node->literals.size()) {
+            result += node->literals[i + 1];
         }
     }
-    return result;
+    return make_shared<String>(std::move(result));
 }
 
 namespace {
@@ -762,11 +748,11 @@ shared_ptr<Object> Evaluator::eval(Node* node, Environment* environment) {
         return make_shared<Boolean>(boolean_literal->value);
     }
     if (auto* string_literal = dynamic_cast<StringLiteral*>(node)) {
-        string value = string_literal->value;
-        if (value.find('{') != string::npos) {
-            value = interpolateString(value, environment);
-        }
-        return make_shared<String>(value);
+        // 보간은 파서가 InterpolatedStringLiteral로 분리하므로 여기 값은 항상 글자 그대로다.
+        return make_shared<String>(string_literal->value);
+    }
+    if (auto* interpolated = dynamic_cast<InterpolatedStringLiteral*>(node)) {
+        return evalInterpolatedString(interpolated, environment);
     }
     if (dynamic_cast<NullLiteral*>(node)) {
         return make_shared<Null>();

@@ -80,7 +80,8 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"block_scope"},
         GoldenCase{"try_catch"},
         GoldenCase{"ops_misc"},
-        GoldenCase{"else_if"}
+        GoldenCase{"else_if"},
+        GoldenCase{"string_interpolation"}
     ),
     [](const ::testing::TestParamInfo<GoldenCase>& info) {
         return info.param.name;

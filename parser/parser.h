@@ -201,6 +201,8 @@ private:
     std::shared_ptr<Expression> parseBooleanLiteral();
 
     std::shared_ptr<Expression> parseStringLiteral();
+    std::shared_ptr<Expression> parseInterpolationExpression(
+        const std::string& text, const Token& stringToken, int& innerDepth);
 
     std::shared_ptr<Expression> parseArrayLiteral();
 

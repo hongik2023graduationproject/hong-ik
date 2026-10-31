@@ -43,11 +43,15 @@
                     "patterns": [
                         {
                             "name": "constant.character.escape.hongik",
-                            "match": "\\\\[\"\\\\nrt0]"
+                            "match": "\\\\[\"\\\\nrt0{}]"
+                        },
+                        {
+                            "name": "constant.character.escape.hongik",
+                            "match": "\\{\\{|\\}\\}"
                         },
                         {
                             "name": "variable.other.interpolation.hongik",
-                            "begin": "\\{",
+                            "begin": "\\{(?!\\s*\\})",
                             "end": "\\}",
                             "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.hongik" } },
                             "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.hongik" } },
