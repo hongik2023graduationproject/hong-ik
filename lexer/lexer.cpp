@@ -374,6 +374,10 @@ string Lexer::readString() {
                 string_value += "\\";
             } else if (current_character == "\"") {
                 string_value += "\"";
+            } else if (current_character == "{" || current_character == "}") {
+                // \{ \} — 보간이 아닌 중괄호 글자. 파서의 보간 분해(Parser::parseStringLiteral)가 쓰는
+                // 이스케이프 표기 {{ }}로 바꿔 넘긴다. 그래야 "\\{x}"(백슬래시 + 보간)와 구별된다.
+                string_value += current_character + current_character;
             } else {
                 string_value += "\\" + current_character;
             }

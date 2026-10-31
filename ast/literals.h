@@ -51,6 +51,33 @@ public:
     }
 };
 
+// 보간이 든 문자열 리터럴 "글자{식}글자{식}글자". 파서가 만든다 (Parser::parseStringLiteral).
+// literals.size() == expressions.size() + 1 이고, 값은 literals[0] + 문자열(expressions[0]) + literals[1] + ...
+// literals의 각 조각은 이미 이스케이프가 풀린 글자 그대로다 ({{ → {, }} → }).
+// 보간이 하나도 없는 문자열은 StringLiteral로 남는다.
+class InterpolatedStringLiteral : public Literal {
+public:
+    std::shared_ptr<Token> token;
+    std::vector<std::string> literals;
+    std::vector<std::shared_ptr<Expression>> expressions;
+
+    std::string String() override {
+        std::string s = "\"";
+        for (size_t i = 0; i < literals.size(); i++) {
+            for (char c : literals[i]) {
+                if (c == '{' || c == '}') {
+                    s += c; // 다시 파싱해도 같은 값이 되도록 {{ }}로 적는다
+                }
+                s += c;
+            }
+            if (i < expressions.size()) {
+                s += "{" + expressions[i]->String() + "}";
+            }
+        }
+        return s + "\"";
+    }
+};
+
 class ArrayLiteral : public Literal {
 public:
     std::shared_ptr<Token> token;

@@ -27,48 +27,29 @@ void Compiler::compileExpression(Expression* expr) {
         return;
     }
     if (auto* e = dynamic_cast<StringLiteral*>(expr)) {
+        // 보간은 파서가 InterpolatedStringLiteral로 분리하므로 여기 값은 항상 글자 그대로다.
         long long line = e->token ? e->token->line : 0;
-        // 문자열 보간 처리
-        const string& val = e->value;
-        if (val.find('{') != string::npos) {
-            // 보간 세그먼트 파싱
-            vector<string> segments;
-            vector<string> varNames;
-            size_t i = 0;
-            string current_seg;
-            while (i < val.size()) {
-                if (val[i] == '{') {
-                    size_t end = val.find('}', i);
-                    if (end != string::npos) {
-                        segments.push_back(current_seg);
-                        current_seg.clear();
-                        varNames.push_back(val.substr(i + 1, end - i - 1));
-                        i = end + 1;
-                        continue;
-                    }
-                }
-                current_seg += val[i];
-                i++;
+        emitConstant(make_shared<String>(e->value), line);
+        return;
+    }
+    if (auto* e = dynamic_cast<InterpolatedStringLiteral*>(expr)) {
+        // 글자 조각과 식 값을 차례로 push한 뒤 OP_INTERPOLATE가 문자열로 이어 붙인다 (빈 조각은 생략).
+        long long line = e->token ? e->token->line : 0;
+        size_t count   = 0;
+        for (size_t i = 0; i < e->literals.size(); i++) {
+            if (!e->literals[i].empty()) {
+                emitConstant(make_shared<String>(e->literals[i]), line);
+                count++;
             }
-            segments.push_back(current_seg);
-
-            // 세그먼트와 변수를 번갈아 push
-            int count = 0;
-            for (size_t si = 0; si < segments.size(); si++) {
-                if (!segments[si].empty()) {
-                    emitConstant(make_shared<String>(segments[si]), line);
-                    count++;
-                }
-                if (si < varNames.size()) {
-                    // 변수를 문자열로 변환하기 위해 식별자 로드
-                    compileIdentifier(varNames[si], line);
-                    count++;
-                }
+            if (i < e->expressions.size()) {
+                compileExpression(e->expressions[i].get());
+                count++;
             }
-            chunk().emitOpAndUint16(OpCode::OP_INTERPOLATE, static_cast<uint16_t>(count), line);
-            return;
         }
-        emitConstant(make_shared<String>(val), line);
+        if (count > std::numeric_limits<uint16_t>::max()) {
+            throw RuntimeException("문자열 보간 조각이 너무 많습니다 (최대 65535개).", line);
+        }
+        chunk().emitOpAndUint16(OpCode::OP_INTERPOLATE, static_cast<uint16_t>(count), line);
         return;
     }
     if (dynamic_cast<NullLiteral*>(expr)) {
@@ -252,7 +233,8 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
     } else if (auto* lf = dynamic_cast<FloatLiteral*>(expr->left.get())) {
         leftFloat = lf->value; leftType = T_FLOAT;
     } else if (auto* ls = dynamic_cast<StringLiteral*>(expr->left.get())) {
-        if (ls->value.find('{') == string::npos) { leftStr = ls->value; leftType = T_STR; }
+        leftStr  = ls->value;
+        leftType = T_STR; // 보간 문자열은 InterpolatedStringLiteral — 여기 오지 않음
     } else {
         return false;
     }
@@ -266,7 +248,8 @@ bool Compiler::tryConstantFold(InfixExpression* expr) {
     } else if (auto* rf = dynamic_cast<FloatLiteral*>(expr->right.get())) {
         rightFloat = rf->value; rightType = R_FLOAT;
     } else if (auto* rs = dynamic_cast<StringLiteral*>(expr->right.get())) {
-        if (rs->value.find('{') == string::npos) { rightStr = rs->value; rightType = R_STR; }
+        rightStr  = rs->value;
+        rightType = R_STR;
     } else {
         return false;
     }

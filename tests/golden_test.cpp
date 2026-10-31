@@ -82,7 +82,9 @@ INSTANTIATE_TEST_SUITE_P(
         GoldenCase{"try_catch_function"},
         GoldenCase{"ops_misc"},
         // 들여쓴 블록 안 빈 줄·공백 줄·주석 줄
-        GoldenCase{"blank_lines"}
+        GoldenCase{"blank_lines"},
+        GoldenCase{"else_if"},
+        GoldenCase{"string_interpolation"}
     ),
     [](const ::testing::TestParamInfo<GoldenCase>& info) {
         return info.param.name;

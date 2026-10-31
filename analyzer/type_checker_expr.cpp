@@ -20,6 +20,13 @@ std::shared_ptr<Type> TypeChecker::inferExpression(const std::shared_ptr<Express
     if (dynamic_cast<IntegerLiteral*>(expr.get())) return makePrim(ObjectType::INTEGER);
     if (dynamic_cast<FloatLiteral*>(expr.get())) return makePrim(ObjectType::FLOAT);
     if (dynamic_cast<StringLiteral*>(expr.get())) return makePrim(ObjectType::STRING);
+    if (auto* interpolated = dynamic_cast<InterpolatedStringLiteral*>(expr.get())) {
+        // "글자{식}" — 보간 식은 어떤 타입이든 문자열로 바뀐다. 식 내부 진단(미정의 식별자 등)만 수집.
+        for (const auto& part : interpolated->expressions) {
+            inferExpression(part);
+        }
+        return makePrim(ObjectType::STRING);
+    }
     if (dynamic_cast<BooleanLiteral*>(expr.get())) return makePrim(ObjectType::BOOLEAN);
     if (dynamic_cast<NullLiteral*>(expr.get())) return makePrim(ObjectType::NULL_OBJ);
 

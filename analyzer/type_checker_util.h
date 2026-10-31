@@ -19,6 +19,7 @@ inline long long nodeLine(Node* node) {
     if (auto* e = dynamic_cast<FloatLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<BooleanLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<StringLiteral*>(node)) return e->token ? e->token->line : 0;
+    if (auto* e = dynamic_cast<InterpolatedStringLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<NullLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* e = dynamic_cast<ArrayLiteral*>(node)) return e->token ? e->token->line : 0;
     if (auto* s = dynamic_cast<InitializationStatement*>(node)) return s->type ? s->type->line : 0;

@@ -2,6 +2,8 @@
 
 #include "../ast/literals.h"
 #include "../exception/exception.h"
+#include "../lexer/lexer.h"
+#include "../utf8_converter/utf8_converter.h"
 #include <algorithm>
 #include <iostream>
 #include <ostream>
@@ -370,7 +372,57 @@ shared_ptr<BlockStatement> Parser::parseBlockStatement() {
 }
 
 // 만약 조건 라면:
+//     ...
+// 아니면 만약 조건 라면:     ← else-if 체인 (길이 제한 없음, 마지막 '아니면:'은 선택)
+//     ...
+// 아니면:
+//     ...
+//
+// '아니면 만약 …'은 문법 설탕이다. else 블록 안에 중첩 if 하나만 든 것으로 파싱하므로
+// (then = { IfStatement }) 평가기·컴파일러·타입 검사기·심볼 수집기가 따로 알 필요가 없고,
+// 블록 스코프도 기존 if/else와 같다 — 각 분기 안의 선언은 그 분기 밖에서 보이지 않는다.
+// 체인은 파서에서 반복문으로 펼쳐 만든다 (긴 체인에서도 파서 재귀가 깊어지지 않음).
 shared_ptr<IfStatement> Parser::parseIfStatement() {
+    auto head = parseIfHead();
+    auto tail = head;
+
+    while (current_token != nullptr && current_token->type == TokenType::아니면) {
+        auto elseToken = current_token;
+        setNextToken();
+
+        if (current_token != nullptr && current_token->type == TokenType::만약) {
+            auto elseIf     = parseIfHead();
+            auto elseBlock  = make_shared<BlockStatement>();
+            elseBlock->line = elseIf->line;
+            elseBlock->statements.push_back(elseIf);
+            tail->then = elseBlock;
+            tail       = elseIf;
+            continue;
+        }
+
+        if (current_token == nullptr || current_token->type != TokenType::COLON) {
+            const Token& at = current_token ? *current_token : *elseToken;
+            throw ParseError(
+                "[줄 " + to_string(at.line) + "] '아니면' 뒤에는 ':' 또는 '만약 <조건> 라면:'이 와야 합니다.", at.line,
+                at.column, at.endColumn);
+        }
+        skipToken(TokenType::COLON);
+        skipToken(TokenType::NEW_LINE);
+        tail->then = parseBlockStatement();
+        if (current_token != nullptr && current_token->type == TokenType::아니면) {
+            throw ParseError("[줄 " + to_string(current_token->line)
+                                 + "] '아니면:' 블록 뒤에는 '아니면'이 더 올 수 없습니다. "
+                                   "'아니면 만약 … 라면:' 분기는 마지막 '아니면:'보다 앞에 두세요.",
+                current_token->line, current_token->column, current_token->endColumn);
+        }
+        break;
+    }
+
+    return head;
+}
+
+// '만약 조건 라면:' + 본문 블록. else 부분은 parseIfStatement가 붙인다.
+shared_ptr<IfStatement> Parser::parseIfHead() {
     auto statement = make_shared<IfStatement>();
     statement->line = current_token->line;
     skipToken(TokenType::만약);
@@ -381,14 +433,6 @@ shared_ptr<IfStatement> Parser::parseIfStatement() {
     skipToken(TokenType::NEW_LINE);
 
     statement->consequence = parseBlockStatement();
-
-    if (current_token != nullptr && current_token->type == TokenType::아니면) {
-        skipToken(TokenType::아니면);
-        skipToken(TokenType::COLON);
-        skipToken(TokenType::NEW_LINE);
-        statement->then = parseBlockStatement();
-    }
-
     return statement;
 }
 
@@ -955,12 +999,172 @@ shared_ptr<Expression> Parser::parseBooleanLiteral() {
     return booleanLiteral;
 }
 
+// ── 문자열 보간 ─────────────────────────────────────────────────────────────────────────────
+// 문자열 리터럴 안의 {식}은 파스 시점에 식으로 파싱해 InterpolatedStringLiteral로 만든다 (런타임 재해석 없음).
+// 그래서 보간 안의 오류도 파스 오류(줄 번호 포함)로 나고, 타입 검사기·컴파일러·평가기는 일반 식처럼 다룬다.
+//
+// 규칙 (토큰 텍스트는 렉서가 \n \t \\ \" 이스케이프를 이미 푼 상태):
+//   {식}        임의의 식 — 식별자·인덱싱·멤버 접근·산술·호출·중첩 문자열 등.
+//               식 안의 문자열은 바깥 따옴표와 겹치므로 \" 로 쓴다: "{학생[\"이름\"]}"
+//               값 → 문자열 변환은 출력()과 같은 형식이다.
+//   {{ 와 }}    중괄호 글자 하나씩 ({ , }). 렉서는 \{ \} 도 {{ }} 로 바꿔 주므로 둘 다 쓸 수 있다.
+//               예: "{{\"이름\": 1}}" 또는 "\{\"이름\": 1\}" → {"이름": 1}
+//               사전 리터럴로 시작하는 식은 {{ 와 겹치므로 한 칸 띄운다: "{ {\"k\": 1}[\"k\"] }"
+//   하위 호환   짝이 맞는 '}'가 없는 '{', 짝 없는 '}' 하나, 빈 {} ({ } 포함)는 글자 그대로 둔다
+//               ("{" + 값 + "}" 처럼 나눠 쓰던 코드가 계속 동작).
+//   짝이 맞는 '}'는 중괄호 깊이와 식 안의 "…" 문자열을 고려해 찾는다 ("{f({\"a\": 1})}" 가능).
+namespace {
+    // raw[open]이 '{'일 때 짝이 맞는 '}'의 위치. 없으면 npos.
+    size_t findInterpolationEnd(const string& raw, size_t open) {
+        int depth = 0;
+        for (size_t j = open; j < raw.size(); j++) {
+            const char c = raw[j];
+            if (c == '"') {
+                // 식 안의 중첩 문자열: 닫는 따옴표까지 건너뛴다 (\" 는 문자열 안의 따옴표)
+                for (j++; j < raw.size() && raw[j] != '"'; j++) {
+                    if (raw[j] == '\\') {
+                        j++;
+                    }
+                }
+                if (j >= raw.size()) {
+                    return string::npos;
+                }
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                if (--depth == 0) {
+                    return j;
+                }
+            }
+        }
+        return string::npos;
+    }
+
+    bool isBlankText(const string& s) {
+        return s.find_first_not_of(" \t\r\n") == string::npos;
+    }
+
+    // ParseError 메시지 앞의 "[줄 N] " 접두사를 뗀다 (감싸는 메시지가 줄 번호를 다시 붙이므로).
+    string stripLinePrefix(const string& message) {
+        if (message.rfind("[줄 ", 0) == 0) {
+            auto close = message.find("] ");
+            if (close != string::npos) {
+                return message.substr(close + 2);
+            }
+        }
+        return message;
+    }
+} // namespace
+
 shared_ptr<Expression> Parser::parseStringLiteral() {
-    auto stringLiteral  = make_shared<StringLiteral>();
-    stringLiteral->line  = current_token->line;
-    stringLiteral->token = current_token;
-    stringLiteral->value = current_token->text;
-    return stringLiteral;
+    auto token        = current_token;
+    const string& raw = token->text;
+
+    vector<string> literals;
+    vector<shared_ptr<Expression>> expressions;
+    string current;
+    int innerDepth = 0;
+
+    for (size_t i = 0; i < raw.size();) {
+        const char c = raw[i];
+        if ((c == '{' || c == '}') && i + 1 < raw.size() && raw[i + 1] == c) {
+            current += c; // {{ → {, }} → }
+            i += 2;
+            continue;
+        }
+        if (c == '{') {
+            const size_t close = findInterpolationEnd(raw, i);
+            if (close == string::npos) {
+                current += c;
+                i++;
+                continue;
+            }
+            const string inner = raw.substr(i + 1, close - i - 1);
+            if (isBlankText(inner)) {
+                current += raw.substr(i, close - i + 1);
+            } else {
+                expressions.push_back(parseInterpolationExpression(inner, *token, innerDepth));
+                literals.push_back(std::move(current));
+                current.clear();
+            }
+            i = close + 1;
+            continue;
+        }
+        current += c;
+        i++;
+    }
+    literals.push_back(std::move(current));
+
+    if (expressions.empty()) {
+        auto stringLiteral   = make_shared<StringLiteral>();
+        stringLiteral->line  = token->line;
+        stringLiteral->token = token;
+        stringLiteral->value = std::move(literals.front());
+        return stringLiteral;
+    }
+
+    auto interpolated         = make_shared<InterpolatedStringLiteral>();
+    interpolated->line        = token->line;
+    interpolated->token       = token;
+    interpolated->literals    = std::move(literals);
+    interpolated->expressions = std::move(expressions);
+    // 보간 식의 깊이를 바깥 식 깊이에 더한다 (kMaxExpressionDepth가 보간 안까지 합쳐 적용되도록).
+    nestedExpressionDepth_ = std::max(nestedExpressionDepth_, innerDepth);
+    return interpolated;
+}
+
+// {…} 안의 텍스트를 새 렉서·파서로 식 하나로 파싱한다. 토큰 위치는 바깥 문자열 토큰의 위치로 맞춘다.
+shared_ptr<Expression> Parser::parseInterpolationExpression(
+    const string& text, const Token& stringToken, int& innerDepth) {
+    static const string kBraceHint = " (중괄호를 글자로 쓰려면 {{ 와 }} 또는 \\{ 와 \\}를 쓰세요.)";
+    const auto fail                = [&](const string& reason) -> ParseError {
+        // 중첩 보간의 오류를 다시 감쌀 때는 안내 문구를 한 번만 붙인다
+        const bool hasHint = reason.find(kBraceHint) != string::npos;
+        return ParseError("[줄 " + to_string(stringToken.line) + "] 문자열 보간 {" + text
+                                             + "} 안의 식을 해석할 수 없습니다: " + reason + (hasHint ? "" : kBraceHint),
+                           stringToken.line, stringToken.column, stringToken.endColumn);
+    };
+
+    const size_t first   = text.find_first_not_of(" \t\r\n");
+    const size_t last    = text.find_last_not_of(" \t\r\n");
+    const string trimmed = text.substr(first, last - first + 1);
+
+    Parser sub;
+    try {
+        Lexer lexer;
+        sub.tokens = lexer.Tokenize(Utf8Converter::Convert(trimmed));
+    } catch (const ParseError& e) {
+        throw fail(stripLinePrefix(e.what()));
+    }
+    for (auto& t : sub.tokens) {
+        t->line      = stringToken.line;
+        t->column    = stringToken.column;
+        t->endColumn = stringToken.endColumn;
+    }
+    if (sub.tokens.empty()) {
+        throw fail("식이 비어 있습니다.");
+    }
+    // 파서는 문장 끝 NEW_LINE이 있다고 가정한다 (식이 덜 끝났을 때 nullptr 토큰을 보지 않도록).
+    sub.tokens.push_back(make_shared<Token>(
+        Token{TokenType::NEW_LINE, "\n", stringToken.line, stringToken.column, stringToken.endColumn}));
+
+    shared_ptr<Expression> expression;
+    try {
+        sub.initialization();
+        sub.expressionNesting_ = expressionNesting_; // 재귀 한도는 바깥과 합쳐 센다
+        expression             = sub.parseExpression(Precedence::LOWEST);
+        sub.setNextToken();
+    } catch (const ExpressionTooDeepException&) {
+        throw;
+    } catch (const ParseError& e) {
+        throw fail(stripLinePrefix(e.what()));
+    }
+    if (sub.current_token != nullptr && sub.current_token->type != TokenType::NEW_LINE
+        && sub.current_token->type != TokenType::END_OF_FILE) {
+        throw fail("식 뒤에 예상하지 못한 토큰 '" + sub.current_token->text + "'이(가) 있습니다.");
+    }
+    innerDepth = std::max(innerDepth, sub.nestedExpressionDepth_);
+    return expression;
 }
 
 shared_ptr<Expression> Parser::parseArrayLiteral() {
