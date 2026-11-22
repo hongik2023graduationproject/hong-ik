@@ -33,28 +33,13 @@ git clone https://github.com/<your-fork>/hong-ik.git
 cd hong-ik
 ```
 
-### 빌드 확인
-
-클론 후 아래 명령어로 빌드가 정상적으로 되는지 확인해주세요:
-
-```bash
-cmake -B build
-cmake --build build
-```
-
 ---
 
 ## 빌드 및 테스트 (Build & Test)
 
 ### 빌드
 
-```bash
-# 빌드 디렉토리 생성 및 설정
-cmake -B build
-
-# 빌드 실행
-cmake --build build
-```
+빌드와 실행 명령은 [README의 시작하기](README.md#시작하기)에 있습니다. WASM 빌드는 `scripts/build-wasm.sh`(Emscripten 필요)로 합니다.
 
 ### 테스트 실행
 
@@ -69,22 +54,6 @@ build/HongIkTests --gtest_filter="LexerTest.*"
 ```
 
 **PR을 제출하기 전에 반드시 모든 테스트가 통과하는지 확인해주세요.** CI에서 Windows, Linux, macOS 세 플랫폼 모두 빌드 및 테스트를 수행합니다.
-
-### 인터프리터 실행
-
-```bash
-# 파일 실행 (기본: 바이트코드 VM)
-./build/HongIk filename.hik
-
-# REPL 모드
-./build/HongIk
-
-# 트리워킹 인터프리터로 실행 (--vm은 호환용 no-op)
-./build/HongIk --eval filename.hik
-
-# 정적 타입 검사 모드 (off|warn|strict, 기본 warn)
-./build/HongIk --type-check=strict filename.hik
-```
 
 ---
 
@@ -184,34 +153,7 @@ docs: README에 바이트코드 VM 설명 추가
 
 ## 프로젝트 구조 (Project Structure)
 
-```
-hong-ik/
-├── lexer/            # 소스코드 → 토큰 변환
-├── token/            # 토큰 타입 정의
-├── parser/           # 토큰 → AST 변환
-├── ast/              # AST 노드 정의
-├── analyzer/         # 신택스 하이라이팅, 심볼 수집, 정적 타입 검사기
-├── vm/               # 바이트코드 컴파일러(compiler*.cpp) + 피홀 최적화 + 가상 머신 (기본 백엔드)
-├── evaluator/        # AST 순회 및 실행 (--eval)
-├── environment/      # 변수/스코프 관리
-├── object/           # 런타임 객체 및 내장 함수
-├── error/            # 구조화된 에러 타입(HongIkError, 위치 정보)
-├── exception/        # 예외 정의
-├── io/               # 콜백 기반 I/O 인터페이스(IOContext: 콘솔/웹)
-├── sandbox/          # 실행 시간·루프 반복 제한(ExecutionLimiter)
-├── util/             # 공용 유틸(오버플로 검사 정수 연산, 정적 타입 모델, JSON, UTF-8)
-├── utf8_converter/   # UTF-8 인코딩 처리
-├── repl/             # REPL 및 파일 실행
-├── lsp/              # Language Server(hongik-lsp) 구현
-├── web/              # WASM(Emscripten) 바인딩과 인메모리 파일시스템
-├── vscode-extension/ # VSCode 확장 (문법 하이라이팅, 스니펫, LSP 클라이언트)
-├── benchmarks/       # Google Benchmark 벤치마크 스위트(HongIkBenchmarks)
-├── scripts/          # 빌드 스크립트 (build-wasm.sh)
-├── docs/             # 설계 문서·벤치마크 결과
-└── tests/            # Google Test 단위 테스트
-```
-
-기본 파이프라인은 `소스코드 → Lexer → Parser → Compiler → VM → 결과`입니다. `--eval`을 주면 `소스코드 → Lexer → Parser → Evaluator → 결과`(트리워킹)로 실행합니다.
+디렉터리 구성과 실행 파이프라인은 [ARCHITECTURE.md](ARCHITECTURE.md)에 있습니다.
 
 ---
 

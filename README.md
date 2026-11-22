@@ -1,49 +1,50 @@
-# hong-ik: 한글 프로그래밍 언어 프로젝트
+# hong-ik
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![C++26](https://img.shields.io/badge/C%2B%2B-26-00599C.svg?logo=cplusplus)](https://isocpp.org/)
-[![Tests](https://img.shields.io/badge/tests-GoogleTest%20%2B%20CTest-brightgreen.svg)](#테스트)
+> 한글 키워드로 쓰는 프로그래밍 언어
 
-📖 **문서**: [기여 가이드](./CONTRIBUTING.md) · [보안 정책](./SECURITY.md) · [변경 이력](./CHANGELOG.md) · [라이선스](./LICENSE)
+C++26 · CMake · 바이트코드 VM · Google Test · WebAssembly
 
-## 소개
+## 기능
 
-**hong-ik**은 한글을 기반으로 설계된 자체 프로그래밍 언어 프로젝트입니다. C++로 작성되었으며 바이트코드 VM(기본)과 트리워킹 인터프리터(`--eval`)를 모두 지원합니다.
+- 한글 키워드 문법과 선언 타입 검사(Optional 타입 포함)
+- 바이트코드 VM(기본)과 트리워킹 인터프리터(`--eval`) 두 실행 방식
+- 실행 전 정적 타입 검사(off, warn, strict)
+- 파일 실행과 REPL
+- 클래스와 상속, 제너레이터, 예외 처리, 모듈 가져오기
+- 문자열·수학·배열·파일·JSON 내장 함수
+- Language Server(`hongik-lsp`)와 VSCode 확장: 진단, 호버, 자동완성, 정의로 이동, 문서 심볼
+- Emscripten WASM 빌드
 
-## 설치 및 실행 방법
+## 시작하기
 
-### 필요한 환경
-- C++26을 지원하는 최신 컴파일러 (네이티브 빌드는 `CMAKE_CXX_STANDARD 26`)
-- [CMake](https://cmake.org/) 3.28 이상
-- (선택) WASM 빌드: [Emscripten](https://emscripten.org/) — WASM 타깃은 C++20으로 컴파일됩니다 (`scripts/build-wasm.sh`)
+C++26을 지원하는 컴파일러와 CMake 3.28 이상이 필요합니다.
 
-### 빌드
 ```bash
-cmake -B cmake-build-debug
-cmake --build cmake-build-debug
+git clone https://github.com/hongik2023graduationproject/hong-ik.git
+cd hong-ik
+cmake -B build
+cmake --build build
 ```
 
-### 테스트
 ```bash
-ctest --test-dir cmake-build-debug
+./build/HongIk filename.hik                      # 파일 실행(바이트코드 VM)
+./build/HongIk                                   # REPL
+./build/HongIk --eval filename.hik               # 트리워킹 인터프리터로 실행
+./build/HongIk --type-check=strict filename.hik  # 정적 타입 검사 모드(off|warn|strict, 기본 warn)
 ```
 
-### 프로그램 실행
+`--type-check=warn`(기본)은 실행 전에 찾은 타입 오류를 `type-warning[...]`으로 출력하고 그대로 실행합니다. `strict`는 `type-error[...]`로 출력하고 실행하지 않으며, `off`는 검사를 건너뜁니다. `--vm` 플래그는 호환성을 위해 남아 있고 효과는 없습니다.
+
+### 에디터 연결
+
 ```bash
-# 파일 실행 (기본: 바이트코드 VM)
-./cmake-build-debug/HongIk filename.hik
-
-# REPL 모드
-./cmake-build-debug/HongIk
-
-# 트리워킹 인터프리터로 실행
-./cmake-build-debug/HongIk --eval filename.hik
-
-# 정적 타입 검사 모드 (off|warn|strict, 기본 warn)
-./cmake-build-debug/HongIk --type-check=strict filename.hik
+cmake --build build --target hongik-lsp
+cd vscode-extension
+npm install
+npm run compile
 ```
 
-`--type-check=warn`(기본)은 실행 전에 찾은 타입 오류를 `type-warning[...]`으로 출력하고 그대로 실행합니다. `strict`는 `type-error[...]`로 출력하고 실행하지 않으며, `off`는 검사를 건너뜁니다.
+VSCode의 `hongik.lsp.path` 설정에 빌드된 `hongik-lsp(.exe)`의 절대 경로를 지정하면 확장이 서버를 실행합니다. 비어 있으면 PATH에서 `hongik-lsp`를 찾습니다. 검증 절차는 [vscode-extension/DEVELOPMENT.md](vscode-extension/DEVELOPMENT.md)에 있습니다.
 
 ## 언어 문법
 
@@ -57,7 +58,7 @@ ctest --test-dir cmake-build-debug
 사전 정보 = {"이름": "홍길동", "나이": "25"}
 ```
 
-선언한 타입과 값의 타입이 맞아야 합니다 (암묵 승격 없음 — `실수 r = 1`은 에러, `실수 r = 1.0`을 사용).
+선언한 타입과 값의 타입이 맞아야 합니다 (암묵 승격 없음. `실수 r = 1`은 에러, `실수 r = 1.0`을 사용).
 
 ### Null 타입과 Optional
 `없음`은 null 값입니다. 일반 타입 변수에는 `없음`을 넣을 수 없고, 타입 뒤에 `?`를 붙인 Optional 타입만 `없음`을 가질 수 있습니다.
@@ -291,7 +292,7 @@ true || false    // true
 
 ## 내장 함수 (45개 + 고차 함수 3개)
 
-일반 내장 함수 45개(`object/builtin_registry.cpp`)와, 인터프리터가 별도로 처리하는 고차 함수 3개(`매핑`, `걸러내기`, `줄이기` — 현재 `--eval` 전용)가 있습니다. 레지스트리에는 `반복`(문자열 반복)도 등록되어 있지만 `반복`이 반복문 키워드라서 호출할 수 없으므로 개수에서 뺐습니다.
+일반 내장 함수 45개(`object/builtin_registry.cpp`)와, 인터프리터가 별도로 처리하는 고차 함수 3개(`매핑`, `걸러내기`, `줄이기`, 현재 `--eval` 전용)가 있습니다. 레지스트리에는 `반복`(문자열 반복)도 등록되어 있지만 `반복`이 반복문 키워드라서 호출할 수 없으므로 개수에서 뺐습니다.
 
 | 함수 | 설명 | 예시 |
 |------|------|------|
@@ -344,45 +345,20 @@ true || false    // true
 | `JSON_파싱(문자열)` | JSON 파싱 | `JSON_파싱("[1, 2]")` -> [1, 2] |
 | `JSON_직렬화(값)` | JSON 직렬화 | `JSON_직렬화({"a": 1})` -> "{\"a\":1}" |
 
-## 바이트코드 VM
+## 문서
 
-바이트코드 VM이 **기본 실행 백엔드**입니다. 트리워킹 인터프리터로 실행하려면 `--eval` 플래그를 사용합니다. `--vm` 플래그는 호환성을 위해 남아 있지만 아무 효과가 없습니다.
+| 문서 | 내용 |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | 실행 파이프라인과 디렉터리 구성 |
+| [README_EN.md](README_EN.md) | 영문 README |
+| [CHANGELOG.md](CHANGELOG.md) | 변경 이력 |
+| [SECURITY.md](SECURITY.md) | 보안 정책 |
+| [benchmarks/README.md](benchmarks/README.md) | 벤치마크 스위트 |
 
-```bash
-./cmake-build-debug/HongIk filename.hik          # VM (기본)
-./cmake-build-debug/HongIk --eval filename.hik   # 트리워킹 인터프리터
-```
+## 기여
 
-VM은 소스코드를 바이트코드로 컴파일한 후 스택 기반 가상 머신에서 실행합니다. 기본 연산, 변수, 함수, 클래스, 예외 처리 등 대부분의 기능을 지원합니다. 고차 함수(`매핑`/`걸러내기`/`줄이기`)와 `부모` 호출은 현재 `--eval`에서만 동작합니다.
+빌드·테스트, 코드 스타일, 커밋·PR 규칙은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있습니다.
 
-## 에디터 지원 (LSP)
+## 라이선스
 
-`hongik-lsp`는 표준 입출력(stdio) 기반 JSON-RPC로 통신하는 Language Server입니다. 진단(문법/타입 에러), 호버, 자동완성, 정의로 이동, 문서 심볼(아웃라인)을 지원합니다.
-
-### 빌드
-```bash
-cmake --build cmake-build-debug --target hongik-lsp
-```
-
-### VSCode 확장
-```bash
-cd vscode-extension
-npm install
-npm run compile
-```
-
-VSCode에서 `hongik.lsp.path` 설정에 빌드된 `hongik-lsp(.exe)`의 절대 경로를 지정하면 확장이 서버를 실행합니다. 비어 있으면 PATH에서 `hongik-lsp`를 찾습니다. 자세한 검증 절차는 [`vscode-extension/DEVELOPMENT.md`](./vscode-extension/DEVELOPMENT.md)를 참고하세요.
-
-## 아키텍처
-
-```
-소스코드(한글) -> Lexer -> Parser -> Compiler -> VM -> 결과        (기본)
-                  |         |          |          |
-               Tokens     AST     Bytecode     Stack
-
-             또는 (--eval)
-
-소스코드(한글) -> Lexer -> Parser -> Evaluator -> 결과
-                  |         |          |
-               Tokens     AST    Environment
-```
+MIT 라이선스입니다. [LICENSE](LICENSE)를 봅니다.
