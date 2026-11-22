@@ -33,7 +33,7 @@ VM은 소스코드를 바이트코드로 컴파일한 뒤 스택 기반 가상 �
 | `exception/` | 예외 정의 |
 | `io/` | 콜백 기반 I/O 인터페이스(IOContext: 콘솔, 웹) |
 | `sandbox/` | 실행 시간과 루프 반복 제한(ExecutionLimiter) |
-| `util/` | 공용 유틸(넘침 검사 정수 연산, 정적 타입 모델, JSON, UTF-8) |
+| `util/` | 공용 유틸(넘침 검사 정수 연산, 사용자 파일 경로 검사, 슬라이스 경계, 정적 타입 모델, JSON, UTF-8) |
 | `utf8_converter/` | UTF-8 인코딩 처리 |
 | `repl/` | REPL과 파일 실행 |
 | `lsp/` | Language Server(`hongik-lsp` 타깃) |
