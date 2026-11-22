@@ -8,10 +8,7 @@
 
 보안 취약점을 발견하셨다면 **공개 이슈로 등록하지 말아 주세요**.
 
-다음 방법 중 하나로 비공개 채널을 통해 알려주세요:
-
-1. **GitHub Security Advisory (권장)** — 저장소의 `Security` 탭 → `Report a vulnerability`
-2. **이메일** — hong-ik 메인테이너에게 직접 (저장소 README의 연락처 또는 커밋 작성자 이메일)
+GitHub의 비공개 보안 제보로 알려주세요. 저장소의 [Security 탭](https://github.com/hongik2023graduationproject/hong-ik/security)에서 `Report a vulnerability`를 누릅니다.
 
 ## 신고 시 포함하면 도움 되는 정보
 
