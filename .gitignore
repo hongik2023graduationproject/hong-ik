@@ -1,12 +1,11 @@
 cmake-build-debug
-.idea
 .devcontainer
-.vscode
 build
 build-wasm
 cmake-build-*/
 build-*/
 wasm-dist/
 dist/
-.DS_Store
-Thumbs.db
+
+# superpowers 로컬 데이터
+.superpowers/
