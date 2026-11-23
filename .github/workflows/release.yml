@@ -1,4 +1,4 @@
-name: WASM Publish
+name: release
 
 # WASM 산출물을 emscripten으로 빌드해서 두 방식으로 배포한다:
 #   - main push  →  rolling GitHub Release `wasm-latest` (소비자가 안정 URL로 fetch)
@@ -16,20 +16,20 @@ on:
       - '**/*.cpp'
       - '**/*.h'
       - 'CMakeLists.txt'
-      - '.github/workflows/wasm-publish.yml'
+      - '.github/workflows/release.yml'
   pull_request:
     branches: [main]
     paths:
       - '**/*.cpp'
       - '**/*.h'
       - 'CMakeLists.txt'
-      - '.github/workflows/wasm-publish.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
     # 수동 트리거 — 빌드 검증이나 강제 재배포가 필요할 때.
 
 # 동일 브랜치에서 연속 푸시 시 진행 중인 빌드를 취소. 마지막 커밋 기준 산출물만 release에 남는다.
 concurrency:
-  group: wasm-publish-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
